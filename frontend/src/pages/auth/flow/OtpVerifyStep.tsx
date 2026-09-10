@@ -1,0 +1,401 @@
+import React, { useState, useEffect, useRef } from 'react'
+import Icon from '../../../components/Icon'
+import type { LanguageCode } from '../../../types/common.types'
+import { getAuthTranslation } from '../../../utils/translations'
+
+interface Props {
+  language: LanguageCode
+  phone: string
+  devOtp?: string
+  onVerifyOtp: (otp: string) => Promise<{ success: boolean; isExistingUser?: boolean; isProfileComplete?: boolean; message?: string }>
+  onResendOtp: () => Promise<{ success: boolean; message: string; devOtp?: string }>
+  onSuccess: (isExistingUser: boolean, isProfileComplete: boolean) => void
+  onBack: () => void
+}
+
+export default function OtpVerifyStep({
+  language,
+  phone,
+  devOtp,
+  onVerifyOtp,
+  onResendOtp,
+  onSuccess,
+  onBack,
+}: Props) {
+  const t = getAuthTranslation(language)
+  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', ''])
+  const [timer, setTimer] = useState(30)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+  const [currentDevOtp, setCurrentDevOtp] = useState(devOtp)
+
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Format masked phone number (+91 98*** **210)
+  const clean = phone.replace(/\D/g, '').slice(-10)
+  const maskedPhone = `+91 ${clean.slice(0, 2)}*** **${clean.slice(-2)}`
+
+  // Auto-focus the first box on mount
+  useEffect(() => {
+    inputRefs.current[0]?.focus()
+  }, [])
+
+  // 30s Countdown timer
+  useEffect(() => {
+    if (timer <= 0) return
+    const interval = setInterval(() => {
+      setTimer((prev) => prev - 1)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [timer])
+
+  // Automatically trigger verification when all 6 digits are entered
+  const triggerVerify = async (code: string) => {
+    if (code.length !== 6 || loading || success) return
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await onVerifyOtp(code)
+      if (res.success) {
+        setSuccess(true)
+        setTimeout(() => {
+          onSuccess(Boolean(res.isExistingUser), Boolean(res.isProfileComplete))
+        }, 500)
+      } else {
+        setError(res.message || t.otpInvalidError)
+        setLoading(false)
+      }
+    } catch (err: any) {
+      setError(err.message || t.otpInvalidError)
+      setLoading(false)
+    }
+  }
+
+  const handleChange = (index: number, value: string) => {
+    // Only accept numeric input
+    const cleanVal = value.replace(/\D/g, '')
+    if (!cleanVal && value !== '') return
+
+    const newOtp = [...otp]
+    newOtp[index] = cleanVal.slice(-1) // Take the last digit
+    setOtp(newOtp)
+    if (error) setError('')
+
+    // Move to next box if digit was typed
+    if (cleanVal && index < 5) {
+      inputRefs.current[index + 1]?.focus()
+    }
+
+    // Check if complete
+    const fullCode = newOtp.join('')
+    if (fullCode.length === 6) {
+      triggerVerify(fullCode)
+    }
+  }
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (!otp[index] && index > 0) {
+        // Move backward if current is already empty
+        inputRefs.current[index - 1]?.focus()
+      } else {
+        const newOtp = [...otp]
+        newOtp[index] = ''
+        setOtp(newOtp)
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      inputRefs.current[index - 1]?.focus()
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      inputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+
+    const newOtp = ['', '', '', '', '', '']
+    for (let i = 0; i < pasted.length; i++) {
+      newOtp[i] = pasted[i]
+    }
+    setOtp(newOtp)
+
+    // Focus on the next empty or last input
+    const nextIdx = Math.min(pasted.length, 5)
+    inputRefs.current[nextIdx]?.focus()
+
+    if (pasted.length === 6) {
+      triggerVerify(pasted)
+    }
+  }
+
+  const handleResend = async () => {
+    if (timer > 0 || loading) return
+
+    setLoading(true)
+    setError('')
+    try {
+      const res = await onResendOtp()
+      if (res.success) {
+        setTimer(30)
+        if (res.devOtp) setCurrentDevOtp(res.devOtp)
+        setOtp(['', '', '', '', '', ''])
+        inputRefs.current[0]?.focus()
+      } else {
+        setError(res.message || 'Failed to resend OTP.')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend OTP.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatTimer = (sec: number) => {
+    const s = sec < 10 ? `0${sec}` : `${sec}`
+    return `00:${s}`
+  }
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100%',
+        padding: '24px 20px',
+        color: 'var(--text-primary)',
+      }}
+    >
+      {/* Top Header */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28, gap: 12 }}>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-primary)',
+            width: 38,
+            height: 38,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <Icon name="arrow-left" size={18} color="var(--accent)" />
+        </button>
+        <div>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+            {t.enterOtp}
+          </h1>
+          <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+            {t.otpSentTo} <strong style={{ color: '#10b981' }}>{maskedPhone}</strong>
+          </p>
+        </div>
+      </div>
+
+      {/* Dev OTP Helper */}
+      {currentDevOtp && (
+        <div
+          onClick={() => {
+            const digits = currentDevOtp.split('')
+            setOtp(digits)
+            triggerVerify(currentDevOtp)
+          }}
+          style={{
+            background: 'rgba(16,185,129,0.12)',
+            border: '1px solid #10b981',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            marginBottom: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{ fontSize: '0.82rem', color: '#a7f3d0' }}>
+            <span>Dev OTP: </span>
+            <strong style={{ letterSpacing: '2px', color: '#fff', fontSize: '0.95rem' }}>{currentDevOtp}</strong>
+          </div>
+          <span style={{ fontSize: '0.75rem', color: '#10b981', textDecoration: 'underline', fontWeight: 700 }}>
+            Auto-fill
+          </span>
+        </div>
+      )}
+
+      {/* 6 OTP Boxes Container */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(6, 1fr)',
+          gap: 8,
+          marginBottom: 16,
+        }}
+      >
+        {otp.map((digit, idx) => {
+          const isFilled = Boolean(digit)
+
+          return (
+            <input
+              key={idx}
+              ref={(el) => { inputRefs.current[idx] = el }}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete={idx === 0 ? 'one-time-code' : 'off'}
+              maxLength={1}
+              value={digit}
+              onChange={(e) => handleChange(idx, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(idx, e)}
+              onPaste={idx === 0 ? handlePaste : undefined}
+              disabled={loading || success}
+              style={{
+                height: 56,
+                borderRadius: '14px',
+                border: error
+                  ? '2px solid #ef4444'
+                  : isFilled
+                  ? '2px solid #10b981'
+                  : '1.5px solid var(--border-color)',
+                background: isFilled ? 'var(--accent-light)' : 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                fontSize: '1.4rem',
+                fontWeight: 800,
+                textAlign: 'center',
+                outline: 'none',
+                transition: 'all 0.18s ease',
+                boxShadow: isFilled ? '0 0 10px rgba(16,185,129,0.2)' : 'none',
+              }}
+            />
+          )
+        })}
+      </div>
+
+      {/* Field-level error */}
+      {error && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginBottom: 16,
+            fontSize: '0.82rem',
+            color: '#ef4444',
+          }}
+        >
+          <Icon name="alert" size={14} color="#ef4444" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Success indicator */}
+      {success && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 16,
+            fontSize: '0.86rem',
+            color: '#34d399',
+            fontWeight: 700,
+          }}
+        >
+          <Icon name="check" size={16} color="#34d399" />
+          <span>{t.otpSuccess}</span>
+        </div>
+      )}
+
+      {/* Verifying Spinner */}
+      {loading && !success && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            margin: '12px 0',
+            color: '#a7f3d0',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+          }}
+        >
+          <div
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              border: '2px solid #10b981',
+              borderTopColor: 'transparent',
+              animation: 'spin 0.8s linear infinite',
+            }}
+          />
+          <span>{t.verifying}</span>
+        </div>
+      )}
+
+      {/* Timer & Resend Controls */}
+      <div
+        style={{
+          marginTop: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        {timer > 0 ? (
+          <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+            <span>{t.resendIn} </span>
+            <strong style={{ color: '#10b981', fontWeight: 800 }}>{formatTimer(timer)}</strong>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>{t.didntReceive}</span>
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={loading}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#10b981',
+                fontWeight: 800,
+                fontSize: '0.84rem',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              {t.resendOtp}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Change Phone option */}
+      <div style={{ textAlign: 'center', marginTop: 'auto', paddingTop: 28 }}>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-tertiary)',
+            fontSize: '0.82rem',
+            cursor: 'pointer',
+            textDecoration: 'underline',
+          }}
+        >
+          Wrong mobile number? Edit number
+        </button>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment and Secret files
+.env
+.env.*
+*.env
+*.local
+!.env.example
+!**/.env.example
+**/.env
+**/.env.*
+**/*.env
+**/*.local
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa*
+*.secret
+
+# Production builds
+dist/
+*/dist/
+build/
+*/build/
+
+# Flutter & Dart artifacts
+.dart_tool/
+*/.dart_tool/
+.packages
+.pub-cache/
+.pub/
+
+# OS & Editor & Logs
+.DS_Store
+Thumbs.db
+*.log
+logs/
+.vscode/
+.idea/
+.gemini/
+.agents/
+implement

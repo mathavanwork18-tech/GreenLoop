@@ -1,0 +1,26 @@
+{
+  "app": {
+    "name": "Green Loop",
+    "tagline": "India's Premier Circular E-Waste Ecosystem"
+  },
+  "nav": {
+    "home": "Home",
+    "map": "Eco Map",
+    "post": "Post E-Waste",
+    "activity": "Activity",
+    "account": "Account"
+  },
+  "home": {
+    "heroTitle": "Circular Tech, Zero Landfill",
+    "searchPlaceholder": "Search devices, scrap, recyclers, or parts...",
+    "exploreFeed": "Eco-Waste Marketplace & Reuse Feed"
+  },
+  "common": {
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "coins": "Green Coins"
+  }
+}

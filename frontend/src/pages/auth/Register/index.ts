@@ -1,0 +1,5 @@
+export { default as RegisterPage } from './RegisterPage'
+export { default as RegisterHeader } from './RegisterHeader'
+export { default as RoleSelector } from './RoleSelector'
+export { default as RegisterForm } from './RegisterForm'
+export { default } from './RegisterPage'

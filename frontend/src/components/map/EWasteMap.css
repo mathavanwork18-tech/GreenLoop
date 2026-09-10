@@ -1,0 +1,493 @@
+/* ==========================================================================
+   GREEN LOOP — SMART E-WASTE MAP (CLEAN CONTROLLED OVERLAY LAYOUT)
+   ========================================================================== */
+
+.smart-map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  box-sizing: border-box;
+}
+
+/* Background Full Canvas */
+.smart-map-canvas {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* ==========================================================================
+   1. MAP OVERLAY CONTAINER (SINGLE VERTICAL FLOW LAYOUT)
+   ========================================================================== */
+
+.map-overlay {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.map-overlay > * {
+  pointer-events: auto;
+}
+
+/* Search Bar Row */
+.map-search-bar {
+  width: 100%;
+  max-width: 560px;
+  height: 48px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: var(--radius-full);
+  padding: 0 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: all 0.2s ease;
+}
+
+[data-theme='dark'] .map-search-bar {
+  background: rgba(13, 31, 23, 0.92);
+  border-color: rgba(52, 211, 153, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.map-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+}
+
+.map-search-input::placeholder {
+  color: var(--text-tertiary);
+  font-weight: 450;
+}
+
+/* Filter Row (Horizontal Scrolling without Wrapping or Colliding) */
+.map-filter-row {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 2px 2px;
+  box-sizing: border-box;
+}
+
+.map-filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+.map-filter-chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-full);
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+[data-theme='dark'] .map-filter-chip {
+  background: rgba(13, 31, 23, 0.88);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.map-filter-chip:hover {
+  border-color: var(--accent);
+}
+
+.map-filter-chip.active {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff;
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+}
+
+/* Compact Radius Dropdown */
+.map-radius-control {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.map-radius-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-full);
+  padding: 6px 13px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='dark'] .map-radius-btn {
+  background: rgba(13, 31, 23, 0.9);
+  color: #34d399;
+  border-color: #34d399;
+}
+
+.map-radius-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 105px;
+  z-index: 600;
+  backdrop-filter: blur(16px);
+}
+
+.map-radius-option {
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.map-radius-option:hover {
+  background: var(--accent-light);
+  color: var(--accent-text);
+}
+
+.map-radius-option.selected {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* Location Status (Small, Compact, Fit-Content) */
+.map-location-status {
+  width: fit-content;
+  max-width: 95%;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='dark'] .map-location-status {
+  background: rgba(13, 31, 23, 0.88);
+  color: #a7f3d0;
+}
+
+/* ==========================================================================
+   2. MINIMAL FLOATING MAP CONTROLS (RIGHT SIDE)
+   ========================================================================== */
+
+.map-floating-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 24px;
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.map-control-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(12px);
+  transition: all 0.15s ease;
+}
+
+[data-theme='dark'] .map-control-btn {
+  background: rgba(13, 31, 23, 0.9);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.map-control-btn:hover {
+  transform: scale(1.08);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.map-nearme-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #ffffff !important;
+  border-color: #10b981;
+}
+
+/* ==========================================================================
+   3. COMPACT PINS & CLUSTER ICONS
+   ========================================================================== */
+
+.gl-compact-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.gl-compact-pin:hover,
+.gl-compact-pin.selected {
+  transform: scale(1.2);
+  z-index: 300 !important;
+}
+
+.gl-pin-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  color: #ffffff;
+}
+
+.gl-pin-arrow {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 6px solid #10b981;
+  margin-top: -2px;
+}
+
+.pin-item .gl-pin-badge { background: #f59e0b; }
+.pin-item .gl-pin-arrow { border-top-color: #f59e0b; }
+
+.pin-parts .gl-pin-badge { background: #8b5cf6; }
+.pin-parts .gl-pin-arrow { border-top-color: #8b5cf6; }
+
+.pin-shop .gl-pin-badge { background: #3b82f6; }
+.pin-shop .gl-pin-arrow { border-top-color: #3b82f6; }
+
+.pin-recycler .gl-pin-badge { background: #10b981; }
+.pin-recycler .gl-pin-arrow { border-top-color: #10b981; }
+
+.gl-cluster-pin {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gl-cluster-badge {
+  border-radius: 50%;
+  background: linear-gradient(135deg, #059669, #10b981);
+  border: 2.5px solid #ffffff;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5);
+  transition: transform 0.2s ease;
+}
+
+.gl-cluster-badge:hover {
+  transform: scale(1.15);
+}
+
+.gl-cluster-count {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.gl-cluster-eco {
+  font-size: 10px;
+}
+
+/* User Location Pin */
+.gl-user-pin {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gl-user-pulse {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.25);
+  animation: glPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.gl-user-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
+  z-index: 2;
+}
+
+@keyframes glPulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* ==========================================================================
+   4. SELECTED ITEM BOTTOM CARD (ONLY SHOWN ON MARKER CLICK)
+   ========================================================================== */
+
+.map-item-card {
+  position: absolute;
+  bottom: 18px;
+  left: 16px;
+  right: 16px;
+  max-width: 440px;
+  z-index: 400;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-xl);
+  padding: 14px;
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme='dark'] .map-item-card {
+  background: rgba(13, 31, 23, 0.95);
+  border-color: rgba(52, 211, 153, 0.5);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 600px) {
+  .smart-map-container {
+    height: 100%;
+    border-radius: 0;
+    border: none;
+  }
+  .map-overlay {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    gap: 6px;
+  }
+  .map-search-bar {
+    height: 44px;
+    padding: 0 12px;
+  }
+  .map-filter-row {
+    gap: 6px;
+  }
+  .map-filter-chip {
+    padding: 5px 11px;
+    font-size: 0.72rem;
+  }
+  .map-radius-btn {
+    padding: 5px 10px;
+    font-size: 0.72rem;
+  }
+  .map-location-status {
+    font-size: 0.68rem;
+    padding: 3px 10px;
+  }
+  .map-floating-controls {
+    right: 10px;
+    bottom: 14px;
+  }
+  .map-item-card {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    padding: 12px;
+  }
+}

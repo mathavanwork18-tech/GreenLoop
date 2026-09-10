@@ -1,0 +1,102 @@
+2. Map component create pannu
+src/
+├── components/
+│   └── map/
+│       ├── EWasteMap.jsx
+│       └── EWasteMap.css
+3. EWasteMap.jsx
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+
+function EWasteMap() {
+  const coimbatore = [11.0168, 76.9558];
+
+  return (
+    <MapContainer
+      center={coimbatore}
+      zoom={13}
+      style={{ height: "600px", width: "100%" }}
+    >
+      <TileLayer
+        attribution='&copy; OpenStreetMap contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      <Marker position={coimbatore}>
+        <Popup>
+          <strong>E-Waste Collection Point</strong>
+          <br />
+          Coimbatore
+        </Popup>
+      </Marker>
+    </MapContainer>
+  );
+}
+
+export default EWasteMap;
+4. App-la display pannu
+
+For example App.jsx:
+
+import EWasteMap from "./components/map/EWasteMap";
+
+function App() {
+  return (
+    <div>
+      <h1>E-Waste Map</h1>
+      <EWasteMap />
+    </div>
+  );
+}
+
+export default App;
+5. Run pannu
+npm run dev
+
+Browser-la open pannina interactive map varum.
+
+♻️ But un project-ku இதுவே final இல்லை
+
+Basic map vandha apram namma E-Waste specific UI/UX build pannuvom:
+
+                 🔍 Search e-waste...
+┌──────────────────────────────────────────┐
+│ [All] [Items] [Parts] [Shops] [Centers] │
+│                                          │
+│             📦                           │
+│                    📱                    │
+│         ♻️              📍 You           │
+│                         🏪               │
+│                    🔧                    │
+│                                          │
+│ ┌──────────────────────────────────────┐ │
+│ │ 💻 Dell Laptop                      │ │
+│ │ Used • 2.1 km away                  │ │
+│ │ ₹2,500                    View →     │ │
+│ └──────────────────────────────────────┘ │
+└──────────────────────────────────────────┘
+🔥 Next level architecture
+
+User item post pannumbothu:
+
+Post "Old Laptop"
+       ↓
+Get Location
+       ↓
+latitude + longitude
+       ↓
+MongoDB
+       ↓
+Map fetch
+       ↓
+📦 Marker automatically appears
+
+Delete pannina:
+
+Delete Item
+     ↓
+MongoDB
+     ↓
+Map refresh
+     ↓
+📦 Marker disappears

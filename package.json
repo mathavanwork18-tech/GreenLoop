@@ -1,0 +1,30 @@
+{
+  "name": "ecocircuit-greenloop-fullstack",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "EcoCircuit / Green Loop — AI-Enhanced Circular E-Waste Platform (Complete Fullstack)",
+  "scripts": {
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "start:backend": "npm start --prefix backend",
+    "build": "npm run build --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend",
+    "seed": "npm run seed --prefix backend",
+    "auto-sync": "node scripts/auto-git-sync.js",
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend"
+  },
+  "keywords": [
+    "e-waste",
+    "sustainability",
+    "react",
+    "express",
+    "mongodb",
+    "flutter",
+    "marketplace"
+  ],
+  "dependencies": {
+    "concurrently": "^9.2.4",
+    "mongodb": "^7.6.0"
+  }
+}
