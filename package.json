@@ -8,8 +8,8 @@
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
     "start:backend": "npm start --prefix backend",
-    "build": "npm run build --prefix frontend",
-    "build:frontend": "npm run build --prefix frontend",
+    "build": "npm --prefix frontend install && npm run build --prefix frontend",
+    "build:frontend": "npm --prefix frontend install && npm run build --prefix frontend",
     "seed": "npm run seed --prefix backend",
     "auto-sync": "node scripts/auto-git-sync.js",
     "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend"
