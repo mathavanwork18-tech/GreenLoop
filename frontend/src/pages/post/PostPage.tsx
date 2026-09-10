@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { postsApi } from '../../services/posts/posts.api'
+import { aiApi } from '../../services/ai/ai.api'
 import LiveCameraView from './components/Camera/LiveCameraView'
 import DevicePresets from './components/Camera/DevicePresets'
 import type { PresetDevice } from './components/Camera/DevicePresets'
+import AIAnalysisStep from './components/AIAnalysis/AIAnalysisStep'
 import Modal from '../../components/ui/Modal'
 import Icon from '../../components/Icon'
 import { Button, Input, Card, Badge } from '../../components/ui'
@@ -14,7 +16,7 @@ export type PostWizardStep = 1 | 2 | 3 | 4 | 5 | 6
 
 const STEP_TITLES: Record<PostWizardStep, { title: string; subtitle: string }> = {
   1: { title: 'Add E-Waste Photo', subtitle: 'Capture with camera, upload a photo, or choose a preset' },
-  2: { title: 'Describe Item', subtitle: 'Confirm device category, brand, and specifications' },
+  2: { title: 'AI Review & Catalog Details', subtitle: 'Verify AI extraction, circular pathway, and device specifications' },
   3: { title: 'Condition & Safety', subtitle: 'Assess physical state and battery safety protocol' },
   4: { title: 'Pricing & Purpose', subtitle: 'Choose whether to sell, donate, or send for certified recycling' },
   5: { title: 'Location & Handover', subtitle: 'Set drop-off or doorstep pickup location' },
@@ -41,6 +43,8 @@ export default function PostPage() {
   // 6 Guided Wizard Steps
   const [step, setStep] = useState<PostWizardStep>(1)
   const [isScanning, setIsScanning] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
+  const [isEditingDetails, setIsEditingDetails] = useState(false)
 
   // Form Fields
   const [title, setTitle] = useState('Samsung Galaxy A52')
@@ -49,15 +53,19 @@ export default function PostPage() {
   const [model, setModel] = useState('Galaxy A52')
   const [condition, setCondition] = useState('Good')
   const [confidence, setConfidence] = useState('96% (High)')
+  const [confidenceScore, setConfidenceScore] = useState<number>(96)
   const [purpose, setPurpose] = useState<'Sell' | 'Donate' | 'Recycle' | 'Repair'>('Sell')
   const [price, setPrice] = useState<number | ''>(5500)
   const [priceRange, setPriceRange] = useState('₹4,800 – ₹6,200')
+  const [estimatedValueMin, setEstimatedValueMin] = useState<number>(4800)
+  const [estimatedValueMax, setEstimatedValueMax] = useState<number>(6200)
   const [negotiable, setNegotiable] = useState(true)
   const [description, setDescription] = useState('Samsung Galaxy A52 in good working condition with minor external scratches.')
   const [location, setLocation] = useState(user?.area ? `${user.area}, ${user.city || 'Coimbatore'}` : 'RS Puram, Coimbatore')
   const [handoverType, setHandoverType] = useState<'pickup' | 'dropoff'>('pickup')
   const [images, setImages] = useState<string[]>(['https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&q=80'])
   const [isHazardousBattery, setIsHazardousBattery] = useState(false)
+  const [hazardAlert, setHazardAlert] = useState<string | undefined>(undefined)
 
   const [safetyChecklist, setSafetyChecklist] = useState({
     backup: false,
@@ -70,14 +78,118 @@ export default function PostPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  // Handlers
-  const handlePhotoCaptured = (dataUrl: string) => {
+  // Real Gemini Multimodal AI Analysis Handler
+  const handlePhotoCaptured = async (dataUrl: string) => {
     setImages([dataUrl])
     setIsScanning(true)
-    setTimeout(() => {
-      setIsScanning(false)
+    setScanError(null)
+
+    try {
+      const result = await aiApi.analyzeDeviceImage(dataUrl, 'en')
+
+      // Auto-populate Title
+      if (result.productName && result.productName !== 'Unknown') {
+        setTitle(result.productName)
+      } else if (result.detectedBrand && result.detectedBrand !== 'Unknown') {
+        setTitle(`${result.detectedBrand} Device`)
+      }
+
+      // Auto-populate Category match
+      if (result.detectedCategory) {
+        const matched = CATEGORIES.find(
+          (c) =>
+            c.toLowerCase() === result.detectedCategory.toLowerCase() ||
+            result.detectedCategory.toLowerCase().includes(c.toLowerCase()) ||
+            c.toLowerCase().includes(result.detectedCategory.toLowerCase())
+        )
+        if (matched) {
+          setCategory(matched)
+        } else if (result.detectedCategory.toLowerCase().includes('phone') || result.detectedCategory.toLowerCase().includes('mobile')) {
+          setCategory('Mobile Phone')
+        } else if (result.detectedCategory.toLowerCase().includes('laptop') || result.detectedCategory.toLowerCase().includes('computer')) {
+          setCategory('Laptop')
+        } else if (result.detectedCategory.toLowerCase().includes('battery')) {
+          setCategory('Battery & Power Bank')
+        } else {
+          setCategory('Other Electronics')
+        }
+      }
+
+      // Auto-populate Brand & Model
+      if (result.detectedBrand && result.detectedBrand !== 'Unknown') {
+        setBrand(result.detectedBrand)
+      }
+      if (result.detectedModel && result.detectedModel !== 'Unknown') {
+        setModel(result.detectedModel)
+      }
+
+      // Auto-populate Condition
+      if (result.condition) {
+        const c = result.condition.toLowerCase()
+        if (c.includes('like new') || c.includes('mint') || c.includes('flawless')) {
+          setCondition('Like New')
+        } else if (c.includes('good') || c.includes('working')) {
+          setCondition('Good')
+        } else if (c.includes('scrap') || c.includes('parts') || c.includes('broken') || c.includes('non-working')) {
+          setCondition('Scrap')
+        } else {
+          setCondition('Fair')
+        }
+      }
+
+      // Confidence metrics
+      const score = result.confidence || 85
+      setConfidenceScore(score)
+      const confLevel = score >= 80 ? 'High' : score >= 50 ? 'Medium' : 'Low'
+      setConfidence(`${score}% (${confLevel})`)
+
+      // Valuation calculations
+      const minVal = result.estimatedValuation?.min ?? 0
+      const maxVal = result.estimatedValuation?.max ?? 0
+      setEstimatedValueMin(minVal)
+      setEstimatedValueMax(maxVal)
+
+      if (maxVal > 0) {
+        setPriceRange(`₹${minVal.toLocaleString()} – ₹${maxVal.toLocaleString()}`)
+        setPrice(Math.round((minVal + maxVal) / 2))
+      } else {
+        setPriceRange('Scrap / Material Valuation')
+        setPrice('')
+      }
+
+      // Description & circular purpose
+      if (result.description) {
+        setDescription(result.description)
+      }
+
+      if (result.suggestedAction) {
+        const action = result.suggestedAction as 'Sell' | 'Donate' | 'Recycle' | 'Repair'
+        if (['Sell', 'Donate', 'Recycle', 'Repair'].includes(action)) {
+          setPurpose(action)
+        }
+      }
+
+      // Battery hazard detection
+      const isHazard = Boolean(
+        result.hazardAlert ||
+        (result.damage && (result.damage.toLowerCase().includes('swoll') || result.damage.toLowerCase().includes('leak')))
+      )
+      setIsHazardousBattery(isHazard)
+      if (isHazard) {
+        setPurpose('Recycle')
+        setHazardAlert(result.hazardAlert || 'Battery hazard detected. Route directly to certified recycler.')
+      } else {
+        setHazardAlert(undefined)
+      }
+
+      setIsEditingDetails(false)
       setStep(2)
-    }, 1000)
+    } catch (err: any) {
+      console.error('AI Analysis failed:', err)
+      setScanError(err?.message || "Couldn't analyze the image right now. Please try again or enter details manually.")
+    } finally {
+      setIsScanning(false)
+    }
   }
 
   const handleSelectPreset = (preset: PresetDevice) => {
@@ -87,12 +199,28 @@ export default function PostPage() {
     setModel(preset.model)
     setCondition(preset.condition)
     setConfidence(preset.confidence)
+    setConfidenceScore(
+      preset.confidence.includes('99') ? 99 : preset.confidence.includes('98') ? 98 : preset.confidence.includes('96') ? 96 : 94
+    )
     setPurpose((preset.purpose as any) || 'Sell')
     setPrice(preset.estimatedPrice || '')
     setPriceRange(preset.priceRange)
+    if (preset.estimatedPrice) {
+      setEstimatedValueMin(Math.round(preset.estimatedPrice * 0.85))
+      setEstimatedValueMax(Math.round(preset.estimatedPrice * 1.15))
+    } else {
+      setEstimatedValueMin(0)
+      setEstimatedValueMax(0)
+    }
     setDescription(preset.description)
     setImages([preset.image])
     setIsHazardousBattery(!!preset.isHazardousBattery)
+    if (preset.isHazardousBattery) {
+      setHazardAlert('Swollen battery detected. Keep isolated and schedule certified hazardous collection.')
+    } else {
+      setHazardAlert(undefined)
+    }
+    setIsEditingDetails(false)
     setStep(2)
   }
 
@@ -168,13 +296,19 @@ export default function PostPage() {
           zIndex: 30,
         }}
       >
-        <div className="container-narrow">
+        <div className="container-narrow" style={{ maxWidth: step === 2 ? 880 : 760 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {step > 1 ? (
                 <button
                   type="button"
-                  onClick={() => setStep((prev) => ((prev - 1) as PostWizardStep))}
+                  onClick={() => {
+                    if (step === 2 && isEditingDetails) {
+                      setIsEditingDetails(false)
+                    } else {
+                      setStep((prev) => ((prev - 1) as PostWizardStep))
+                    }
+                  }}
                   style={{
                     background: 'var(--bg-surface-2)',
                     border: '1px solid var(--border-color)',
@@ -240,7 +374,7 @@ export default function PostPage() {
         </div>
       </div>
 
-      <div className="container-narrow" style={{ paddingTop: 20 }}>
+      <div className="container-narrow" style={{ paddingTop: 20, maxWidth: step === 2 ? 880 : 760 }}>
         {formError && (
           <div
             style={{
@@ -252,9 +386,13 @@ export default function PostPage() {
               fontSize: '0.84rem',
               fontWeight: 600,
               marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
             }}
           >
-            {formError}
+            <Icon name="alert" size={16} color="#f87171" />
+            <span>{formError}</span>
           </div>
         )}
 
@@ -267,6 +405,98 @@ export default function PostPage() {
               isScanning={isScanning}
             />
 
+            {/* AI Active Scanning Card Overlay */}
+            {isScanning && (
+              <div
+                style={{
+                  marginTop: 18,
+                  padding: '22px 18px',
+                  borderRadius: 'var(--radius-lg)',
+                  background: 'var(--bg-surface-2)',
+                  border: '1.5px solid var(--accent)',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 12,
+                  boxShadow: '0 8px 30px rgba(16, 185, 129, 0.15)',
+                }}
+              >
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: '50%',
+                    background: 'var(--accent-light)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon name="sparkles" size={26} color="var(--accent)" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>
+                    Gemini AI Multimodal Analysis in Progress...
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: 360, margin: '0 auto' }}>
+                    Extracting brand, model, physical condition, battery safety, and circular fair-market valuation.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Scan Error with Retry and Manual Fallback */}
+            {scanError && (
+              <div
+                style={{
+                  marginTop: 18,
+                  padding: '16px 18px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1.5px solid rgba(239, 68, 68, 0.3)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ef4444', fontWeight: 700, fontSize: '0.88rem' }}>
+                  <Icon name="alert" size={18} color="#ef4444" />
+                  <span>AI Analysis Encountered an Issue</span>
+                </div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                  {scanError}
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+                  {images.length > 0 && images[0] && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handlePhotoCaptured(images[0])}
+                    >
+                      Try Again
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setScanError(null)
+                      setTitle('')
+                      setBrand('')
+                      setModel('')
+                      setConfidenceScore(30)
+                      setConfidence('Manual Entry')
+                      setIsEditingDetails(true)
+                      setStep(2)
+                    }}
+                  >
+                    Enter Details Manually
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div style={{ marginTop: 20 }}>
               <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Quick Device Presets
@@ -276,109 +506,223 @@ export default function PostPage() {
           </div>
         )}
 
-        {/* STEP 2: Describe Item & Specs */}
+        {/* STEP 2: AI Review & Catalog Details */}
         {step === 2 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Image Thumbnail Preview & Match Pill */}
-            <Card padding="sm" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <img
-                src={images[0]}
-                alt="Selected device"
-                style={{ width: 68, height: 68, borderRadius: 'var(--radius-md)', objectFit: 'cover' }}
+          <div>
+            {!isEditingDetails ? (
+              <AIAnalysisStep
+                image={images[0]}
+                productName={title}
+                category={category}
+                brand={brand}
+                model={model}
+                condition={condition}
+                confidenceScore={confidenceScore}
+                estimatedValueMin={estimatedValueMin}
+                estimatedValueMax={estimatedValueMax}
+                description={description}
+                purpose={purpose}
+                onPurposeChange={(p) => setPurpose(p as any)}
+                onNext={() => setStep(3)}
+                onEditDetails={() => setIsEditingDetails(true)}
+                onRetake={() => {
+                  setImages([])
+                  setStep(1)
+                }}
+                onManualEntry={() => {
+                  setTitle('')
+                  setBrand('')
+                  setModel('')
+                  setConfidenceScore(30)
+                  setConfidence('Manual Entry')
+                  setIsEditingDetails(true)
+                }}
+                isHazardousBattery={isHazardousBattery}
+                hazardAlert={hazardAlert}
               />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                  <Icon name="sparkles" size={14} color="var(--accent)" />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 800 }}>
-                    AI Detection Match: {confidence}
-                  </span>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Header with return to AI Summary */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8, borderBottom: '1px solid var(--border-color)' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                      Edit Product Specifications
+                    </h2>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                      Fine-tune AI suggestions or fill in custom details before proceeding.
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditingDetails(false)}
+                  >
+                    View AI Summary
+                  </Button>
                 </div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  {title}
+
+                {/* Thumbnail Preview Card */}
+                <Card padding="sm" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <img
+                    src={images[0]}
+                    alt="Selected device"
+                    style={{ width: 64, height: 64, borderRadius: 'var(--radius-md)', objectFit: 'cover' }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <Icon name="sparkles" size={14} color="var(--accent)" />
+                      <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 800 }}>
+                        Confidence: {confidence}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {title || 'Untitled Device'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        fontSize: '0.72rem',
+                        color: 'var(--accent-text)',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        marginTop: 2,
+                      }}
+                    >
+                      Change Photo
+                    </button>
+                  </div>
+                </Card>
+
+                <Input
+                  label="Listing Title *"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Samsung Galaxy A52 (128GB)"
+                  required
+                />
+
+                <div className="input-group">
+                  <label className="input-label">Device Category *</label>
+                  <select
+                    className="input"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    fontSize: '0.72rem',
-                    color: 'var(--accent-text)',
-                    cursor: 'pointer',
-                    fontWeight: 700,
-                    marginTop: 2,
-                  }}
-                >
-                  Change Photo ↺
-                </button>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <Input
+                    label="Brand"
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
+                    placeholder="e.g. Samsung"
+                  />
+                  <Input
+                    label="Model / Variant"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="e.g. Galaxy A52"
+                  />
+                </div>
+
+                <div className="input-group">
+                  <label className="input-label">Condition Assessment</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                    {[
+                      { id: 'Like New', label: 'Like New', desc: 'No visible flaws, fully functional', icon: 'sparkles' as const },
+                      { id: 'Good', label: 'Good Condition', desc: 'Minor wear, working display & battery', icon: 'check' as const },
+                      { id: 'Fair', label: 'Minor Faults', desc: 'Cracked glass, degraded battery', icon: 'alert' as const },
+                      { id: 'Scrap', label: 'Scrap / For Parts', desc: 'Dead board, harvesting parts only', icon: 'recycle' as const },
+                    ].map((c) => {
+                      const isSelected = condition === c.id
+                      return (
+                        <div
+                          key={c.id}
+                          onClick={() => setCondition(c.id)}
+                          style={{
+                            padding: '12px 10px',
+                            borderRadius: 'var(--radius-md)',
+                            background: isSelected ? 'var(--accent-light)' : 'var(--bg-surface)',
+                            border: `1.5px solid ${isSelected ? 'var(--accent)' : 'var(--border-color)'}`,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 2,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Icon name={c.icon} size={14} color={isSelected ? 'var(--accent)' : 'var(--text-secondary)'} />
+                            <span style={{ fontWeight: 800, fontSize: '0.84rem', color: isSelected ? 'var(--accent-text)' : 'var(--text-primary)' }}>
+                              {c.label}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                            {c.desc}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {purpose === 'Sell' && (
+                  <Input
+                    label="Asking Price (INR)"
+                    type="number"
+                    prefixText="₹"
+                    value={price === '' ? '' : price}
+                    onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="Enter asking price"
+                  />
+                )}
+
+                <div className="input-group">
+                  <label className="input-label">Description & Notes</label>
+                  <textarea
+                    className="input"
+                    rows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe working condition, physical flaws, included accessories..."
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                  <Button
+                    variant="ghost"
+                    style={{ flex: 1 }}
+                    onClick={() => setIsEditingDetails(false)}
+                  >
+                    Return to AI Review
+                  </Button>
+                  <Button
+                    variant="primary"
+                    style={{ flex: 1.5 }}
+                    onClick={() => {
+                      if (!title.trim()) {
+                        setFormError('Please enter a listing title.')
+                        return
+                      }
+                      setFormError(null)
+                      setStep(3)
+                    }}
+                  >
+                    Continue to Condition & Safety →
+                  </Button>
+                </div>
               </div>
-            </Card>
-
-            <Input
-              label="Listing Title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Samsung Galaxy A52 (128GB)"
-              required
-            />
-
-            <div className="input-group">
-              <label className="input-label">Device Category *</label>
-              <select
-                className="input"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <Input
-                label="Brand"
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-                placeholder="e.g. Samsung"
-              />
-              <Input
-                label="Model / Variant"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g. Galaxy A52"
-              />
-            </div>
-
-            <div className="input-group">
-              <label className="input-label">Description & Notes</label>
-              <textarea
-                className="input"
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe working condition, physical flaws, included accessories..."
-              />
-            </div>
-
-            <Button
-              variant="primary"
-              fullWidth
-              size="lg"
-              onClick={() => {
-                if (!title.trim()) {
-                  setFormError('Please enter a listing title.')
-                  return
-                }
-                setFormError(null)
-                setStep(3)
-              }}
-            >
-              Continue to Condition →
-            </Button>
+            )}
           </div>
         )}
 
@@ -389,10 +733,10 @@ export default function PostPage() {
               <label className="input-label">Physical & Operational Condition *</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                 {[
-                  { id: 'Like New', label: '✨ Like New', desc: 'No visible flaws, fully functional' },
-                  { id: 'Good', label: '👍 Good Condition', desc: 'Minor wear, working display & battery' },
-                  { id: 'Fair', label: '⚠️ Minor Faults', desc: 'Cracked glass, degraded battery' },
-                  { id: 'Scrap', label: '🔩 Scrap / For Parts', desc: 'Dead board, harvesting parts only' },
+                  { id: 'Like New', label: 'Like New', desc: 'No visible flaws, fully functional', icon: 'sparkles' as const },
+                  { id: 'Good', label: 'Good Condition', desc: 'Minor wear, working display & battery', icon: 'check' as const },
+                  { id: 'Fair', label: 'Minor Faults', desc: 'Cracked glass, degraded battery', icon: 'alert' as const },
+                  { id: 'Scrap', label: 'Scrap / For Parts', desc: 'Dead board, harvesting parts only', icon: 'recycle' as const },
                 ].map((c) => {
                   const isSelected = condition === c.id
                   return (
@@ -408,8 +752,11 @@ export default function PostPage() {
                         transition: 'all 0.15s ease',
                       }}
                     >
-                      <div style={{ fontWeight: 800, fontSize: '0.88rem', color: isSelected ? 'var(--accent-text)' : 'var(--text-primary)' }}>
-                        {c.label}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name={c.icon} size={15} color={isSelected ? 'var(--accent)' : 'var(--text-secondary)'} />
+                        <span style={{ fontWeight: 800, fontSize: '0.88rem', color: isSelected ? 'var(--accent-text)' : 'var(--text-primary)' }}>
+                          {c.label}
+                        </span>
                       </div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
                         {c.desc}
@@ -445,8 +792,9 @@ export default function PostPage() {
               </div>
 
               {isHazardousBattery ? (
-                <div style={{ fontSize: '0.78rem', color: '#f87171', lineHeight: 1.45, padding: '8px 10px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: 'var(--radius-sm)' }}>
-                  ⚠️ This device has been classified as hazardous e-waste. It will be scheduled exclusively for doorstep fire-safe collection with a certified TNPCB recycler.
+                <div style={{ fontSize: '0.78rem', color: '#f87171', lineHeight: 1.45, padding: '8px 10px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Icon name="alert" size={16} color="#ef4444" />
+                  <span>This device has been classified as hazardous e-waste. It will be scheduled exclusively for doorstep fire-safe collection with a certified TNPCB recycler.</span>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -496,9 +844,9 @@ export default function PostPage() {
               <label className="input-label">Preferred Circular Pathway *</label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                 {[
-                  { id: 'Sell', label: '💰 Sell', desc: 'Earn money' },
-                  { id: 'Donate', label: '🤝 Donate', desc: 'Schools/NGO' },
-                  { id: 'Recycle', label: '♻️ Recycle', desc: 'Zero Landfill' },
+                  { id: 'Sell', label: 'Sell', desc: 'Earn money', icon: 'coin' as const },
+                  { id: 'Donate', label: 'Donate', desc: 'Schools/NGO', icon: 'gift' as const },
+                  { id: 'Recycle', label: 'Recycle', desc: 'Zero Landfill', icon: 'recycle' as const },
                 ].map((opt) => {
                   const isSelected = purpose === opt.id
                   const isDisabled = isHazardousBattery && opt.id !== 'Recycle'
@@ -518,10 +866,15 @@ export default function PostPage() {
                         opacity: isDisabled ? 0.4 : 1,
                         textAlign: 'center',
                         transition: 'all 0.15s ease',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 4,
                       }}
                     >
+                      <Icon name={opt.icon} size={18} color={isSelected ? '#ffffff' : 'var(--accent)'} />
                       <div style={{ fontWeight: 800, fontSize: '0.88rem' }}>{opt.label}</div>
-                      <div style={{ fontSize: '0.7rem', color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)', marginTop: 2 }}>
+                      <div style={{ fontSize: '0.7rem', color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)' }}>
                         {opt.desc}
                       </div>
                     </button>
@@ -645,8 +998,9 @@ export default function PostPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  <div style={{ fontWeight: 800, fontSize: '0.86rem', color: handoverType === 'pickup' ? 'var(--accent-text)' : 'var(--text-primary)' }}>
-                    🚚 Doorstep Pickup
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.86rem', color: handoverType === 'pickup' ? 'var(--accent-text)' : 'var(--text-primary)' }}>
+                    <Icon name="pickup" size={16} color="currentColor" />
+                    <span>Doorstep Pickup</span>
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
                     Collector arrives at your address
@@ -663,8 +1017,9 @@ export default function PostPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  <div style={{ fontWeight: 800, fontSize: '0.86rem', color: handoverType === 'dropoff' ? 'var(--accent-text)' : 'var(--text-primary)' }}>
-                    📍 Self Drop-Off
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: '0.86rem', color: handoverType === 'dropoff' ? 'var(--accent-text)' : 'var(--text-primary)' }}>
+                    <Icon name="location-pin" size={16} color="currentColor" />
+                    <span>Self Drop-Off</span>
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 4 }}>
                     Drop off at nearest partner hub
@@ -770,7 +1125,10 @@ export default function PostPage() {
                 variant="ghost"
                 size="lg"
                 style={{ flex: 1 }}
-                onClick={() => setStep(2)}
+                onClick={() => {
+                  setIsEditingDetails(true)
+                  setStep(2)
+                }}
               >
                 Edit Details
               </Button>

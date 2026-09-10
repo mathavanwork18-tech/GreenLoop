@@ -4,60 +4,122 @@ import { aiTools } from './aiTools'
 import type { ProcessQueryOptions } from './aiEngine'
 import type { AIMessage, AIConversationState } from '../../types/ai.types'
 
+/**
+ * Optimizes an image data URL on a hidden HTML5 canvas to prevent sending massive uncompressed photos over network.
+ */
+async function optimizeImageForAnalysis(dataUrl: string, maxDimension = 1280, quality = 0.85): Promise<string> {
+  if (typeof window === 'undefined' || !dataUrl.startsWith('data:image')) return dataUrl
+
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      let { width, height } = img
+      if (width <= maxDimension && height <= maxDimension && dataUrl.length < 600000) {
+        return resolve(dataUrl)
+      }
+
+      if (width > height && width > maxDimension) {
+        height = Math.round((height * maxDimension) / width)
+        width = maxDimension
+      } else if (height > maxDimension) {
+        width = Math.round((width * maxDimension) / height)
+        height = maxDimension
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return resolve(dataUrl)
+
+      ctx.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
 export const aiApi = {
   /**
-   * AI Vision scanner heuristic simulation for image upload.
+   * Real Multimodal Gemini Analysis via Green Loop Backend Service.
    */
-  async analyzeDeviceImage(imageDataUrl: string): Promise<AIAnalysisResult> {
-    await new Promise(r => setTimeout(r, 900))
+  async analyzeDeviceImage(
+    imageDataUrl: string,
+    language: string = 'en',
+    description: string = ''
+  ): Promise<AIAnalysisResult> {
+    const optimizedImage = await optimizeImageForAnalysis(imageDataUrl)
 
-    const isBattery = imageDataUrl.includes('battery') || imageDataUrl.length % 5 === 0
-    const isLaptop = imageDataUrl.includes('laptop') || imageDataUrl.length % 3 === 0
+    const response = await fetch('/api/ai/analyze-product', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        image: optimizedImage,
+        language,
+        description
+      })
+    })
 
-    if (isBattery) {
-      return {
-        detectedBrand: 'Generic OEM',
-        detectedModel: 'Lithium-Ion Polymer Battery Pack',
-        detectedCategory: 'Battery',
-        confidence: 96,
-        condition: 'Hazmat (Swollen Battery)',
-        estimatedValuation: { min: 0, max: 0, currency: 'INR' },
-        suggestedAction: 'Recycle',
-        hazardAlert: '⚠️ Swollen Li-ion cells contain pressurized gas. Do not puncture or discard in regular bins.',
-        recyclingImpact: {
-          co2OffsetKg: 8.5,
-          materials: ['Lithium 80g', 'Cobalt 65g', 'Nickel 140g']
-        }
-      }
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Server returned error status ${response.status}`)
     }
 
-    if (isLaptop) {
-      return {
-        detectedBrand: 'Dell',
-        detectedModel: 'Inspiron 15 (Series 3000)',
-        detectedCategory: 'Laptop',
-        confidence: 94,
-        condition: 'Good',
-        estimatedValuation: { min: 4500, max: 8000, currency: 'INR' },
-        suggestedAction: 'Sell',
-        recyclingImpact: {
-          co2OffsetKg: 34.2,
-          materials: ['Copper 220g', 'Aluminum 850g', 'Gold Pins 0.4g', 'ABS Plastic 1.2kg']
-        }
-      }
+    const payload = await response.json()
+    if (!payload.success || !payload.data) {
+      throw new Error(payload.error || 'Failed to analyze product image')
+    }
+
+    const d = payload.data
+
+    const isHazardous =
+      String(d.condition).toLowerCase().includes('hazmat') ||
+      String(d.condition).toLowerCase().includes('swoll') ||
+      String(d.damage).toLowerCase().includes('swoll') ||
+      String(d.damage).toLowerCase().includes('leak')
+
+    let suggestedAction: 'Sell' | 'Repair' | 'Donate' | 'Recycle' = 'Sell'
+    if (isHazardous) {
+      suggestedAction = 'Recycle'
+    } else if (String(d.reusability).toLowerCase() === 'none') {
+      suggestedAction = 'Recycle'
+    } else if (String(d.damage).toLowerCase().includes('cracked') || String(d.damage).toLowerCase().includes('broken')) {
+      suggestedAction = 'Repair'
+    } else if (d.estimated_value_max <= 500) {
+      suggestedAction = 'Donate'
     }
 
     return {
-      detectedBrand: 'Samsung',
-      detectedModel: 'Galaxy A52 (6GB/128GB)',
-      detectedCategory: 'Mobile',
-      confidence: 98,
-      condition: 'Good',
-      estimatedValuation: { min: 5000, max: 7500, currency: 'INR' },
-      suggestedAction: 'Sell',
+      productName: d.product_name,
+      detectedBrand: d.brand,
+      detectedModel: d.model,
+      detectedCategory: d.category,
+      confidence: Math.round(Number(d.confidence || 0.75) * 100),
+      condition: d.condition,
+      estimatedValuation: {
+        min: d.estimated_value_min || 0,
+        max: d.estimated_value_max || 0,
+        currency: 'INR'
+      },
+      suggestedAction,
+      description: d.description,
+      damage: d.damage,
+      estimatedAge: d.estimated_age,
+      reusability: d.reusability,
+      recyclability: d.recyclability,
+      materials: d.materials || [],
+      components: d.components || [],
+      keywords: d.keywords || [],
+      hazardAlert: isHazardous
+        ? 'Hazardous battery / chemical hazard detected. Keep isolated from flammable items and route directly to authorized hazardous recycling.'
+        : undefined,
       recyclingImpact: {
-        co2OffsetKg: 18.4,
-        materials: ['Gold 0.03g', 'Silver 0.35g', 'Copper 15g', 'Rare Earths 1.2g']
+        co2OffsetKg: Math.round((d.estimated_value_max > 0 ? d.estimated_value_max * 0.005 : 5.0) * 10) / 10,
+        materials: d.materials?.length ? d.materials : ['Recoverable Materials', 'ABS Polymer', 'Copper Wiring']
       }
     }
   },
@@ -69,8 +131,7 @@ export const aiApi = {
     message: AIMessage
     updatedState: AIConversationState
   }> {
-    // Artificial small delay for natural conversational feel
-    await new Promise(r => setTimeout(r, 450))
+    await new Promise((r) => setTimeout(r, 350))
     return GreenAiEngine.processMessage(options)
   },
 
@@ -79,3 +140,5 @@ export const aiApi = {
    */
   tools: aiTools
 }
+
+export default aiApi

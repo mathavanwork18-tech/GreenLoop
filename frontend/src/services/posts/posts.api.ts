@@ -1,20 +1,77 @@
 import type { Post } from '../../types/post.types'
 import { MOCK_POSTS } from '../../data/mockData'
+import { supabase } from '../../utils/supabase'
+import { fetchPosts as fetchSupabasePosts, createPost as createSupabasePost, subscribeToNewPosts } from './supabasePosts'
+
+export { createSupabasePost, fetchSupabasePosts, subscribeToNewPosts }
+export * from './supabasePosts'
+
+function mapSupabasePostToAppPost(sbPost: any): Post {
+  return {
+    id: String(sbPost.id),
+    title: sbPost.title || 'Untitled Device',
+    category: sbPost.category || 'Other Electronics',
+    brand: sbPost.brand || 'Electronics',
+    model: sbPost.model || '',
+    condition: sbPost.condition || 'Good',
+    purpose: sbPost.purpose || (sbPost.price ? 'Sell' : 'Donate'),
+    price: sbPost.price ?? null,
+    negotiable: sbPost.negotiable ?? false,
+    description: sbPost.description || '',
+    location: sbPost.location || 'Coimbatore',
+    locationName: sbPost.location_name || sbPost.location || 'Coimbatore',
+    latitude: sbPost.latitude || 11.0168,
+    longitude: sbPost.longitude || 76.9558,
+    distance: sbPost.distance || 0.8,
+    status: sbPost.status || 'available',
+    seller: {
+      name: sbPost.profiles?.full_name || 'Community Member',
+      rating: 4.9,
+      verified: true,
+      avatar: null,
+    },
+    images: sbPost.image_url ? [sbPost.image_url] : (sbPost.images || ['https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&q=80']),
+    createdAt: sbPost.created_at ? new Date(sbPost.created_at).toLocaleDateString() : 'Just now',
+    likes: sbPost.likes || 0,
+    comments: sbPost.comments || 0,
+    liked: false,
+    saved: false,
+  }
+}
 
 export const postsApi = {
   async getPosts(): Promise<Post[]> {
-    await new Promise(r => setTimeout(r, 200))
+    let supabaseItems: Post[] = []
+    try {
+      const rawPosts = await fetchSupabasePosts(0, 50)
+      if (rawPosts && rawPosts.length > 0) {
+        supabaseItems = rawPosts.map(mapSupabasePostToAppPost)
+      }
+    } catch (e) {
+      console.warn('Supabase fetch failed, using local/cached posts:', e)
+    }
+
     const stored = localStorage.getItem('gl_posts')
+    let localItems: Post[] = []
     if (stored) {
       try {
-        return JSON.parse(stored)
+        localItems = JSON.parse(stored)
       } catch {}
+    } else {
+      localItems = MOCK_POSTS as unknown as Post[]
     }
-    return MOCK_POSTS as unknown as Post[]
+
+    if (supabaseItems.length > 0) {
+      // Merge unique by ID
+      const existingIds = new Set(supabaseItems.map(p => p.id))
+      const combined = [...supabaseItems, ...localItems.filter(p => !existingIds.has(p.id))]
+      return combined
+    }
+
+    return localItems
   },
 
   async createPost(post: Omit<Post, 'id' | 'createdAt' | 'likes' | 'comments' | 'liked' | 'saved'>): Promise<Post> {
-    await new Promise(r => setTimeout(r, 400))
     const existing = await this.getPosts()
     const newPost: Post = {
       ...post,
@@ -25,6 +82,28 @@ export const postsApi = {
       liked: false,
       saved: false,
     }
+
+    // Try syncing to Supabase if authenticated
+    try {
+      const { data: authData } = await supabase.auth.getUser()
+      if (authData?.user) {
+        await supabase.from('posts').insert({
+          user_id: authData.user.id,
+          title: post.title,
+          description: post.description,
+          image_url: post.images?.[0] || null,
+          category: post.category,
+          brand: post.brand,
+          model: post.model,
+          condition: post.condition,
+          price: post.price,
+          status: 'active'
+        })
+      }
+    } catch (err) {
+      console.warn('Supabase post insert skipped/failed:', err)
+    }
+
     const updated = [newPost, ...existing]
     localStorage.setItem('gl_posts', JSON.stringify(updated))
     // Trigger cross-component sync event
@@ -33,7 +112,6 @@ export const postsApi = {
   },
 
   async editPost(postId: string, updates: Partial<Post>, currentUserName?: string): Promise<Post> {
-    await new Promise(r => setTimeout(r, 300))
     const existing = await this.getPosts()
     const targetPost = existing.find(p => p.id === postId)
     if (!targetPost) {
@@ -89,7 +167,6 @@ export const postsApi = {
   },
 
   async deletePost(postId: string, currentUserName?: string): Promise<Post[]> {
-    await new Promise(r => setTimeout(r, 200))
     const existing = await this.getPosts()
     const targetPost = existing.find(p => p.id === postId)
 

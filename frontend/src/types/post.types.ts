@@ -41,16 +41,26 @@ export interface AIAnalysisResult {
   detectedModel: string
   detectedCategory: string
   confidence: number
-  condition: DeviceCondition
+  condition: DeviceCondition | string
   estimatedValuation: {
     min: number
     max: number
     currency: string
   }
-  suggestedAction: EcoAction
+  suggestedAction: EcoAction | string
   hazardAlert?: string
-  recyclingImpact: {
+  recyclingImpact?: {
     co2OffsetKg: number
     materials: string[]
   }
+  productName?: string
+  description?: string
+  damage?: string
+  estimatedAge?: string
+  reusability?: string
+  recyclability?: string
+  materials?: string[]
+  components?: string[]
+  keywords?: string[]
 }
+

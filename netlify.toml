@@ -1,0 +1,49 @@
+[build]
+  base = "."
+  publish = "frontend/dist"
+  command = "npm run build --prefix frontend"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Gemini Multimodal AI Analysis endpoints via Netlify Serverless Functions
+[[redirects]]
+  from = "/api/ai/analyze-product"
+  to = "/.netlify/functions/analyze-product"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai/status"
+  to = "/.netlify/functions/status"
+  status = 200
+
+# Client-Side Routing for React Router SPA (prevents 404 on page refresh)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Cache control headers for PWA Service Worker & Web Manifest
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/registerSW.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
