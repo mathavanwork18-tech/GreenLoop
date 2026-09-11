@@ -3,10 +3,10 @@
 -- Target Table: public.recycling_centers
 -- ==============================================================================
 
--- 1. Create table if not exists with all required columns
+-- 1. Ensure table exists with all required columns
 CREATE TABLE IF NOT EXISTS public.recycling_centers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
   address TEXT NOT NULL,
   city TEXT NOT NULL DEFAULT 'Coimbatore',
   latitude DOUBLE PRECISION NOT NULL,
@@ -15,11 +15,16 @@ CREATE TABLE IF NOT EXISTS public.recycling_centers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 2. Create index on coordinates for rapid geographical queries
+-- 2. Explicitly create Unique Index on name (Required for ON CONFLICT (name))
+-- This fixes ERROR 42P10 when the table already existed without an explicit UNIQUE constraint
+CREATE UNIQUE INDEX IF NOT EXISTS idx_recycling_centers_name 
+  ON public.recycling_centers (name);
+
+-- 3. Create index on coordinates for rapid geographical queries
 CREATE INDEX IF NOT EXISTS idx_recycling_centers_coords 
   ON public.recycling_centers (latitude, longitude);
 
--- 3. Configure Row Level Security (RLS)
+-- 4. Configure Row Level Security (RLS)
 ALTER TABLE public.recycling_centers ENABLE ROW LEVEL SECURITY;
 
 -- Allow public read access (SELECT only for regular users & app clients)
@@ -30,8 +35,8 @@ CREATE POLICY "Allow public read access to recycling centers"
   TO public
   USING (true);
 
--- 4. Idempotent initial seed of the 10 Coimbatore recycling centers
--- Using ON CONFLICT (name) to avoid accidental duplicate records
+-- 5. Idempotent seed of the 10 Coimbatore recycling centers
+-- With idx_recycling_centers_name in place, ON CONFLICT (name) will succeed seamlessly
 INSERT INTO public.recycling_centers (name, address, city, latitude, longitude, contact_phone)
 VALUES
   (
