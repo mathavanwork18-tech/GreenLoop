@@ -8,12 +8,18 @@ const router = express.Router()
  * Health and readiness check for the Gemini AI service.
  */
 router.get('/status', (req, res) => {
-  const isConfigured = Boolean(process.env.GEMINI_API_KEY)
+  const isConfigured = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0)
   res.json({
     success: true,
     service: 'Green Loop Gemini AI Analysis Service',
     status: isConfigured ? 'ready' : 'missing_api_key',
-    modelStrategy: ['gemini-3.5-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash']
+    configured: isConfigured,
+    modelStrategy: [
+      'gemini-3.5-flash-lite',
+      'gemini-3.6-flash',
+      'gemini-flash-latest',
+      'gemini-3.7-flash'
+    ]
   })
 })
 

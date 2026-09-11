@@ -1,28 +1,70 @@
+import dns from 'dns'
+
+// Prevent IPv6 DNS connection timeouts on Node.js / serverless environments
+try {
+  dns.setDefaultResultOrder('ipv4first')
+} catch {}
+
 const DEFAULT_MODELS = [
   'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
   'gemini-flash-latest',
-  'gemini-2.5-flash'
+  'gemini-3.7-flash'
 ]
 
+const SUPPORTED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif'
+])
+
+// Maximum 7MB payload (approx 5MB unencoded image)
+const MAX_PAYLOAD_SIZE = 7 * 1024 * 1024
+
+/**
+ * Normalizes and validates input image string to mimeType and raw base64 data.
+ */
 function parseImageData(imageInput) {
-  if (typeof imageInput !== 'string') {
-    throw new Error('Image data must be a base64 encoded data URI or base64 string')
+  if (typeof imageInput !== 'string' || !imageInput.trim()) {
+    throw new Error('Product image is required (base64 data URI or string)')
   }
 
+  if (imageInput.length > MAX_PAYLOAD_SIZE) {
+    throw new Error('Image size exceeds 5MB limit. Please upload a compressed photo.')
+  }
+
+  // Check for Data URL format e.g. "data:image/jpeg;base64,..."
   const match = imageInput.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/)
   if (match) {
-    return {
-      mimeType: match[1],
-      data: match[2]
+    const mimeType = match[1].toLowerCase()
+    if (!SUPPORTED_MIME_TYPES.has(mimeType)) {
+      throw new Error(`Unsupported image format: ${mimeType}. Please upload a JPEG, PNG, or WebP image.`)
     }
+    const data = match[2].trim()
+    if (!data) {
+      throw new Error('Base64 image payload is empty.')
+    }
+    return { mimeType, data }
+  }
+
+  // If raw base64 string without data URI prefix
+  const cleaned = imageInput.trim()
+  if (!/^[A-Za-z0-9+/=]+$/.test(cleaned.slice(0, 100))) {
+    throw new Error('Invalid image format: Not a recognized data URI or base64 image string.')
   }
 
   return {
     mimeType: 'image/jpeg',
-    data: imageInput.trim()
+    data: cleaned
   }
 }
 
+/**
+ * Validates and ensures structured fields have expected types and fallbacks.
+ */
 function sanitizeProductData(raw) {
   const isObj = raw && typeof raw === 'object' && !Array.isArray(raw)
   const d = isObj ? raw : {}
@@ -66,6 +108,18 @@ function sanitizeProductData(raw) {
   }
 }
 
+/**
+ * Redacts any accidental leakage of API key from error strings.
+ */
+function sanitizeErrorMessage(msg, apiKey) {
+  if (!msg || typeof msg !== 'string') return 'An error occurred while analyzing the product.'
+  let sanitized = msg
+  if (apiKey && apiKey.length > 5) {
+    sanitized = sanitized.split(apiKey).join('[REDACTED_API_KEY]')
+  }
+  return sanitized.replace(/key=[a-zA-Z0-9_\-.]+/gi, 'key=[REDACTED]')
+}
+
 export const handler = async (event) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -82,36 +136,60 @@ export const handler = async (event) => {
     return {
       statusCode: 405,
       headers: corsHeaders,
-      body: JSON.stringify({ success: false, error: 'Method Not Allowed' })
+      body: JSON.stringify({ success: false, error: 'Method Not Allowed. Only POST requests are supported.' })
+    }
+  }
+
+  // 1. Secure Server-Side API Key verification
+  const apiKey = process.env.GEMINI_API_KEY?.trim()
+  if (!apiKey) {
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        success: false,
+        error: 'GEMINI_API_KEY is not configured in Netlify environment variables. Please add GEMINI_API_KEY in your Netlify site settings (Site configuration > Environment variables) and trigger a new deploy.'
+      })
     }
   }
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) {
+    // 2. Parse & validate request payload
+    let payload = {}
+    try {
+      payload = JSON.parse(event.body || '{}')
+    } catch {
       return {
-        statusCode: 500,
+        statusCode: 400,
         headers: corsHeaders,
-        body: JSON.stringify({
-          success: false,
-          error: 'GEMINI_API_KEY is not configured in Netlify environment variables'
-        })
+        body: JSON.stringify({ success: false, error: 'Invalid JSON body in request' })
       }
     }
 
-    const payload = JSON.parse(event.body || '{}')
     const { image, description = '', language = 'en' } = payload
 
     if (!image) {
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: JSON.stringify({ success: false, error: 'Image data is required' })
+        body: JSON.stringify({ success: false, error: 'Product image is required (base64 data URI or string)' })
       }
     }
 
-    const { mimeType, data: base64Data } = parseImageData(image)
+    let parsedImage
+    try {
+      parsedImage = parseImageData(image)
+    } catch (parseErr) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ success: false, error: parseErr.message })
+      }
+    }
 
+    const { mimeType, data: base64Data } = parsedImage
+
+    // 3. Grounded e-waste cataloging prompt
     const systemPrompt = `You are an AI assistant helping users create an e-waste marketplace catalog.
 Analyze the supplied product image carefully.
 Identify only information that can reasonably be determined from the image.
@@ -149,13 +227,23 @@ Return ONLY valid JSON matching this schema:
 
     let lastError = null
 
+    // 4. Resilient multi-model fallback chain
     for (const model of DEFAULT_MODELS) {
+      const abortController = new AbortController()
+      // 18s per-model timeout to avoid hanging serverless functions
+      const timeoutId = setTimeout(() => abortController.abort(), 18000)
+
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+        // Use x-goog-api-key header so secret key is never in the URL or query string
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
         const response = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          signal: abortController.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
           body: JSON.stringify({
             contents: [
               {
@@ -173,23 +261,42 @@ Return ONLY valid JSON matching this schema:
             generationConfig: {
               responseMimeType: 'application/json',
               temperature: 0.2,
-              maxOutputTokens: 1200
+              maxOutputTokens: 1400
             }
           })
         })
 
+        clearTimeout(timeoutId)
+
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}))
-          const errorMsg = errData.error?.message || `HTTP ${response.status}`
-          console.warn(`[Netlify Function] Model ${model} returned error: ${errorMsg}`)
-          lastError = new Error(errorMsg)
+          const rawError = errData.error?.message || `HTTP ${response.status} ${response.statusText}`
+          const cleanError = sanitizeErrorMessage(rawError, apiKey)
+          console.warn(`[Netlify Function] Model ${model} returned error status ${response.status}: ${cleanError}`)
+
+          // Distinguish rate limit vs general failure
+          if (response.status === 429) {
+            lastError = new Error('Gemini API rate limit reached. Retrying alternative model...')
+          } else {
+            lastError = new Error(cleanError)
+          }
           continue
         }
 
         const data = await response.json()
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
-        if (!rawText) {
-          throw new Error('Empty response received from Gemini')
+        const candidate = data.candidates?.[0]
+
+        if (!candidate) {
+          const promptFeedback = data.promptFeedback
+          if (promptFeedback?.blockReason) {
+            throw new Error(`Image could not be processed due to content filter: ${promptFeedback.blockReason}`)
+          }
+          throw new Error('Gemini returned an empty response with no candidates.')
+        }
+
+        const rawText = candidate.content?.parts?.[0]?.text
+        if (!rawText || !rawText.trim()) {
+          throw new Error('Empty text content received from Gemini model candidate.')
         }
 
         let parsedJson
@@ -200,7 +307,7 @@ Return ONLY valid JSON matching this schema:
           if (jsonMatch) {
             parsedJson = JSON.parse(jsonMatch[1])
           } else {
-            throw jsonErr
+            throw new Error('Failed to parse structured catalog JSON from Gemini response.')
           }
         }
 
@@ -211,8 +318,14 @@ Return ONLY valid JSON matching this schema:
           body: JSON.stringify({ success: true, data: sanitized })
         }
       } catch (err) {
-        console.warn(`[Netlify Function] Attempt with ${model} failed:`, err.message)
-        lastError = err
+        clearTimeout(timeoutId)
+        const isTimeout = err.name === 'AbortError'
+        const errMsg = isTimeout
+          ? `Analysis with model ${model} timed out after 18s.`
+          : sanitizeErrorMessage(err.message, apiKey)
+
+        console.warn(`[Netlify Function] Attempt with model ${model} failed:`, errMsg)
+        lastError = new Error(errMsg)
       }
     }
 
@@ -221,17 +334,18 @@ Return ONLY valid JSON matching this schema:
       headers: corsHeaders,
       body: JSON.stringify({
         success: false,
-        error: lastError?.message || 'All Gemini models failed to analyze the image'
+        error: lastError?.message || 'All Gemini models were unable to analyze the product image. Please try again or enter details manually.'
       })
     }
   } catch (err) {
-    console.error('Netlify function error:', err)
+    const cleanError = sanitizeErrorMessage(err.message, apiKey)
+    console.error('[Netlify Function Unhandled Error]:', cleanError)
     return {
       statusCode: 500,
       headers: corsHeaders,
       body: JSON.stringify({
         success: false,
-        error: err.message || 'Internal server error processing image'
+        error: cleanError || 'Internal server error while analyzing product image.'
       })
     }
   }

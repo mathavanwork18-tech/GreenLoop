@@ -6,18 +6,25 @@ export const handler = async () => {
     'Content-Type': 'application/json'
   }
 
+  const isConfigured = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0)
+
   return {
     statusCode: 200,
     headers: corsHeaders,
     body: JSON.stringify({
       success: true,
       service: 'Green Loop Gemini AI Analysis Service (Netlify Serverless)',
-      status: 'ready',
+      status: isConfigured ? 'ready' : 'missing_gemini_api_key',
+      configured: isConfigured,
       modelStrategy: [
         'gemini-3.5-flash-lite',
+        'gemini-3.6-flash',
         'gemini-flash-latest',
-        'gemini-2.5-flash'
-      ]
+        'gemini-3.7-flash'
+      ],
+      notice: isConfigured
+        ? 'Gemini API key is configured in Netlify environment.'
+        : 'GEMINI_API_KEY is not configured in Netlify environment variables.'
     })
   }
 }

@@ -7,31 +7,52 @@ try {
 
 const DEFAULT_MODELS = [
   'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
   'gemini-flash-latest',
-  'gemini-2.5-flash'
+  'gemini-3.7-flash'
 ]
 
+const SUPPORTED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif'
+])
+
+const MAX_PAYLOAD_SIZE = 7 * 1024 * 1024
+
 /**
- * Normalizes input image string to mimeType and raw base64 data.
+ * Normalizes and validates input image string to mimeType and raw base64 data.
  */
 function parseImageData(imageInput) {
-  if (typeof imageInput !== 'string') {
-    throw new Error('Image data must be a base64 encoded data URI or base64 string')
+  if (typeof imageInput !== 'string' || !imageInput.trim()) {
+    throw new Error('Product image is required (base64 data URI or string)')
+  }
+
+  if (imageInput.length > MAX_PAYLOAD_SIZE) {
+    throw new Error('Image size exceeds 5MB limit. Please upload a compressed photo.')
   }
 
   // Check for Data URL format e.g. "data:image/jpeg;base64,..."
   const match = imageInput.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/)
   if (match) {
-    return {
-      mimeType: match[1],
-      data: match[2]
+    const mimeType = match[1].toLowerCase()
+    if (!SUPPORTED_MIME_TYPES.has(mimeType)) {
+      throw new Error(`Unsupported image format: ${mimeType}. Please upload a JPEG, PNG, or WebP image.`)
     }
+    const data = match[2].trim()
+    if (!data) {
+      throw new Error('Base64 image payload is empty.')
+    }
+    return { mimeType, data }
   }
 
-  // Default to JPEG if raw base64
+  const cleaned = imageInput.trim()
   return {
     mimeType: 'image/jpeg',
-    data: imageInput.trim()
+    data: cleaned
   }
 }
 
@@ -81,6 +102,15 @@ function sanitizeProductData(raw) {
   }
 }
 
+function sanitizeErrorMessage(msg, apiKey) {
+  if (!msg || typeof msg !== 'string') return 'An error occurred during AI analysis.'
+  let sanitized = msg
+  if (apiKey && apiKey.length > 5) {
+    sanitized = sanitized.split(apiKey).join('[REDACTED_API_KEY]')
+  }
+  return sanitized.replace(/key=[a-zA-Z0-9_\-.]+/gi, 'key=[REDACTED]')
+}
+
 export class GeminiService {
   /**
    * Analyze an e-waste product photo and return structured catalog data.
@@ -92,9 +122,9 @@ export class GeminiService {
    * @returns {Promise<Object>} Structured catalog information
    */
   static async analyzeProduct({ image, description = '', language = 'en' }) {
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.GEMINI_API_KEY?.trim()
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not configured in the server environment')
+      throw new Error('GEMINI_API_KEY is not configured in the server environment. Please set GEMINI_API_KEY in backend/.env.')
     }
 
     const { mimeType, data: base64Data } = parseImageData(image)
@@ -138,13 +168,18 @@ Return ONLY valid JSON matching this schema:
 
     // Attempt through fallback model chain
     for (const model of DEFAULT_MODELS) {
+      const abortController = new AbortController()
+      const timeoutId = setTimeout(() => abortController.abort(), 18000)
+
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
         const response = await fetch(endpoint, {
           method: 'POST',
+          signal: abortController.signal,
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
           },
           body: JSON.stringify({
             contents: [
@@ -163,22 +198,40 @@ Return ONLY valid JSON matching this schema:
             generationConfig: {
               responseMimeType: 'application/json',
               temperature: 0.2,
-              maxOutputTokens: 1200
+              maxOutputTokens: 1400
             }
           })
         })
 
+        clearTimeout(timeoutId)
+
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}))
-          const errorMsg = errData.error?.message || `HTTP ${response.status}`
-          console.warn(`[GeminiService] Model ${model} returned error: ${errorMsg}`)
-          lastError = new Error(errorMsg)
-          continue // Try next model in chain
+          const rawError = errData.error?.message || `HTTP ${response.status} ${response.statusText}`
+          const cleanError = sanitizeErrorMessage(rawError, apiKey)
+          console.warn(`[GeminiService] Model ${model} returned error: ${cleanError}`)
+
+          if (response.status === 429) {
+            lastError = new Error('Gemini API rate limit reached. Retrying alternative model...')
+          } else {
+            lastError = new Error(cleanError)
+          }
+          continue
         }
 
         const data = await response.json()
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text
-        if (!rawText) {
+        const candidate = data.candidates?.[0]
+
+        if (!candidate) {
+          const promptFeedback = data.promptFeedback
+          if (promptFeedback?.blockReason) {
+            throw new Error(`Image could not be processed due to content filter: ${promptFeedback.blockReason}`)
+          }
+          throw new Error('Gemini returned an empty response with no candidates.')
+        }
+
+        const rawText = candidate.content?.parts?.[0]?.text
+        if (!rawText || !rawText.trim()) {
           throw new Error('Empty response received from Gemini')
         }
 
@@ -186,19 +239,24 @@ Return ONLY valid JSON matching this schema:
         try {
           parsedJson = JSON.parse(rawText)
         } catch (jsonErr) {
-          // Attempt markdown fence extraction if present
           const jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
           if (jsonMatch) {
             parsedJson = JSON.parse(jsonMatch[1])
           } else {
-            throw jsonErr
+            throw new Error('Failed to parse structured catalog JSON from Gemini response.')
           }
         }
 
         return sanitizeProductData(parsedJson)
       } catch (err) {
-        console.warn(`[GeminiService] Attempt with ${model} failed:`, err.message)
-        lastError = err
+        clearTimeout(timeoutId)
+        const isTimeout = err.name === 'AbortError'
+        const errMsg = isTimeout
+          ? `Analysis with model ${model} timed out after 18s.`
+          : sanitizeErrorMessage(err.message, apiKey)
+
+        console.warn(`[GeminiService] Attempt with ${model} failed:`, errMsg)
+        lastError = new Error(errMsg)
       }
     }
 
