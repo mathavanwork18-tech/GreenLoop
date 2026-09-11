@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
+import Icon, { type IconName } from '../Icon'
 
-export type MapCategoryFilter = 'all' | 'items' | 'parts' | 'shops' | 'centers'
+export type MapCategoryFilter = 'all' | 'nearest' | 'coimbatore' | 'items'
 
 interface MapFiltersProps {
   activeCategory: MapCategoryFilter
   onCategoryChange: (category: MapCategoryFilter) => void
   activeRadius: number
   onRadiusChange: (radius: number) => void
+  hasLocationPermission: boolean
 }
 
 export default function MapFilters({
@@ -14,19 +16,19 @@ export default function MapFilters({
   onCategoryChange,
   activeRadius,
   onRadiusChange,
+  hasLocationPermission,
 }: MapFiltersProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const categories: { id: MapCategoryFilter; label: string; icon: string }[] = [
-    { id: 'all', label: 'All', icon: '🌐' },
-    { id: 'items', label: 'Items', icon: '📦' },
-    { id: 'parts', label: 'Parts', icon: '🔧' },
-    { id: 'shops', label: 'Shops', icon: '🏪' },
-    { id: 'centers', label: 'Centers', icon: '♻️' },
+  const categories: { id: MapCategoryFilter; label: string; icon: IconName; requiresLocation?: boolean }[] = [
+    { id: 'all', label: 'All Centers', icon: 'map' },
+    { id: 'nearest', label: 'Nearest', icon: 'location-pin', requiresLocation: true },
+    { id: 'coimbatore', label: 'Coimbatore', icon: 'building' },
+    { id: 'items', label: 'Community Posts', icon: 'refresh' },
   ]
 
-  const radiusOptions = [1, 5, 10, 25, 50]
+  const radiusOptions = [5, 10, 20, 35, 50]
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -41,27 +43,46 @@ export default function MapFilters({
   }, [dropdownOpen])
 
   return (
-    <div className="map-filter-row">
-      {/* Category Filter Chips */}
-      {categories.map(cat => (
-        <button
-          key={cat.id}
-          onClick={() => onCategoryChange(cat.id)}
-          className={`map-filter-chip ${activeCategory === cat.id ? 'active' : ''}`}
-        >
-          <span>{cat.icon}</span>
-          <span>{cat.label}</span>
-        </button>
-      ))}
+    <div className="map-filter-row" style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      {/* Filter Chips (Zero emojis — 100% SVG Icons) */}
+      {categories.map(cat => {
+        const isActive = activeCategory === cat.id
+        const isDisabled = cat.requiresLocation && !hasLocationPermission
 
-      {/* Compact Radius Dropdown Control */}
-      <div className="map-radius-control" ref={dropdownRef}>
+        return (
+          <button
+            key={cat.id}
+            onClick={() => {
+              if (isDisabled) return
+              onCategoryChange(cat.id)
+            }}
+            disabled={isDisabled}
+            className={`map-filter-chip ${isActive ? 'active' : ''}`}
+            title={isDisabled ? 'Enable location to sort by nearest' : undefined}
+            style={{
+              opacity: isDisabled ? 0.45 : 1,
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}
+          >
+            <Icon name={cat.icon} size={14} color={isActive ? '#ffffff' : 'var(--text-secondary)'} />
+            <span>{cat.label}</span>
+          </button>
+        )
+      })}
+
+      {/* Radius Selector */}
+      <div className="map-radius-control" ref={dropdownRef} style={{ marginLeft: 'auto' }}>
         <button
           className="map-radius-btn"
           onClick={() => setDropdownOpen(prev => !prev)}
-          aria-label="Select radius"
+          aria-label="Filter radius"
+          style={{ display: 'flex', alignItems: 'center', gap: 4 }}
         >
-          <span>{activeRadius} km ▾</span>
+          <Icon name="search" size={12} color="var(--accent)" />
+          <span>{activeRadius} km</span>
         </button>
 
         {dropdownOpen && (
@@ -75,7 +96,7 @@ export default function MapFilters({
                 }}
                 className={`map-radius-option ${activeRadius === r ? 'selected' : ''}`}
               >
-                {r} km
+                Within {r} km
               </button>
             ))}
           </div>
