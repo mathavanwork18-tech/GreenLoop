@@ -27,11 +27,11 @@ export default function RegisterForm({ step, form, updateForm, onNext, onSubmit,
           />
         </div>
         <div className="input-group">
-          <label className="input-label">Email Address *</label>
+          <label className="input-label">Email Address (Optional)</label>
           <input
             className="input"
             type="email"
-            placeholder="mathavan@example.com"
+            placeholder="mathavan@example.com (optional)"
             value={form.email}
             onChange={e => updateForm('email', e.target.value)}
           />
@@ -58,7 +58,7 @@ export default function RegisterForm({ step, form, updateForm, onNext, onSubmit,
         <button
           className="btn btn-primary btn-lg btn-full"
           style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          disabled={!form.name || !form.email || !form.phone || !form.city}
+          disabled={!form.name || !form.phone || !form.city}
           onClick={onNext}
         >
           <span>Continue</span>

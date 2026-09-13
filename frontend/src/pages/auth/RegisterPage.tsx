@@ -185,8 +185,8 @@ export default function RegisterPage() {
                 <input className="input" placeholder="Mathavan Kumar" value={form.name} onChange={e => updateForm('name', e.target.value)} />
               </div>
               <div className="input-group">
-                <label className="input-label">Email Address *</label>
-                <input className="input" type="email" placeholder="mathavan@example.com" value={form.email} onChange={e => updateForm('email', e.target.value)} />
+                <label className="input-label">Email Address (Optional)</label>
+                <input className="input" type="email" placeholder="mathavan@example.com (optional)" value={form.email} onChange={e => updateForm('email', e.target.value)} />
               </div>
               <div className="input-group">
                 <label className="input-label">Phone Number *</label>
@@ -199,7 +199,7 @@ export default function RegisterPage() {
               <button
                 className="btn btn-primary btn-lg btn-full"
                 style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                disabled={!form.name || !form.email || !form.phone || !form.city}
+                disabled={!form.name || !form.phone || !form.city}
                 onClick={() => setStep(3)}
               >
                 <span>Continue</span>

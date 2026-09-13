@@ -19,7 +19,7 @@ export const authApi = {
       ...MOCK_USER,
       id: 'u_' + Date.now(),
       name: payload.name,
-      email: payload.email,
+      email: payload.email || '',
       phone: payload.phone,
       role: payload.role,
       city: payload.city,

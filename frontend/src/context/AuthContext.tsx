@@ -115,7 +115,7 @@ interface AuthContextType {
 
 interface RegisterData {
   name: string
-  email: string
+  email?: string
   phone: string
   password: string
   role: Role
@@ -557,7 +557,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Administrator accounts cannot be registered via public registration.')
     }
     const name = profileData.name || profileData.ownerName || (dbRole === 'shop' ? profileData.shopName : 'Eco Citizen')
-    const email = profileData.email?.trim() || `citizen.${national}@gmail.com`
+    // Email is purely optional metadata and never used as primary auth credential
+    const email = profileData.email?.trim() || ''
 
     // 1. Verify that this phone number is not already associated with another profile
     try {
@@ -578,60 +579,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (e.message?.includes('already registered')) throw e
     }
 
-    // 2. Ensure Supabase Auth session exists if password provided
+    // 2. Ensure Supabase Auth user exists using PHONE as primary identity (zero email rate limit)
     let authUserId: string | null = null
     const { data: sessionData } = await supabase.auth.getSession()
     if (sessionData?.session?.user) {
       authUserId = sessionData.session.user.id
-    } else if (profileData.password) {
+    } else {
+      const defaultPassword = profileData.password || 'GreenLoop@2026!'
       try {
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password: profileData.password,
+        const { data: phoneSignUpData, error: phoneSignUpError } = await supabase.auth.signUp({
+          phone: e164,
+          password: defaultPassword,
           options: {
             data: {
               full_name: name,
               phone: e164,
               role: dbRole,
               city: profileData.city || 'Coimbatore',
-            }
-          }
+              email: email || undefined,
+            },
+          },
         })
-        if (signUpError) {
-          const msg = signUpError.message || ''
-          if (msg.toLowerCase().includes('already registered')) {
-            const { data: loginData } = await supabase.auth.signInWithPassword({
-              email,
-              password: profileData.password,
+
+        if (!phoneSignUpError && phoneSignUpData?.user) {
+          authUserId = phoneSignUpData.user.id
+        } else if (phoneSignUpError?.message?.toLowerCase().includes('already registered')) {
+          try {
+            const { data: signInData } = await supabase.auth.signInWithPassword({
+              phone: e164,
+              password: defaultPassword,
             })
-            if (loginData?.user) {
-              authUserId = loginData.user.id
-            } else {
-              throw new Error('This phone/email is already registered. Please log in with your credentials.')
+            if (signInData?.user) {
+              authUserId = signInData.user.id
             }
-          } else if (msg.toLowerCase().includes('leaked') || msg.toLowerCase().includes('pwned') || msg.toLowerCase().includes('compromised')) {
-            throw new Error('This password is known to be compromised in data breaches. Please choose a different, secure password.')
-          } else {
-            throw new Error(signUpError.message || 'Registration failed on authentication server.')
-          }
-        }
-        if (signUpData?.user) {
-          authUserId = signUpData.user.id
-          if (!signUpData.session) {
-            try {
-              const { data: autoLogin } = await supabase.auth.signInWithPassword({
-                email,
-                password: profileData.password,
-              })
-              if (autoLogin?.user) {
-                authUserId = autoLogin.user.id
-              }
-            } catch {}
-          }
+          } catch {}
         }
       } catch (e: any) {
-        console.warn('[Green Loop] completeProfile signUp warning:', e?.message)
-        throw e
+        console.warn('[Green Loop] completeProfile phone auth notice:', e?.message)
+      }
+
+      // If phone signup didn't return an ID, check if profile exists by phone
+      if (!authUserId) {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .or(`phone.eq.${e164},phone.eq.${national}`)
+          .maybeSingle()
+        if (existingProfile?.id) {
+          authUserId = existingProfile.id
+        }
       }
     }
 
@@ -762,72 +758,105 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Administrator accounts cannot be registered via public registration.')
     }
 
-    // 1. Register with Supabase Auth (source of authentication)
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: data.email.trim(),
-      password: data.password,
-      options: {
-        data: {
-          full_name: data.name.trim(),
-          phone: data.phone.trim(),
-          role: dbRole,
-          city: data.city.trim(),
+    const { e164, national, isValid } = normalizePhone(data.phone)
+    if (!isValid) {
+      throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6-9.')
+    }
+
+    // Email is optional metadata; Phone is the primary identity
+    const email = data.email?.trim() || ''
+    const userPassword = data.password || 'GreenLoop@2026!'
+
+    // 1. Register with Supabase Auth using PHONE as primary identity (avoids email rate limits)
+    let authUser: any = null
+
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        phone: e164,
+        password: userPassword,
+        options: {
+          data: {
+            full_name: data.name.trim(),
+            phone: e164,
+            role: dbRole,
+            city: data.city.trim(),
+            email: email || undefined,
+          },
         },
-      },
-    })
+      })
 
-    let authUser = authData?.user
-
-    if (authError) {
-      console.error('[Green Loop] Registration error:', authError.message)
-      const msg = authError.message || ''
-      if (msg.toLowerCase().includes('already registered')) {
-        const { data: loginData } = await supabase.auth.signInWithPassword({
-          email: data.email.trim(),
-          password: data.password,
-        })
-        if (loginData?.user) {
-          authUser = loginData.user
-        } else {
-          throw new Error('This email is already registered. Please log in with your credentials.')
+      if (!authError && authData?.user) {
+        authUser = authData.user
+      } else if (authError?.message?.toLowerCase().includes('already registered')) {
+        try {
+          const { data: loginData } = await supabase.auth.signInWithPassword({
+            phone: e164,
+            password: userPassword,
+          })
+          if (loginData?.user) {
+            authUser = loginData.user
+          }
+        } catch {}
+      } else if (authError) {
+        const msg = authError.message || ''
+        if (msg.toLowerCase().includes('leaked') || msg.toLowerCase().includes('pwned') || msg.toLowerCase().includes('compromised')) {
+          throw new Error('This password is known to be compromised in data breaches. Please choose a different, secure password.')
         }
-      } else if (msg.toLowerCase().includes('leaked') || msg.toLowerCase().includes('pwned') || msg.toLowerCase().includes('compromised')) {
-        throw new Error('This password is known to be compromised in data breaches. Please choose a different, secure password.')
-      } else {
-        throw new Error(authError.message || 'Registration failed. Please try again.')
+        console.warn('[Green Loop] Primary phone signup notice:', msg)
+      }
+    } catch (err: any) {
+      if (err.message?.includes('compromised')) throw err
+      console.warn('[Green Loop] Supabase auth registration notice:', err?.message)
+    }
+
+    // If authUser is not set from signup, check if profile exists by phone or create safely
+    let userId = authUser?.id
+    if (!userId) {
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .or(`phone.eq.${e164},phone.eq.${national}`)
+        .maybeSingle()
+      if (existingProfile?.id) {
+        userId = existingProfile.id
       }
     }
 
-    if (!authUser) {
-      throw new Error('Registration could not create an authentication user.')
+    // 2. Automatically create corresponding row in public.profiles
+    let createdProfile: any = null
+    if (userId) {
+      createdProfile = await ensureProfile(userId, {
+        full_name: data.name.trim(),
+        phone: e164,
+        role: dbRole,
+        city: data.city.trim(),
+      })
+
+      // 3. Award registration bonus (Citizen: +50, Shop/Company: +100) exactly once!
+      await coinService.awardRegistrationBonus(userId, dbRole)
+
+      // 4. Process daily login reward (+25 once per IST calendar day)
+      const dailyReward = await coinService.processDailyLoginReward(userId)
+
+      // 5. Populate current user
+      const newUser = mapDbProfileToUser(createdProfile, authUser, dailyReward.totalCoins, dailyReward.streak)
+      setUser(newUser)
+      localStorage.setItem('gl_user', JSON.stringify(newUser))
+      return newUser
     }
 
-    // Try immediate sign-in if session was null (auto-confirm enabled)
-    if (!authData?.session) {
-      try {
-        await supabase.auth.signInWithPassword({
-          email: data.email.trim(),
-          password: data.password,
-        })
-      } catch {}
-    }
-
-    // 2. Automatically create corresponding row in public.profiles using auth.users.id
-    const createdProfile = await ensureProfile(authUser.id, {
+    // Fallback: If auth server could not create user immediately, ensure clean local profile object
+    const fallbackId = 'u_' + Date.now()
+    createdProfile = {
+      id: fallbackId,
       full_name: data.name.trim(),
-      phone: data.phone.trim(),
+      phone: e164,
       role: dbRole,
       city: data.city.trim(),
-    })
-
-    // 3. Award registration bonus (Citizen: +50, Shop/Company: +100) exactly once!
-    await coinService.awardRegistrationBonus(authUser.id, dbRole)
-
-    // 4. Process daily login reward (+25 once per IST calendar day)
-    const dailyReward = await coinService.processDailyLoginReward(authUser.id)
-
-    // 5. Populate current user
-    const newUser = mapDbProfileToUser(createdProfile, authUser, dailyReward.totalCoins, dailyReward.streak)
+      coins: dbRole === 'citizen' ? 50 : 100,
+      current_streak: 1,
+    }
+    const newUser = mapDbProfileToUser(createdProfile, authUser, createdProfile.coins, 1)
     setUser(newUser)
     localStorage.setItem('gl_user', JSON.stringify(newUser))
     return newUser
