@@ -79,7 +79,32 @@ function sanitizeProductData(raw) {
   }
 
   const confidenceNum = Number(d.confidence)
-  const confidence = isNaN(confidenceNum) ? 0.75 : Math.max(0, Math.min(1, confidenceNum))
+  const confidence = isNaN(confidenceNum) ? 0.85 : Math.max(0, Math.min(1, confidenceNum))
+
+  // Swollen battery / hazardous check
+  const isHazardous =
+    cleanStr(d.hazard_level).toUpperCase() === 'CRITICAL' ||
+    cleanStr(d.condition).toLowerCase().includes('hazmat') ||
+    cleanStr(d.condition).toLowerCase().includes('swoll') ||
+    cleanStr(d.damage).toLowerCase().includes('swoll') ||
+    cleanStr(d.damage).toLowerCase().includes('leak')
+
+  const minVal = isHazardous ? 0 : clampNumber(d.estimated_value_min, 0)
+  const maxVal = isHazardous ? 0 : clampNumber(d.estimated_value_max, 0)
+
+  let suggestedAction = cleanStr(d.suggested_action, 'Sell')
+  if (isHazardous) {
+    suggestedAction = 'Recycle'
+  } else if (!['Sell', 'Repair', 'Donate', 'Recycle'].includes(suggestedAction)) {
+    if (maxVal <= 500 && maxVal > 0) suggestedAction = 'Donate'
+    else if (maxVal === 0) suggestedAction = 'Recycle'
+    else suggestedAction = 'Sell'
+  }
+
+  const co2Offset = clampNumber(
+    d.co2_offset_kg,
+    Math.round((maxVal > 0 ? maxVal * 0.005 + 5.0 : 8.0) * 10) / 10
+  )
 
   return {
     product_name: cleanStr(d.product_name, 'Unknown E-Waste Device'),
@@ -87,14 +112,20 @@ function sanitizeProductData(raw) {
     subcategory: cleanStr(d.subcategory, 'Electronics'),
     brand: cleanStr(d.brand, 'Unknown'),
     model: cleanStr(d.model, 'Unknown'),
-    condition: cleanStr(d.condition, 'Used - Acceptable'),
+    condition: isHazardous ? 'Hazmat (Swollen Battery)' : cleanStr(d.condition, 'Used - Acceptable'),
     damage: cleanStr(d.damage, 'None visible'),
     estimated_age: cleanStr(d.estimated_age, 'Unknown'),
     description: cleanStr(d.description, 'Electronic device scanned for circular e-waste recycling or reuse.'),
-    reusability: cleanStr(d.reusability, 'Moderate'),
+    reusability: isHazardous ? 'None' : cleanStr(d.reusability, 'Moderate'),
     recyclability: cleanStr(d.recyclability, 'High'),
-    estimated_value_min: clampNumber(d.estimated_value_min, 0),
-    estimated_value_max: clampNumber(d.estimated_value_max, 0),
+    suggested_action: suggestedAction,
+    hazard_level: isHazardous ? 'CRITICAL' : cleanStr(d.hazard_level, 'NONE'),
+    hazard_alert: isHazardous
+      ? cleanStr(d.hazard_alert, 'DANGER: Swollen or damaged lithium battery detected. Risk of fire/toxic gas. Keep isolated in a fire-safe container and route immediately to a certified TNPCB recycler.')
+      : (d.hazard_alert ? cleanStr(d.hazard_alert) : null),
+    estimated_value_min: minVal,
+    estimated_value_max: maxVal,
+    co2_offset_kg: co2Offset,
     materials: cleanArr(d.materials),
     components: cleanArr(d.components),
     keywords: cleanArr(d.keywords),
@@ -113,12 +144,13 @@ function sanitizeErrorMessage(msg, apiKey) {
 
 export class GeminiService {
   /**
-   * Analyze an e-waste product photo and return structured catalog data.
+   * Domain-Trained Multimodal Product Analyzer:
+   * Analyzes an e-waste product photo and returns structured circular catalog data.
    *
    * @param {Object} options
    * @param {string} options.image - Base64 or Data URI of product image
    * @param {string} [options.description] - Optional user context or notes
-   * @param {string} [options.language] - Optional preferred language (e.g. 'ta', 'hi', 'en')
+   * @param {string} [options.language] - Preferred language ('en', 'ta', 'hi')
    * @returns {Promise<Object>} Structured catalog information
    */
   static async analyzeProduct({ image, description = '', language = 'en' }) {
@@ -129,50 +161,76 @@ export class GeminiService {
 
     const { mimeType, data: base64Data } = parseImageData(image)
 
-    const systemPrompt = `You are an AI assistant helping users create an e-waste marketplace catalog.
-Analyze the supplied product image carefully.
-Identify only information that can reasonably be determined from the image.
-Do not invent brand, model, specifications, condition, age, or value.
-If information cannot be determined, return "Unknown".
+    const systemPrompt = `You are Green Loop AI, an expert computer vision intelligence trained in electronic waste (e-waste) classification, circular economy triage, hazardous materials safety, and fair secondary-market valuation in India.
 
-Valuation Guidelines:
-- Estimate resale/scrap value range in Indian Rupees (INR, ₹).
-- If non-functional or pure scrap, set realistic materials/scrap valuation.
-- If it is a dangerous swollen battery, flag hazardous condition and set value to 0.
+TRAINED DOMAIN KNOWLEDGE & INSTRUCTIONS:
+1. Battery Safety & Hazardous Breach (CRITICAL PRIORITY):
+   - Inspect carefully for swollen, bloated, leaking, punctured, dented, or overheating lithium-ion / lithium-polymer pouch cells.
+   - If ANY battery swelling, electrolyte odor, or thermal scorch is detected:
+     * Set condition to "Hazmat (Swollen Battery)"
+     * Set hazard_level to "CRITICAL"
+     * Set hazard_alert to "DANGER: Swollen or damaged lithium battery detected. Risk of thermal runaway and fire. Do not charge, pierce, or dispose in regular trash. Place in a fireproof or sand-filled container and hand over immediately to an authorized TNPCB/CPCB e-waste recycler."
+     * Set reusability to "None"
+     * Set suggested_action to "Recycle"
+     * Set estimated_value_min and estimated_value_max to 0 (safety over profit).
 
-Language:
-- Provide all user-facing strings (product_name, description, condition, damage) in ${language === 'ta' ? 'Tamil' : language === 'hi' ? 'Hindi' : 'English'}.
+2. Circular Economy Action Hierarchy:
+   - "Sell": Intact, operational, or easily refurbished hardware (Laptops, Phones, Displays, PC components).
+   - "Repair": Display cracked, battery degraded, or easily repairable faults.
+   - "Donate": Functional hardware with low monetary resale (< ₹500) but high utility for students/non-profits.
+   - "Recycle": Obsolete hardware, crushed frames, dead motherboards, or hazardous scrap (Zero Landfill).
 
-Return ONLY valid JSON matching this schema:
+3. Valuation Guidance in Indian Rupees (INR, ₹):
+   - Baseline secondary market and scrap price benchmarks:
+     * Working Laptops: ₹4,000 - ₹18,000; Scrap/Broken laptop for parts: ₹500 - ₹1,500
+     * Working Smartphones: ₹1,500 - ₹12,000; Dead/Cracked scrap phone: ₹100 - ₹350
+     * LCD/LED Monitors: ₹400 - ₹2,000; CRT Monitors: ₹50 - ₹150 (salvage glass/copper)
+     * Desktop Motherboards & Circuit Boards: Scrap ₹150 - ₹400/kg
+     * RAM & Solid State Drives (SSDs): ₹250 - ₹2,500
+     * Copper Wires & Adapters: ₹50 - ₹200
+     * Obsolete / Non-functional scrap: Fair scrap recovery value based on precious metal content.
+
+4. Material Recovery & Environmental Impact:
+   - Identify recoverable elements: Gold (Au), Silver (Ag), Palladium (Pd), Copper (Cu), Aluminum (Al), Cobalt (Co), Lithium (Li), Neodymium (Nd), ABS Plastic, Polycarbonate.
+   - Estimate CO2 diversion impact in kilograms (typically 5 to 50 kg CO2e saved from landfill).
+
+5. Accuracy & Output Constraints:
+   - Identify only what is visually verifiable or stated in the user notes. Do not hallucinate fake brands.
+   - Language for text fields: ${language === 'ta' ? 'Tamil' : language === 'hi' ? 'Hindi' : 'English'}.
+
+Return ONLY a valid JSON object matching this schema:
 {
   "product_name": "Clear descriptive name e.g. Dell Inspiron 15 or Unknown Laptop",
   "category": "One of: Mobile Phone, Laptop, Tablet, Desktop / PC, Battery & Power Bank, Audio & Headphones, Circuit Board / Scrap, Cables & Adapters, Home Appliance, Other Electronics",
   "subcategory": "Specific type e.g. Smartphone, Li-ion Battery, LCD Monitor, Motherboard",
-  "brand": "Manufacturer name if clearly visible, otherwise Unknown",
-  "model": "Model identifier if clearly visible, otherwise Unknown",
+  "brand": "Manufacturer name if visible, otherwise Unknown",
+  "model": "Model name/number if visible, otherwise Unknown",
   "condition": "One of: Brand New, Like New, Good, Used - Acceptable, For Parts / Faulty, Hazmat (Swollen Battery)",
-  "damage": "Observable physical damage e.g. cracked screen, missing keys, cosmetic wear, or None visible",
-  "estimated_age": "e.g. 3-5 years or Unknown",
-  "description": "Concise 2-3 sentence description highlighting visible features, condition, and potential for reuse or material recycling.",
+  "damage": "Observable physical damage e.g. cracked screen, swollen pouch, missing keys, or None visible",
+  "estimated_age": "e.g. 2-4 years or Unknown",
+  "description": "Concise 2-3 sentence description highlighting visible features, condition, and circular reuse/recycling potential.",
   "reusability": "High, Moderate, Low, or None",
   "recyclability": "High, Moderate, or Low",
+  "suggested_action": "Sell, Repair, Donate, or Recycle",
+  "hazard_level": "NONE, LOW, or CRITICAL",
+  "hazard_alert": "Safety warning string if hazardous, else null",
   "estimated_value_min": 500,
   "estimated_value_max": 1500,
-  "materials": ["e.g. Aluminum", "Copper", "Lithium", "ABS Plastic"],
-  "components": ["e.g. Display Panel", "Motherboard", "Battery"],
+  "co2_offset_kg": 14.5,
+  "materials": ["e.g. Copper", "Aluminum", "Gold", "ABS Plastic"],
+  "components": ["e.g. Motherboard", "Display Panel", "Battery"],
   "keywords": ["tag1", "tag2", "tag3"],
-  "confidence": 0.95
+  "confidence": 0.90
 }${description ? `\n\nUser Context/Notes: "${description}"` : ''}`
 
     let lastError = null
 
-    // Attempt through fallback model chain
     for (const model of DEFAULT_MODELS) {
       const abortController = new AbortController()
       const timeoutId = setTimeout(() => abortController.abort(), 18000)
 
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
 
         const response = await fetch(endpoint, {
           method: 'POST',
@@ -260,12 +318,143 @@ Return ONLY valid JSON matching this schema:
       }
     }
 
-    // If all models failed, throw controlled error
     throw lastError || new Error('All Gemini models failed to analyze the product image')
   }
 
   /**
-   * Generates a semantic vector embedding using Gemini text-embedding-004.
+   * Domain-Trained Conversational AI:
+   * Provides real-time guidance on electronics reuse, repair, battery safety, and recycling.
+   *
+   * @param {Object} options
+   * @param {string} options.message - User prompt
+   * @param {Array} [options.history] - Optional conversation history
+   * @param {Object} [options.context] - Contextual metadata (location, active page, user role)
+   * @param {string} [options.language] - Preferred language ('en', 'ta', 'hi')
+   * @returns {Promise<Object>} Formatted AI reply with action recommendations
+   */
+  static async chat({ message, history = [], context = {}, language = 'en' }) {
+    const apiKey = process.env.GEMINI_API_KEY?.trim()
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not configured in the server environment.')
+    }
+
+    const cleanMessage = String(message || '').trim()
+    if (!cleanMessage) {
+      throw new Error('Message is required')
+    }
+
+    const systemInstruction = `You are Green Loop AI, an expert circular economy advisor and technical specialist for electronic waste (e-waste) management in India (Tamil Nadu and national coverage).
+Your mission is to maximize device life, promote responsible certified recycling under Central Pollution Control Board (CPCB) and Tamil Nadu Pollution Control Board (TNPCB) regulations, ensure hazardous battery safety, and help users repair, sell, or safely dispose of electronics.
+
+CORE KNOWLEDGE & RULES:
+1. Battery Safety (HIGHEST PRIORITY):
+   If the user asks about swollen, bulging, hot, leaking, or damaged batteries:
+   - IMMEDIATELY state the fire risk.
+   - Do NOT pierce, bend, crush, or plug into a charger.
+   - Store in a non-flammable container (or dry sand bucket).
+   - Hand over only to an authorized CPCB/TNPCB certified e-waste recycler.
+2. Circular Economy Hierarchy:
+   - Always encourage: Repair / Refurbish > Harvest Working Spare Parts (RAM, SSD, screen) > Material Recovery (smelting precious metals) > Safe Disposal (Zero Landfill).
+3. Indian Secondary Market & Pricing:
+   - Give realistic valuation ranges in Indian Rupees (₹ INR).
+   - Explain secure data sanitization (DBAN, Android factory reset with device encryption, iOS Erase All Content and Settings) before handing over hardware.
+4. Format:
+   - Clean, friendly, actionable markdown with bullet points and bold highlights.
+   - Conclude with 1-2 actionable recommendations.
+${context?.userCity ? `User Location: ${context.userCity}` : ''}
+${context?.currentPath ? `Current App View: ${context.currentPath}` : ''}
+Language: Respond in ${language === 'ta' ? 'Tamil' : language === 'hi' ? 'Hindi' : 'English'}.`
+
+    // Format conversation history for Gemini API
+    const contents = []
+
+    // Inject system instruction in contents or dedicated config
+    contents.push({
+      role: 'user',
+      parts: [{ text: `[System Instruction]\n${systemInstruction}` }]
+    })
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'Understood. I am Green Loop AI, trained in circular e-waste management, Indian market pricing, and hazardous safety. How can I assist?' }]
+    })
+
+    if (Array.isArray(history)) {
+      for (const item of history.slice(-6)) {
+        if (item.sender === 'user' || item.role === 'user') {
+          contents.push({ role: 'user', parts: [{ text: String(item.text || item.content || '').slice(0, 1000) }] })
+        } else if (item.sender === 'ai' || item.role === 'model') {
+          contents.push({ role: 'model', parts: [{ text: String(item.text || item.content || '').slice(0, 1000) }] })
+        }
+      }
+    }
+
+    contents.push({
+      role: 'user',
+      parts: [{ text: cleanMessage.slice(0, 1500) }]
+    })
+
+    let lastError = null
+
+    for (const model of DEFAULT_MODELS) {
+      const abortController = new AbortController()
+      const timeoutId = setTimeout(() => abortController.abort(), 16000)
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          signal: abortController.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
+          body: JSON.stringify({
+            contents,
+            generationConfig: {
+              temperature: 0.35,
+              maxOutputTokens: 900
+            }
+          })
+        })
+
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          const rawError = errData.error?.message || `HTTP ${response.status}`
+          console.warn(`[GeminiService Chat] Model ${model} returned error:`, sanitizeErrorMessage(rawError, apiKey))
+          lastError = new Error(sanitizeErrorMessage(rawError, apiKey))
+          continue
+        }
+
+        const data = await response.json()
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+        if (!text || !text.trim()) {
+          throw new Error('Empty response received from Gemini')
+        }
+
+        // Detect if reply contains hazardous battery warnings
+        const isHazard = text.toLowerCase().includes('swollen') || text.toLowerCase().includes('thermal runaway')
+
+        return {
+          text: text.trim(),
+          modelUsed: model,
+          hazardAlert: isHazard
+            ? 'Battery safety warning: handle with caution, avoid puncturing or charging.'
+            : undefined
+        }
+      } catch (err) {
+        clearTimeout(timeoutId)
+        lastError = err
+      }
+    }
+
+    throw lastError || new Error('All Gemini models failed to generate response')
+  }
+
+  /**
+   * Generates a semantic vector embedding using Gemini gemini-embedding-001.
    */
   static async generateEmbedding(text) {
     const apiKey = process.env.GEMINI_API_KEY
@@ -278,13 +467,14 @@ Return ONLY valid JSON matching this schema:
       throw new Error('Text is required to generate an embedding')
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`
+    const model = 'models/gemini-embedding-001'
+    const url = `https://generativelanguage.googleapis.com/v1beta/${model}:embedContent?key=${apiKey}`
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'models/text-embedding-004',
+        model,
         content: {
           parts: [{ text: cleanText }]
         }

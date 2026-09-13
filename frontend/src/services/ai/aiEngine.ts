@@ -729,8 +729,48 @@ export class GreenAiEngine {
     }
 
     // -------------------------------------------------------------
-    // INTENT 14: GENERAL E-WASTE & CERTIFICATES
+    // INTENT 14 & 15: GENERAL E-WASTE, RECYCLING, SAFETY & CHAT ADVISORY
+    // Grounded in Domain-Trained Gemini Intelligence
     // -------------------------------------------------------------
+    try {
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: q,
+          context: {
+            userCity: user?.city || 'Coimbatore',
+            currentPath: options.currentPath,
+            role: user?.role || 'individual'
+          }
+        })
+      })
+
+      if (response.ok) {
+        const payload = await response.json()
+        if (payload.success && payload.data?.text) {
+          return {
+            message: {
+              id: `ai-${Date.now()}`,
+              sender: 'ai',
+              text: payload.data.text,
+              timestamp,
+              intent: 'GENERAL_EWASTE_QUESTION',
+              hazardAlert: payload.data.hazardAlert,
+              actionChips: [
+                { label: '🗺️ Find Recyclers on Map', actionType: 'navigate', payload: '/map' },
+                { label: '📦 Post Item on Circular Loop', actionType: 'navigate', payload: '/post' },
+                { label: '🪙 View Rewards & Wallet', actionType: 'navigate', payload: '/activity' }
+              ]
+            },
+            updatedState
+          }
+        }
+      }
+    } catch {
+      // If backend network fails, continue to fallback below
+    }
+
     if (intent === 'GENERAL_EWASTE_QUESTION') {
       const text = `**Green Loop Circular Mission**:\n\nGreen Loop is an authorized circular e-waste platform in Tamil Nadu adhering to Central Pollution Control Board (CPCB) and TNPCB e-waste management guidelines.\n\n• **Zero Landfill Target**: Preventing toxic lead, mercury, and cadmium from contaminating soil & groundwater.\n• **Traceable Recycling**: All drop-offs generate an official digital Certificate of Safe Destruction with verifiable serial numbers.`
 
@@ -750,9 +790,7 @@ export class GreenAiEngine {
       }
     }
 
-    // -------------------------------------------------------------
-    // INTENT 15: UNSUPPORTED / OUT OF SCOPE (No hallucination)
-    // -------------------------------------------------------------
+    // Fallback if no specific intent matched and chat was unavailable
     return {
       message: {
         id: `ai-${Date.now()}`,
@@ -771,3 +809,4 @@ export class GreenAiEngine {
     }
   }
 }
+

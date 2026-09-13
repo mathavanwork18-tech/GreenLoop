@@ -5,21 +5,34 @@ const router = express.Router()
 
 /**
  * GET /api/ai/status
- * Health and readiness check for the Gemini AI service.
+ * Health, capability, and model check for the Gemini AI service.
  */
 router.get('/status', (req, res) => {
   const isConfigured = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0)
   res.json({
     success: true,
-    service: 'Green Loop Gemini AI Analysis Service',
+    service: 'Green Loop Gemini Circular AI Engine',
     status: isConfigured ? 'ready' : 'missing_api_key',
     configured: isConfigured,
+    capabilities: [
+      'multimodal_image_analysis',
+      'circular_valuation_inr',
+      'swollen_battery_safety_detection',
+      'conversational_ewaste_advisory',
+      'vector_embeddings'
+    ],
+    domainTrained: {
+      regulations: ['CPCB', 'TNPCB', 'E-Waste Management Rules 2022', 'EPR'],
+      currency: 'INR (₹)',
+      safetyTriage: 'Lithium battery swelling, hazardous chemicals, zero landfill'
+    },
     modelStrategy: [
       'gemini-3.5-flash-lite',
       'gemini-3.6-flash',
       'gemini-flash-latest',
       'gemini-3.7-flash'
-    ]
+    ],
+    embeddingModel: 'models/gemini-embedding-001'
   })
 })
 
@@ -57,6 +70,41 @@ router.post('/analyze-product', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: error.message || 'Unable to analyze product image right now. Please try again or enter details manually.'
+    })
+  }
+})
+
+/**
+ * POST /api/ai/chat
+ * Interactive conversational AI grounded in circular economy, repairs, and battery safety.
+ */
+router.post('/chat', async (req, res) => {
+  try {
+    const { message, history, context, language } = req.body
+
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Message text is required'
+      })
+    }
+
+    const reply = await GeminiService.chat({
+      message,
+      history,
+      context,
+      language: language || 'en'
+    })
+
+    return res.json({
+      success: true,
+      data: reply
+    })
+  } catch (error) {
+    console.error('[AI Chat Route Error]:', error.message)
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'AI Chat service is temporarily unavailable'
     })
   }
 })

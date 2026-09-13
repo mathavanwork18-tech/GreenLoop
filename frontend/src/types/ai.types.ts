@@ -70,6 +70,7 @@ export interface AIMessage {
   deleteConfirmation?: AIDeleteConfirmation
   radiusUsed?: number
   isError?: boolean
+  hazardAlert?: string
 }
 
 export interface AIConversationState {

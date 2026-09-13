@@ -125,6 +125,38 @@ export const aiApi = {
   },
 
   /**
+   * Conversational e-waste advisory directly from trained Gemini service.
+   */
+  async chatWithGemini(options: {
+    message: string
+    history?: Array<{ role?: string; sender?: string; text?: string; content?: string }>
+    context?: {
+      userCity?: string
+      currentPath?: string
+      role?: string
+    }
+    language?: string
+  }): Promise<{ text: string; hazardAlert?: string; modelUsed?: string }> {
+    const response = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options)
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `Server error ${response.status}`)
+    }
+
+    const payload = await response.json()
+    if (!payload.success || !payload.data) {
+      throw new Error(payload.error || 'Failed to get AI response')
+    }
+
+    return payload.data
+  },
+
+  /**
    * Process interactive chat assistant message grounded in real application data.
    */
   async processAssistantQuery(options: ProcessQueryOptions): Promise<{
@@ -142,3 +174,4 @@ export const aiApi = {
 }
 
 export default aiApi
+
