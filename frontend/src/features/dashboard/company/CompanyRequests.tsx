@@ -132,9 +132,9 @@ export default function CompanyRequests() {
                 </div>
 
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: '0.76rem', color: 'var(--text-tertiary)' }}>
-                  <span>📍 {req.location}</span>
-                  <span>📅 Scheduled: {req.scheduledDate}</span>
-                  <span>📞 {req.clientPhone}</span>
+                  <span>Location: {req.location}</span>
+                  <span>Scheduled: {req.scheduledDate}</span>
+                  <span>Contact: {req.clientPhone}</span>
                 </div>
               </div>
 

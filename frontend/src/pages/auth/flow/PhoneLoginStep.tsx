@@ -22,7 +22,6 @@ export default function PhoneLoginStep({
   const [phone, setPhone] = useState(initialPhone.replace(/\D/g, '').slice(-10))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [devOtpNotification, setDevOtpNotification] = useState<string | null>(null)
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only permit digits, maximum 10 digits
@@ -51,12 +50,9 @@ export default function PhoneLoginStep({
     try {
       const res = await onSendOtp(phone)
       if (res.success) {
-        if (res.devOtp) {
-          setDevOtpNotification(res.devOtp)
-        }
         // Brief transition delay so user sees sending state
         setTimeout(() => {
-          onOtpSent(phone, res.devOtp)
+          onOtpSent(phone)
         }, 400)
       } else {
         setError(res.message || 'Failed to send OTP. Please try again.')
@@ -110,27 +106,6 @@ export default function PhoneLoginStep({
           </p>
         </div>
       </div>
-
-      {/* Dev OTP Banner (if generated in test mode) */}
-      {devOtpNotification && (
-        <div
-          style={{
-            background: 'rgba(16,185,129,0.15)',
-            border: '1px solid #10b981',
-            borderRadius: '12px',
-            padding: '12px 14px',
-            marginBottom: 18,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <Icon name="verified" size={18} color="#10b981" />
-          <div style={{ fontSize: '0.82rem', color: '#a7f3d0' }}>
-            <strong>Demo OTP:</strong> <span style={{ letterSpacing: '2px', fontWeight: 800, color: '#fff' }}>{devOtpNotification}</span>
-          </div>
-        </div>
-      )}
 
       {/* Form Area */}
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>

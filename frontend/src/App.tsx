@@ -26,27 +26,15 @@ import { MissionsPage } from './pages/missions'
 import { ImpactPage } from './pages/impact'
 import { SupportPage } from './pages/support'
 
-// Local Shop Modular Components
-import LocalShopAppShell from './features/dashboard/shop/LocalShopAppShell'
-import ShopDashboard from './features/dashboard/shop/ShopDashboard'
-import ShopInventory from './features/dashboard/shop/ShopInventory'
-import ShopPickups from './features/dashboard/shop/ShopPickups'
-import ShopTransactions from './features/dashboard/shop/ShopTransactions'
-import ShopAnalytics from './features/dashboard/shop/ShopAnalytics'
-import ShopNotifications from './features/dashboard/shop/ShopNotifications'
-import ShopProfile from './features/dashboard/shop/ShopProfile'
-
-// Company Enterprise Modular Components
-import CompanyAppShell from './features/dashboard/company/CompanyAppShell'
-import CompanyDashboard from './features/dashboard/company/CompanyDashboard'
-import CompanyRequests from './features/dashboard/company/CompanyRequests'
-import CompanyInventory from './features/dashboard/company/CompanyInventory'
-import CompanyProcessing from './features/dashboard/company/CompanyProcessing'
-import CompanyTransactions from './features/dashboard/company/CompanyTransactions'
-import CompanyAnalytics from './features/dashboard/company/CompanyAnalytics'
-import CompanyReports from './features/dashboard/company/CompanyReports'
-import CompanyNotifications from './features/dashboard/company/CompanyNotifications'
-import CompanyProfile from './features/dashboard/company/CompanyProfile'
+// Local Shop / Company Marketplace Dashboard
+import {
+  LocalShopAppShell,
+  LocalShopHomePage,
+  LocalShopMapPage,
+  LocalShopPostPage,
+  LocalShopOrdersPage,
+  LocalShopAccountPage,
+} from './pages/shop'
 
 // Green Loop Administrator Modular Components
 import AdminAppShell from './features/dashboard/admin/AdminAppShell'
@@ -83,7 +71,7 @@ function AppRoutes() {
   // Centralized role resolution from database profile
   const userRole = normalizeRole(user?.role)
 
-  // 0. GREEN LOOP ADMINISTRATOR CONTROL CENTER (CREATORS: MATHAVAN, VIMAL RAJ, THIRU LOOP)
+  // 0. GREEN LOOP ADMINISTRATOR CONTROL CENTER (Authenticated profiles only)
   if (userRole === 'admin') {
     return (
       <AdminAppShell>
@@ -109,43 +97,27 @@ function AppRoutes() {
     )
   }
 
-  // 1. LOCAL SHOP BUSINESS DASHBOARD
-  if (userRole === 'shop') {
+  // 1. LOCAL SHOP / COMPANY MARKETPLACE DASHBOARD (Home | Map | Post | Orders | Account)
+  if (userRole === 'shop' || userRole === 'company') {
     return (
       <LocalShopAppShell>
         <Routes>
-          <Route path="/shop" element={<ShopDashboard />} />
-          <Route path="/shop/inventory" element={<ShopInventory />} />
-          <Route path="/shop/pickups" element={<ShopPickups />} />
-          <Route path="/shop/transactions" element={<ShopTransactions />} />
-          <Route path="/shop/analytics" element={<ShopAnalytics />} />
-          <Route path="/shop/notifications" element={<ShopNotifications />} />
-          <Route path="/shop/profile" element={<ShopProfile />} />
-          {/* Strict Role Guard: Any other route redirects to /shop */}
-          <Route path="*" element={<Navigate to="/shop" replace />} />
+          <Route path="/" element={<LocalShopHomePage />} />
+          <Route path="/shop" element={<LocalShopHomePage />} />
+          <Route path="/map" element={<LocalShopMapPage />} />
+          <Route path="/shop/map" element={<LocalShopMapPage />} />
+          <Route path="/post" element={<LocalShopPostPage />} />
+          <Route path="/shop/post" element={<LocalShopPostPage />} />
+          <Route path="/orders" element={<LocalShopOrdersPage />} />
+          <Route path="/shop/orders" element={<LocalShopOrdersPage />} />
+          <Route path="/account" element={<LocalShopAccountPage />} />
+          <Route path="/shop/account" element={<LocalShopAccountPage />} />
+          <Route path="/account/edit" element={<EditProfilePage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          {/* Strict Role Guard: Any other route redirects to / */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </LocalShopAppShell>
-    )
-  }
-
-  // 2. COMPANY ENTERPRISE RECYCLER DASHBOARD
-  if (userRole === 'company') {
-    return (
-      <CompanyAppShell>
-        <Routes>
-          <Route path="/company" element={<CompanyDashboard />} />
-          <Route path="/company/requests" element={<CompanyRequests />} />
-          <Route path="/company/inventory" element={<CompanyInventory />} />
-          <Route path="/company/processing" element={<CompanyProcessing />} />
-          <Route path="/company/transactions" element={<CompanyTransactions />} />
-          <Route path="/company/analytics" element={<CompanyAnalytics />} />
-          <Route path="/company/reports" element={<CompanyReports />} />
-          <Route path="/company/notifications" element={<CompanyNotifications />} />
-          <Route path="/company/profile" element={<CompanyProfile />} />
-          {/* Strict Role Guard: Any other route redirects to /company */}
-          <Route path="*" element={<Navigate to="/company" replace />} />
-        </Routes>
-      </CompanyAppShell>
     )
   }
 

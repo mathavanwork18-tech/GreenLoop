@@ -758,9 +758,9 @@ export class GreenAiEngine {
               intent: 'GENERAL_EWASTE_QUESTION',
               hazardAlert: payload.data.hazardAlert,
               actionChips: [
-                { label: '🗺️ Find Recyclers on Map', actionType: 'navigate', payload: '/map' },
-                { label: '📦 Post Item on Circular Loop', actionType: 'navigate', payload: '/post' },
-                { label: '🪙 View Rewards & Wallet', actionType: 'navigate', payload: '/activity' }
+                { label: 'Find Recyclers on Map', actionType: 'navigate', payload: '/map' },
+                { label: 'Post Item on Circular Loop', actionType: 'navigate', payload: '/post' },
+                { label: 'View Rewards & Wallet', actionType: 'navigate', payload: '/activity' }
               ]
             },
             updatedState

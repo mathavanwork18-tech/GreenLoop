@@ -9,15 +9,9 @@ export const ROLES: { id: Role; label: string; description: string; badge: strin
   },
   {
     id: 'shop',
-    label: 'Local Shop',
-    description: 'Neighborhood refurbishment and repair shops managing collections, pickups, and inventory',
+    label: 'Local Shop / Company',
+    description: 'Refurbishment shops and companies purchasing e-waste, managing bulk materials, and orders',
     badge: 'Business',
-  },
-  {
-    id: 'company',
-    label: 'Company',
-    description: 'Enterprise e-waste recyclers managing bulk collection manifests, industrial processing, and compliance',
-    badge: 'Enterprise',
   },
 ]
 

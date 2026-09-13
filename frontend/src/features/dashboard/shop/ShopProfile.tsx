@@ -63,8 +63,9 @@ export default function ShopProfile() {
       </div>
 
       {saveSuccess && (
-        <div style={{ padding: 12, background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', borderRadius: 'var(--radius-md)', marginBottom: 16, fontWeight: 700, fontSize: '0.82rem' }}>
-          ✓ Business profile updated and synced with Supabase public.profiles!
+        <div style={{ padding: 12, background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', borderRadius: 'var(--radius-md)', marginBottom: 16, fontWeight: 700, fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon name="check" size={14} color="#10b981" />
+          <span>Business profile updated and synced with Supabase public.profiles!</span>
         </div>
       )}
 

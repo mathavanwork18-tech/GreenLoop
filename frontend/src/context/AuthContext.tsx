@@ -359,12 +359,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      if (event === 'SIGNED_IN' && session?.user) {
-        const { data: profile } = await supabase
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
+        let { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .maybeSingle()
+
+        if (!profile) {
+          const meta = session.user.user_metadata || {}
+          profile = await ensureProfile(session.user.id, {
+            full_name: meta.full_name || meta.name,
+            phone: meta.phone,
+            role: meta.role,
+            city: meta.city,
+          })
+        }
 
         const dailyReward = await coinService.processDailyLoginReward(session.user.id)
 
@@ -373,7 +383,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(syncedUser)
           localStorage.setItem('gl_user', JSON.stringify(syncedUser))
         }
-      } else if (event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT' || !session?.user) {
         recommendationTracker.clearUserSession()
         setUser(null)
         localStorage.removeItem('gl_user')
@@ -456,19 +466,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Native Supabase Phone OTP Flow - Single Source of Truth
-    try {
-      await supabase.auth.signInWithOtp({ phone: e164 })
-    } catch (err: any) {
-      console.warn('[Green Loop] Supabase signInWithOtp notice:', err?.message)
+    const { error } = await supabase.auth.signInWithOtp({ phone: e164 })
+    if (error) {
+      console.error('[Green Loop] Supabase signInWithOtp error:', error)
+      throw new Error(error.message || 'Failed to send OTP via SMS. Please check the mobile number and try again.')
     }
-
-    // Always provide 123456 as devOtp for instant local testing when SMS gateway is in development
-    const devOtp = '123456'
 
     return {
       success: true,
       message: `OTP sent successfully to ${masked}`,
-      devOtp,
     }
   }
 
@@ -493,42 +499,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Please enter a valid 6-digit OTP.')
     }
 
-    let authUser: any = null
-    let authUserId = ''
+    // 1. Native Supabase Phone OTP Verification - Authenticated Session Creation
+    const { data: verifyData, error: authError } = await supabase.auth.verifyOtp({
+      phone: e164,
+      token: cleanOtp,
+      type: 'sms',
+    })
 
-    // 1. Native Supabase Phone OTP Verification
-    try {
-      const { data: verifyData, error: authError } = await supabase.auth.verifyOtp({
-        phone: e164,
-        token: cleanOtp,
-        type: 'sms',
-      })
-      if (!authError && verifyData?.user) {
-        authUser = verifyData.user
-        authUserId = authUser.id
-      } else if (cleanOtp === '123456') {
-        console.log('[Green Loop] Dev OTP (123456) accepted for testing.')
-      } else if (authError) {
-        throw new Error(authError.message || 'Verification code is invalid or has expired.')
-      }
-    } catch (err: any) {
-      if (cleanOtp === '123456') {
-        console.log('[Green Loop] Dev OTP (123456) accepted for testing.')
-      } else {
-        throw err
+    if (authError) {
+      console.error('[Green Loop] Supabase verifyOtp error:', authError)
+      throw new Error(authError.message || 'Verification code is invalid or has expired.')
+    }
+
+    const authUser = verifyData?.user
+    if (!authUser) {
+      throw new Error('Verification failed: authenticated user session could not be established.')
+    }
+
+    // STEP 4 — Verify session exists after login
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      throw new Error('Session establishment failed. Please try signing in again.')
+    }
+
+    // 2. Locate existing profile in profiles table keyed strictly by profiles.id = auth user.id
+    let { data: dbProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .maybeSingle()
+
+    if (!dbProfile) {
+      // Check by phone fallback if previously created before GoTrue linkage
+      const { data: phoneProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`phone.eq.${e164},phone.eq.${national}`)
+        .maybeSingle()
+      if (phoneProfile) {
+        dbProfile = phoneProfile
       }
     }
 
-    // 2. Locate existing profile in profiles table keyed by phone or auth.uid()
-    const { data: dbProfile } = await supabase
-      .from('profiles')
-      .select('*')
-      .or(`phone.eq.${e164},phone.eq.${national}${authUserId ? `,id.eq.${authUserId}` : ''}`)
-      .maybeSingle()
-
     if (dbProfile && dbProfile.id) {
-      const loggedIn = mapDbProfileToUser(dbProfile, authUser)
+      const dailyReward = await coinService.processDailyLoginReward(authUser.id)
+      const loggedIn = mapDbProfileToUser(dbProfile, authUser, dailyReward.totalCoins, dailyReward.streak)
       setUser(loggedIn)
+      localStorage.setItem('gl_user', JSON.stringify(loggedIn))
       return {
         success: true,
         isExistingUser: true,
@@ -538,7 +555,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Verified Supabase user, but profile is not yet created -> new user registration
+    // Verified Supabase user, but profile is not yet created -> continue to profile completion
     return {
       success: true,
       isExistingUser: false,
@@ -631,28 +648,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    if (!authUserId) {
+      throw new Error('Authentication required: Could not establish authenticated identity. Please verify your phone number first.')
+    }
+
     // 3. Persist to public.profiles
     let totalCoins = dbRole === 'citizen' ? 50 : 100
     let streak = 1
 
-    if (authUserId) {
-      await ensureProfile(authUserId, {
-        full_name: name,
-        phone: e164,
-        role: dbRole,
-        city: profileData.city || 'Coimbatore',
-        address: profileData.shopAddress || profileData.area || '',
-      })
+    await ensureProfile(authUserId, {
+      full_name: name,
+      phone: e164,
+      role: dbRole,
+      city: profileData.city || 'Coimbatore',
+      address: profileData.shopAddress || profileData.area || '',
+    })
 
-      // Award registration bonus and process first daily login reward
-      await coinService.awardRegistrationBonus(authUserId, dbRole)
-      const daily = await coinService.processDailyLoginReward(authUserId)
-      totalCoins = daily.totalCoins
-      streak = daily.streak
-    }
+    // Award registration bonus and process first daily login reward
+    await coinService.awardRegistrationBonus(authUserId, dbRole)
+    const daily = await coinService.processDailyLoginReward(authUserId)
+    totalCoins = daily.totalCoins
+    streak = daily.streak
 
     const completedUser: User = {
-      id: authUserId || ('u_' + Date.now()),
+      id: authUserId,
       name,
       username: (name || 'citizen').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
       email,
@@ -845,21 +864,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return newUser
     }
 
-    // Fallback: If auth server could not create user immediately, ensure clean local profile object
-    const fallbackId = 'u_' + Date.now()
-    createdProfile = {
-      id: fallbackId,
-      full_name: data.name.trim(),
-      phone: e164,
-      role: dbRole,
-      city: data.city.trim(),
-      coins: dbRole === 'citizen' ? 50 : 100,
-      current_streak: 1,
-    }
-    const newUser = mapDbProfileToUser(createdProfile, authUser, createdProfile.coins, 1)
-    setUser(newUser)
-    localStorage.setItem('gl_user', JSON.stringify(newUser))
-    return newUser
+    throw new Error('Registration failed on authentication server. Please check your mobile number and try again.')
   }
 
   const logout = async () => {

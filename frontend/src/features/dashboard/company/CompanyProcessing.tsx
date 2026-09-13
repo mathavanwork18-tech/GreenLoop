@@ -156,9 +156,9 @@ export default function CompanyProcessing() {
                   </div>
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: '0.76rem', color: 'var(--text-tertiary)' }}>
-                    <span>⚖️ Batch Weight: <strong>{item.weightKg} kg</strong></span>
-                    <span>🏭 Facility: {item.targetFacility}</span>
-                    <span>🕒 Intake: {item.lastUpdated}</span>
+                    <span>Batch Weight: <strong>{item.weightKg} kg</strong></span>
+                    <span>Facility: {item.targetFacility}</span>
+                    <span>Intake: {item.lastUpdated}</span>
                   </div>
                 </div>
 

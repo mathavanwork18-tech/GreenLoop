@@ -118,8 +118,9 @@ export default function CompanyAnalytics() {
                 <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
                   Certified chemical leaching neutralization for mercury, lead, and cadmium fractions.
                 </div>
-                <div style={{ marginTop: 8, fontSize: '0.72rem', color: '#10b981', fontWeight: 800 }}>
-                  ✓ 100% TNPCB Mandate Fulfilled
+                <div style={{ marginTop: 8, fontSize: '0.72rem', color: '#10b981', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name="check" size={13} color="#10b981" />
+                  <span>100% TNPCB Mandate Fulfilled</span>
                 </div>
               </div>
 
@@ -130,8 +131,9 @@ export default function CompanyAnalytics() {
                 <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
                   Secondary refining efficiency for gold, palladium, copper, and silver contacts.
                 </div>
-                <div style={{ marginTop: 8, fontSize: '0.72rem', color: '#059669', fontWeight: 800 }}>
-                  ✓ 94.2% Recovery Rate Verified
+                <div style={{ marginTop: 8, fontSize: '0.72rem', color: '#059669', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Icon name="check" size={13} color="#059669" />
+                  <span>94.2% Recovery Rate Verified</span>
                 </div>
               </div>
             </div>

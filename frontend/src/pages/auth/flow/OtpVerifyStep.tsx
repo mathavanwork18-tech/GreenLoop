@@ -6,7 +6,6 @@ import { getAuthTranslation } from '../../../utils/translations'
 interface Props {
   language: LanguageCode
   phone: string
-  devOtp?: string
   onVerifyOtp: (otp: string) => Promise<{
     success: boolean
     isExistingUser?: boolean
@@ -15,7 +14,7 @@ interface Props {
     role?: any
     message?: string
   }>
-  onResendOtp: () => Promise<{ success: boolean; message: string; devOtp?: string }>
+  onResendOtp: () => Promise<{ success: boolean; message: string }>
   onSuccess: (isExistingUser: boolean, isProfileComplete: boolean, role?: any) => void
   onBack: () => void
 }
@@ -23,7 +22,6 @@ interface Props {
 export default function OtpVerifyStep({
   language,
   phone,
-  devOtp,
   onVerifyOtp,
   onResendOtp,
   onSuccess,
@@ -35,7 +33,6 @@ export default function OtpVerifyStep({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [currentDevOtp, setCurrentDevOtp] = useState(devOtp)
   const [welcomeTransition, setWelcomeTransition] = useState<{
     show: boolean
     name: string
@@ -173,7 +170,6 @@ export default function OtpVerifyStep({
       const res = await onResendOtp()
       if (res.success) {
         setTimer(30)
-        if (res.devOtp) setCurrentDevOtp(res.devOtp)
         setOtp(['', '', '', '', '', ''])
         inputRefs.current[0]?.focus()
       } else {
@@ -340,35 +336,8 @@ export default function OtpVerifyStep({
         </div>
       </div>
 
-      {/* Dev OTP Helper */}
-      {currentDevOtp && (
-        <div
-          onClick={() => {
-            const digits = currentDevOtp.split('')
-            setOtp(digits)
-            triggerVerify(currentDevOtp)
-          }}
-          style={{
-            background: 'rgba(16,185,129,0.12)',
-            border: '1px solid #10b981',
-            borderRadius: '12px',
-            padding: '10px 14px',
-            marginBottom: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-          }}
-        >
-          <div style={{ fontSize: '0.82rem', color: '#a7f3d0' }}>
-            <span>Dev OTP: </span>
-            <strong style={{ letterSpacing: '2px', color: '#fff', fontSize: '0.95rem' }}>{currentDevOtp}</strong>
-          </div>
-          <span style={{ fontSize: '0.75rem', color: '#10b981', textDecoration: 'underline', fontWeight: 700 }}>
-            Auto-fill
-          </span>
-        </div>
-      )}
+      {/* Instructions */}
+      <div style={{ marginBottom: 16 }}></div>
 
       {/* 6 OTP Boxes Container */}
       <div

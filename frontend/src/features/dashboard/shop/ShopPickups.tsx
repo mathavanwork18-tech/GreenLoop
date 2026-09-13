@@ -195,9 +195,9 @@ export default function ShopPickups() {
                   </div>
 
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: '0.76rem', color: 'var(--text-tertiary)' }}>
-                    <span>📍 {req.customerCity}</span>
-                    <span>📞 {req.customerPhone}</span>
-                    <span>📅 Scheduled: {req.scheduledDate}</span>
+                    <span>City: {req.customerCity}</span>
+                    <span>Phone: {req.customerPhone}</span>
+                    <span>Scheduled: {req.scheduledDate}</span>
                   </div>
                 </div>
 

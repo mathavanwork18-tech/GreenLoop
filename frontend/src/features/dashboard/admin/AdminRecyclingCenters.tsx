@@ -116,10 +116,10 @@ export default function AdminRecyclingCenters() {
               </div>
 
               <div style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div>📍 Address: <strong>{c.address}, {c.city}</strong></div>
-                <div>📞 Contact: <strong>{c.contact_phone || 'Official Desk'}</strong></div>
-                <div>⚖️ Capacity: <strong>{(c.capacity_kg || 1000).toLocaleString()} kg / mo</strong></div>
-                <div>🌐 GPS: <strong>{c.latitude}, {c.longitude}</strong></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="location-pin" size={14} color="#10b981" /> Address: <strong>{c.address}, {c.city}</strong></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="phone" size={14} color="#10b981" /> Contact: <strong>{c.contact_phone || 'Official Desk'}</strong></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="chart" size={14} color="#10b981" /> Capacity: <strong>{(c.capacity_kg || 1000).toLocaleString()} kg / mo</strong></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Icon name="map" size={14} color="#10b981" /> GPS: <strong>{c.latitude}, {c.longitude}</strong></div>
               </div>
             </div>
           ))

@@ -23,10 +23,15 @@ export interface CreatePostParams {
 export async function createPost(params: CreatePostParams) {
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser()
 
+  if (authError) {
+    throw new Error(authError.message || 'Authentication error: Unable to verify your account.')
+  }
+
   if (!user) {
-    throw new Error('You must be signed in to create an e-waste listing.')
+    throw new Error('Please sign in to create an e-waste listing.')
   }
 
   const newRow = {
@@ -49,13 +54,25 @@ export async function createPost(params: CreatePostParams) {
   const { data, error } = await supabase
     .from('e_waste_posts')
     .insert(newRow)
-    .select('*, profiles:user_id ( full_name, phone, city )')
+    .select('*')
     .single()
 
   if (error) {
     console.error('[Green Loop] Post failed on e_waste_posts:', error)
     throw new Error(error.message || 'Database error: unable to save e-waste listing.')
   }
+
+  // Attach seller profile metadata cleanly
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, phone, city')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (profile && data) {
+      data.profiles = profile
+    }
+  } catch {}
 
   return data
 }

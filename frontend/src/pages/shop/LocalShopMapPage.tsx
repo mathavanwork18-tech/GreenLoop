@@ -53,7 +53,7 @@ export default function LocalShopMapPage() {
         const { data: shopsData, error: shopsErr } = await supabase
           .from('profiles')
           .select('id, full_name, phone, city, address, role')
-          .or('role.eq.shop,role.eq.local_shop')
+          .or('role.eq.shop,role.eq.local_shop,role.eq.company,role.eq.recycler')
 
         if (shopsErr) {
           console.warn('[Green Loop] Shops lookup error:', shopsErr.message)
