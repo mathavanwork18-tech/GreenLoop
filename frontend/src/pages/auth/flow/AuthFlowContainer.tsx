@@ -38,6 +38,7 @@ export default function AuthFlowContainer() {
 
   const [step, setStep] = useState<AuthStep>('LANGUAGE')
   const [phone, setPhone] = useState('')
+  const [devOtp, setDevOtp] = useState('123456')
   const [role, setRole] = useState<Role>('GENERAL_USER')
   const [draftData, setDraftData] = useState<Record<string, any>>({})
   const [showResumeModal, setShowResumeModal] = useState(false)
@@ -86,8 +87,9 @@ export default function AuthFlowContainer() {
   }
 
   // Step 2: OTP Sent
-  const handleOtpSent = (phoneNumber: string) => {
+  const handleOtpSent = (phoneNumber: string, code?: string) => {
     setPhone(phoneNumber)
+    if (code) setDevOtp(code)
     saveRegistrationDraft({ phone: phoneNumber, step: 3 })
     setStep('OTP')
   }
@@ -219,8 +221,13 @@ export default function AuthFlowContainer() {
           <OtpVerifyStep
             language={language}
             phone={phone}
+            devOtp={devOtp}
             onVerifyOtp={(code: string) => verifyOtp(phone, code)}
-            onResendOtp={() => sendOtp(phone)}
+            onResendOtp={async () => {
+              const res = await sendOtp(phone)
+              if (res.devOtp) setDevOtp(res.devOtp)
+              return res
+            }}
             onSuccess={handleOtpSuccess}
             onBack={() => setStep('PHONE')}
           />

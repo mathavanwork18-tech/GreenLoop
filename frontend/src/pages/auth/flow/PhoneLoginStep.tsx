@@ -52,7 +52,7 @@ export default function PhoneLoginStep({
       if (res.success) {
         // Brief transition delay so user sees sending state
         setTimeout(() => {
-          onOtpSent(phone)
+          onOtpSent(phone, res.devOtp || '123456')
         }, 400)
       } else {
         setError(res.message || 'Failed to send OTP. Please try again.')

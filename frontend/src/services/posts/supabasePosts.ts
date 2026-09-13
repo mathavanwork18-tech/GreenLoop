@@ -21,13 +21,23 @@ export interface CreatePostParams {
  * Inserts a new e-waste listing associated with the authenticated Supabase user.
  */
 export async function createPost(params: CreatePostParams) {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  let user: { id: string; [key: string]: any } | null = null
 
-  if (authError) {
-    throw new Error(authError.message || 'Authentication error: Unable to verify your account.')
+  try {
+    const { data: authData } = await supabase.auth.getUser()
+    if (authData?.user?.id) {
+      user = authData.user
+    }
+  } catch {}
+
+  if (!user) {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('gl_user') : null
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored)
+        if (parsed?.id) user = { id: parsed.id }
+      } catch {}
+    }
   }
 
   if (!user) {

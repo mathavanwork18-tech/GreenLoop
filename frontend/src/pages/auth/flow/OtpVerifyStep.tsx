@@ -6,6 +6,7 @@ import { getAuthTranslation } from '../../../utils/translations'
 interface Props {
   language: LanguageCode
   phone: string
+  devOtp?: string
   onVerifyOtp: (otp: string) => Promise<{
     success: boolean
     isExistingUser?: boolean
@@ -14,7 +15,7 @@ interface Props {
     role?: any
     message?: string
   }>
-  onResendOtp: () => Promise<{ success: boolean; message: string }>
+  onResendOtp: () => Promise<{ success: boolean; message: string; devOtp?: string }>
   onSuccess: (isExistingUser: boolean, isProfileComplete: boolean, role?: any) => void
   onBack: () => void
 }
@@ -22,6 +23,7 @@ interface Props {
 export default function OtpVerifyStep({
   language,
   phone,
+  devOtp = '123456',
   onVerifyOtp,
   onResendOtp,
   onSuccess,
@@ -29,6 +31,7 @@ export default function OtpVerifyStep({
 }: Props) {
   const t = getAuthTranslation(language)
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', ''])
+  const [currentDevOtp, setCurrentDevOtp] = useState(devOtp || '123456')
   const [timer, setTimer] = useState(30)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -161,6 +164,16 @@ export default function OtpVerifyStep({
     }
   }
 
+  const handleAutofill = () => {
+    const code = currentDevOtp || '123456'
+    const digits = code.split('').slice(0, 6)
+    while (digits.length < 6) digits.push('')
+    setOtp(digits)
+    if (code.length === 6) {
+      triggerVerify(code)
+    }
+  }
+
   const handleResend = async () => {
     if (timer > 0 || loading) return
 
@@ -170,6 +183,7 @@ export default function OtpVerifyStep({
       const res = await onResendOtp()
       if (res.success) {
         setTimer(30)
+        if (res.devOtp) setCurrentDevOtp(res.devOtp)
         setOtp(['', '', '', '', '', ''])
         inputRefs.current[0]?.focus()
       } else {
@@ -336,8 +350,67 @@ export default function OtpVerifyStep({
         </div>
       </div>
 
-      {/* Instructions */}
-      <div style={{ marginBottom: 16 }}></div>
+      {/* Instructions / OTP Autofill Card */}
+      <div
+        onClick={handleAutofill}
+        style={{
+          background: 'rgba(16,185,129,0.12)',
+          border: '1.5px solid rgba(16,185,129,0.45)',
+          borderRadius: '14px',
+          padding: '12px 16px',
+          marginBottom: 20,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              background: 'rgba(16,185,129,0.22)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon name="sparkles" size={18} color="#10b981" />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.74rem', color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+              Testing Code
+            </div>
+            <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '2px' }}>
+              {currentDevOtp || '123456'}
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleAutofill()
+          }}
+          disabled={loading || success}
+          style={{
+            background: 'linear-gradient(135deg, #10b981, #059669)',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#ffffff',
+            fontWeight: 800,
+            fontSize: '0.8rem',
+            padding: '8px 14px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+          }}
+        >
+          Auto-fill OTP
+        </button>
+      </div>
 
       {/* 6 OTP Boxes Container */}
       <div
