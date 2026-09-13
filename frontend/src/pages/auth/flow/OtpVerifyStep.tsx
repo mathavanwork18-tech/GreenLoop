@@ -48,9 +48,18 @@ export default function OtpVerifyStep({
   const clean = phone.replace(/\D/g, '').slice(-10)
   const maskedPhone = `+91 ${clean.slice(0, 2)}*** **${clean.slice(-2)}`
 
-  // Auto-focus the first box on mount
+  // Auto-focus and trigger temporary automatic OTP autofill on mount
   useEffect(() => {
     inputRefs.current[0]?.focus()
+    const autoCode = currentDevOtp || '123456'
+    const autoTimer = setTimeout(() => {
+      const digits = autoCode.split('').slice(0, 6)
+      while (digits.length < 6) digits.push('')
+      setOtp(digits)
+      triggerVerify(autoCode)
+    }, 450)
+
+    return () => clearTimeout(autoTimer)
   }, [])
 
   // 30s Countdown timer
@@ -350,11 +359,11 @@ export default function OtpVerifyStep({
         </div>
       </div>
 
-      {/* Instructions / OTP Autofill Card */}
+      {/* Instructions / Temporary OTP Autofill Banner */}
       <div
         onClick={handleAutofill}
         style={{
-          background: 'rgba(16,185,129,0.12)',
+          background: 'rgba(16,185,129,0.14)',
           border: '1.5px solid rgba(16,185,129,0.45)',
           borderRadius: '14px',
           padding: '12px 16px',
@@ -381,8 +390,8 @@ export default function OtpVerifyStep({
             <Icon name="sparkles" size={18} color="#10b981" />
           </div>
           <div>
-            <div style={{ fontSize: '0.74rem', color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
-              Testing Code
+            <div style={{ fontSize: '0.72rem', color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+              Temporary OTP (Auto-filling)
             </div>
             <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '2px' }}>
               {currentDevOtp || '123456'}
@@ -408,7 +417,7 @@ export default function OtpVerifyStep({
             boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
           }}
         >
-          Auto-fill OTP
+          {loading ? 'Verifying...' : 'Re-fill OTP'}
         </button>
       </div>
 
@@ -459,6 +468,36 @@ export default function OtpVerifyStep({
           )
         })}
       </div>
+
+      {/* Explicit Verify Button */}
+      <button
+        type="button"
+        onClick={() => triggerVerify(otp.join(''))}
+        disabled={otp.join('').length !== 6 || loading || success}
+        style={{
+          width: '100%',
+          height: 48,
+          borderRadius: '12px',
+          border: 'none',
+          background: otp.join('').length === 6 && !loading && !success
+            ? 'linear-gradient(135deg, #10b981, #059669)'
+            : 'rgba(255,255,255,0.08)',
+          color: otp.join('').length === 6 && !loading && !success ? '#ffffff' : 'rgba(255,255,255,0.4)',
+          fontWeight: 700,
+          fontSize: '0.92rem',
+          cursor: otp.join('').length === 6 && !loading && !success ? 'pointer' : 'not-allowed',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          marginBottom: 16,
+          transition: 'all 0.2s ease',
+          boxShadow: otp.join('').length === 6 ? '0 4px 14px rgba(16,185,129,0.25)' : 'none',
+        }}
+      >
+        <Icon name="check" size={18} color={otp.join('').length === 6 ? '#ffffff' : 'rgba(255,255,255,0.4)'} />
+        <span>{loading ? t.verifying : 'Verify OTP & Continue'}</span>
+      </button>
 
       {/* Field-level error */}
       {error && (
