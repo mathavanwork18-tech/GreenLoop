@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../utils/supabase'
 import { useAuth } from '../../context/AuthContext'
 import Icon from '../../components/Icon'
+import MarketplaceChatModal, { type ChatListingContext } from '../../components/chat/MarketplaceChatModal'
 
 interface GeneralUserPost {
   id: string
@@ -26,6 +27,9 @@ export default function LocalShopHomePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<string>('all')
+
+  // Marketplace Chat state
+  const [chatListing, setChatListing] = useState<ChatListingContext | null>(null)
 
   // Modals state
   const [enquiryPost, setEnquiryPost] = useState<GeneralUserPost | null>(null)
@@ -426,14 +430,20 @@ export default function LocalShopHomePage() {
                       Seller: <strong style={{ color: 'var(--text-primary)' }}>{post.sellerName}</strong>
                     </div>
 
-                    {/* Action Buttons: Enquiry & Buy */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 'auto' }}>
+                    {/* Action Buttons: Message Seller & Buy */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: 10, marginTop: 'auto' }}>
                       <button
                         onClick={() => {
-                          setEnquiryPost(post)
-                          setEnquiryMessage('')
-                          setEnquiryError(null)
-                          setEnquirySuccess(false)
+                          setChatListing({
+                            id: post.id,
+                            title: post.title,
+                            askingPrice: post.askingPrice,
+                            location: post.location,
+                            sellerName: post.sellerName,
+                            sellerId: post.userId,
+                            imageUrl: post.imageUrl,
+                            category: post.category,
+                          })
                         }}
                         className="btn btn-secondary"
                         style={{
@@ -442,13 +452,13 @@ export default function LocalShopHomePage() {
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: 6,
-                          fontSize: '0.82rem',
+                          fontSize: '0.8rem',
                           fontWeight: 700,
                           borderRadius: 'var(--radius-md)',
                         }}
                       >
-                        <Icon name="comment" size={15} color="var(--text-secondary)" />
-                        <span>Enquiry</span>
+                        <Icon name="comment" size={15} color="var(--accent)" />
+                        <span>Message Seller</span>
                       </button>
 
                       <button
@@ -624,6 +634,15 @@ export default function LocalShopHomePage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Live Marketplace 1-on-1 Chat Modal */}
+      {chatListing && (
+        <MarketplaceChatModal
+          isOpen={Boolean(chatListing)}
+          onClose={() => setChatListing(null)}
+          listing={chatListing}
+        />
       )}
     </div>
   )

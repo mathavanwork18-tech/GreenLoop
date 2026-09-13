@@ -3,6 +3,7 @@ import Icon from './Icon'
 import { useAuth } from '../context/AuthContext'
 import { postsApi } from '../services/posts/posts.api'
 import { interactionsApi, type PostCommentItem } from '../services/interactions/interactions.api'
+import MarketplaceChatModal from './chat/MarketplaceChatModal'
 
 export interface PostItem {
   id: string
@@ -59,6 +60,7 @@ export default function PostDetailModal({
   const [commentsList, setCommentsList] = useState<PostCommentItem[]>([])
   const [claiming, setClaiming] = useState(false)
   const [claimStatus, setClaimStatus] = useState<string | null>(null)
+  const [openMarketplaceChat, setOpenMarketplaceChat] = useState(false)
 
   useEffect(() => {
     if (post?.id && isOpen) {
@@ -504,39 +506,80 @@ export default function PostDetailModal({
               <span>{deleting ? 'Deleting...' : 'Delete Listing'}</span>
             </button>
           ) : (
-            <button
-              className="btn btn-primary"
-              disabled={claiming || claimStatus === 'pending' || claimStatus === 'approved'}
-              onClick={handleClaimPost}
-              style={{
-                flex: 1,
-                fontSize: '0.88rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                background: claimStatus ? '#059669' : undefined,
-              }}
-            >
-              {claiming ? (
-                <span>Submitting Claim...</span>
-              ) : claimStatus === 'approved' ? (
-                <><Icon name="check" size={16} color="#fff" /><span>Claim Approved</span></>
-              ) : claimStatus === 'pending' ? (
-                <><Icon name="check" size={16} color="#fff" /><span>Claim Pending</span></>
-              ) : post.purpose === 'Sell' ? (
-                <><Icon name="coin" size={16} color="#fff" /><span>Claim & Make Offer</span></>
-              ) : post.purpose === 'Recycle' ? (
-                <><Icon name="pickup" size={16} color="#fff" /><span>Claim for Recycling</span></>
-              ) : post.purpose === 'Donate' ? (
-                <><Icon name="gift" size={16} color="#fff" /><span>Claim Donation</span></>
-              ) : (
-                <><Icon name="refresh" size={16} color="#fff" /><span>Claim Device</span></>
-              )}
-            </button>
+            <>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setOpenMarketplaceChat(true)}
+                style={{
+                  height: 42,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '0 16px',
+                  borderRadius: 'var(--radius-md)',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--bg-surface-2)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <Icon name="comment" size={16} color="var(--accent)" />
+                <span>Message Seller</span>
+              </button>
+
+              <button
+                className="btn btn-primary"
+                disabled={claiming || claimStatus === 'pending' || claimStatus === 'approved'}
+                onClick={handleClaimPost}
+                style={{
+                  flex: 1,
+                  fontSize: '0.88rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: claimStatus ? '#059669' : undefined,
+                }}
+              >
+                {claiming ? (
+                  <span>Submitting Claim...</span>
+                ) : claimStatus === 'approved' ? (
+                  <><Icon name="check" size={16} color="#fff" /><span>Claim Approved</span></>
+                ) : claimStatus === 'pending' ? (
+                  <><Icon name="check" size={16} color="#fff" /><span>Claim Pending</span></>
+                ) : post.purpose === 'Sell' ? (
+                  <><Icon name="coin" size={16} color="#fff" /><span>Claim & Make Offer</span></>
+                ) : post.purpose === 'Recycle' ? (
+                  <><Icon name="pickup" size={16} color="#fff" /><span>Claim for Recycling</span></>
+                ) : post.purpose === 'Donate' ? (
+                  <><Icon name="gift" size={16} color="#fff" /><span>Claim Donation</span></>
+                ) : (
+                  <><Icon name="refresh" size={16} color="#fff" /><span>Claim Device</span></>
+                )}
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Integrated Marketplace Peer-to-Peer Chat Modal */}
+      <MarketplaceChatModal
+        isOpen={openMarketplaceChat}
+        listing={{
+          id: post.id,
+          title: post.title,
+          askingPrice: post.price,
+          location: post.location,
+          category: post.category,
+          condition: post.condition,
+          sellerName: post.seller.name,
+          imageUrl: post.images?.[0] || null,
+        }}
+        onClose={() => setOpenMarketplaceChat(false)}
+      />
     </>
   )
 }

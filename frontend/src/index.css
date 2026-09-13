@@ -21,32 +21,32 @@
   --color-blue-400:  #60a5fa;
   --color-blue-500:  #3b82f6;
 
-  /* === LIGHT MODE TOKENS === */
-  --bg-base:          #f8faf9;
+  /* === LIGHT MODE TOKENS — LAYERED ENVIRONMENTAL TECH PALETTE === */
+  --bg-base:          #f1f5f3;
   --bg-surface:       #ffffff;
-  --bg-surface-2:     #f0f4f2;
-  --bg-surface-hover: #e8f0ec;
-  --bg-overlay:       rgba(255,255,255,0.88);
-  --border-color:     #e2e8e5;
-  --border-subtle:    #edf2ef;
+  --bg-surface-2:     #eef4f0;
+  --bg-surface-hover: #e2ece6;
+  --bg-overlay:       rgba(241, 245, 243, 0.92);
+  --border-color:     #d5e0d9;
+  --border-subtle:    #e4ece7;
 
-  --text-primary:     #111827;
-  --text-secondary:   #4b5563;
-  --text-tertiary:    #9ca3af;
+  --text-primary:     #19231d;
+  --text-secondary:   #4b5e53;
+  --text-tertiary:    #73887c;
   --text-inverse:     #ffffff;
 
   --accent:           #059669;
   --accent-hover:     #047857;
-  --accent-light:     #d1fae5;
+  --accent-light:     #e6f7ef;
   --accent-text:      #065f46;
 
   --coin-color:       #d97706;
-  --coin-bg:          #fffbeb;
+  --coin-bg:          #fef3c7;
 
-  --shadow-sm:        0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:        0 4px 16px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
-  --shadow-lg:        0 12px 40px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06);
-  --shadow-accent:    0 4px 20px rgba(5,150,105,0.22);
+  --shadow-sm:        0 1px 3px rgba(16, 36, 26, 0.05), 0 1px 2px rgba(16, 36, 26, 0.03);
+  --shadow-md:        0 4px 14px rgba(16, 36, 26, 0.08), 0 2px 6px rgba(16, 36, 26, 0.04);
+  --shadow-lg:        0 10px 30px rgba(16, 36, 26, 0.1), 0 4px 12px rgba(16, 36, 26, 0.05);
+  --shadow-accent:    0 4px 18px rgba(5, 150, 105, 0.2);
 
   --radius-xs:  6px;
   --radius-sm:  8px;

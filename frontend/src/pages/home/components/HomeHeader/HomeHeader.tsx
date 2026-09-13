@@ -81,6 +81,28 @@ export default function HomeHeader({ onNotificationClick }: HomeHeaderProps) {
             />
           </button>
 
+          {/* Direct Messages Shortcut */}
+          <button
+            onClick={() => navigate('/chat')}
+            aria-label="Messages & Chat"
+            title="Messages & Chat"
+            style={{
+              background: 'var(--bg-surface-2)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '50%',
+              width: 36,
+              height: 36,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              position: 'relative',
+              color: 'var(--text-primary)'
+            }}
+          >
+            <Icon name="comment" size={17} color="var(--text-primary)" />
+          </button>
+
           <button
             onClick={onNotificationClick}
             aria-label="Notifications"
