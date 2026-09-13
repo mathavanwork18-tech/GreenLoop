@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
 import Icon from '../../../components/Icon'
+import PasswordRequirements2Ticks from '../../../components/PasswordRequirements2Ticks'
 import type { LanguageCode } from '../../../types/common.types'
 import { getAuthTranslation } from '../../../utils/translations'
+import { normalizePhone } from '../../../utils/phone'
 
 interface Props {
   language: LanguageCode
@@ -36,8 +38,19 @@ export default function ShopRegisterStep({
   const [category, setCategory] = useState(initialData.category || 'Electronics Repair')
   const [email, setEmail] = useState(initialData.email || '')
   const [shopAddress, setShopAddress] = useState(initialData.shopAddress || '')
-  const [area, setArea] = useState(initialData.area || 'Ritchie Street')
+  const [area, setArea] = useState(initialData.area || 'Guindy')
   const [city, setCity] = useState(initialData.city || 'Chennai')
+  const [password, setPassword] = useState(initialData.password || '')
+  const [confirmPassword, setConfirmPassword] = useState(initialData.confirmPassword || '')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // Simplified password policy: 6-16 chars, letters/numbers, symbols optional
+  const isPasswordMin = password.length >= 6
+  const isPasswordMax = password.length <= 16
+  const isPasswordLengthValid = isPasswordMin && isPasswordMax
+  const isPasswordMismatch = Boolean(confirmPassword && password !== confirmPassword)
+  const isPasswordValid = isPasswordLengthValid && !isPasswordMismatch && Boolean(confirmPassword)
 
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -84,6 +97,19 @@ export default function ShopRegisterStep({
       }
     }
 
+    // Password validation (6-16 characters)
+    if (!password) {
+      newErrors.password = 'Password is required'
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters.'
+    } else if (password.length > 16) {
+      newErrors.password = 'Password must be 16 characters or fewer.'
+    }
+
+    if (password !== confirmPassword) {
+      newErrors.confirmPassword = "Passwords don't match."
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
       return
@@ -96,6 +122,7 @@ export default function ShopRegisterStep({
         ownerName: ownerName.trim(),
         category,
         email: email.trim(),
+        password,
         shopAddress: shopAddress.trim(),
         area: area.trim(),
         city: city.trim(),
@@ -170,7 +197,7 @@ export default function ShopRegisterStep({
               fontWeight: 600,
             }}
           >
-            <span>+91 {phone}</span>
+            <span>{normalizePhone(phone).display || ('+91 ' + phone)}</span>
             <span
               style={{
                 fontSize: '0.72rem',
@@ -401,6 +428,147 @@ export default function ShopRegisterStep({
           </div>
         </div>
 
+        {/* Password & Confirm Password */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <label style={{ fontSize: '0.84rem', fontWeight: 700, margin: 0 }}>
+              {t.password} <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <span
+              style={{
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                color: password.length > 16 ? '#ef4444' : password.length >= 6 ? 'var(--accent)' : 'var(--text-tertiary)',
+              }}
+            >
+              {password.length}/16
+            </span>
+          </div>
+
+          {/* Password Input with Show/Hide Toggle */}
+          <div style={{ position: 'relative', marginBottom: 10 }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                handleFieldChange('password', e.target.value)
+              }}
+              placeholder="Enter 6–16 characters"
+              style={{
+                width: '100%',
+                height: 48,
+                borderRadius: '12px',
+                border:
+                  errors.password || (password.length > 0 && !isPasswordLengthValid)
+                    ? '2px solid #ef4444'
+                    : '1.5px solid var(--border-color)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                padding: '0 44px 0 14px',
+                fontSize: '0.95rem',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                padding: 4,
+              }}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} color="var(--text-secondary)" />
+            </button>
+          </div>
+
+          {/* Inline password validation messages */}
+          {password.length > 0 && password.length < 6 && (
+            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: 10, display: 'block' }}>
+              Password must be at least 6 characters.
+            </span>
+          )}
+          {password.length > 16 && (
+            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: 10, display: 'block' }}>
+              Password must be 16 characters or fewer.
+            </span>
+          )}
+          {errors.password && password.length >= 6 && password.length <= 16 && (
+            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: 10, display: 'block' }}>
+              {errors.password}
+            </span>
+          )}
+
+          {/* Confirm Password Input with Show/Hide Toggle */}
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value)
+                handleFieldChange('confirmPassword', e.target.value)
+              }}
+              placeholder={t.confirmPasswordPlaceholder}
+              style={{
+                width: '100%',
+                height: 48,
+                borderRadius: '12px',
+                border:
+                  errors.confirmPassword || isPasswordMismatch
+                    ? '2px solid #ef4444'
+                    : '1.5px solid var(--border-color)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                padding: '0 44px 0 14px',
+                fontSize: '0.95rem',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={{
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                padding: 4,
+              }}
+              aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+            >
+              <Icon name={showConfirmPassword ? 'eye-off' : 'eye'} size={18} color="var(--text-secondary)" />
+            </button>
+          </div>
+
+          {(errors.confirmPassword || isPasswordMismatch) && (
+            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
+              Passwords don't match.
+            </span>
+          )}
+
+          {/* 2-Tick Password Acceptance Indicator */}
+          <PasswordRequirements2Ticks
+            password={password}
+            confirmPassword={confirmPassword}
+          />
+        </div>
+
         {/* Global form error */}
         {errors.form && (
           <div
@@ -420,7 +588,7 @@ export default function ShopRegisterStep({
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !password || !isPasswordValid}
           className="btn btn-primary btn-lg btn-full"
           style={{
             height: 52,
@@ -433,6 +601,8 @@ export default function ShopRegisterStep({
             justifyContent: 'center',
             gap: 10,
             marginTop: 10,
+            opacity: loading || !password || !isPasswordValid ? 0.6 : 1,
+            cursor: loading || !password || !isPasswordValid ? 'not-allowed' : 'pointer',
           }}
         >
           {loading ? (

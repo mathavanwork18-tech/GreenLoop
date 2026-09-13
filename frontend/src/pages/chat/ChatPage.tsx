@@ -175,10 +175,10 @@ export default function ChatPage() {
         }}
       >
         {[
-          '📍 Share Live GPS',
-          '⏰ Confirm 11:30 AM Slot',
-          '🔥 Request Thermal Safety Box',
-          '📜 Ask for TNPCB Certificate',
+          'Share Live GPS',
+          'Confirm 11:30 AM Slot',
+          'Request Thermal Safety Box',
+          'Ask for TNPCB Certificate',
         ].map((chip) => (
           <button
             key={chip}

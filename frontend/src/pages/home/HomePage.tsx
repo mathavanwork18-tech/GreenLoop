@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useHomeFeed } from './hooks/useHomeFeed'
+import { useAuth } from '../../context/AuthContext'
 import HomeHeader from './components/HomeHeader/HomeHeader'
 import HeroSection from './components/HeroSection/HeroSection'
 import SearchSection from './components/SearchSection/SearchSection'
@@ -8,10 +10,23 @@ import RecommendationSection from './components/RecommendationSection/Recommenda
 import PostFeed from './components/PostFeed/PostFeed'
 import NearbySection from './components/NearbySection/NearbySection'
 import PostDetailModal from '../../components/PostDetailModal'
+import RecommendationDebugModal from '../../components/RecommendationDebugModal'
+import Icon from '../../components/Icon'
 import type { Post } from '../../types/post.types'
 
 export default function HomePage() {
-  const { posts, recommended, nearby, handleToggleLike, handleToggleSave } = useHomeFeed()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const {
+    posts,
+    recommended,
+    nearby,
+    debugScores,
+    handleToggleLike,
+    handleToggleSave,
+    handleTrackPostOpen,
+    handleTrackSearch,
+  } = useHomeFeed()
 
   // Filter and search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -21,9 +36,20 @@ export default function HomePage() {
   const [activeSort, setActiveSort] = useState('newest')
   const [verifiedOnly, setVerifiedOnly] = useState(false)
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  const [showDebugModal, setShowDebugModal] = useState(false)
 
   // Selected post for detail modal
   const [selectedPost, setSelectedPost] = useState<Post | null>(null)
+
+  const handleSelectPost = (post: Post) => {
+    handleTrackPostOpen(post)
+    setSelectedPost(post)
+  }
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query)
+    handleTrackSearch(query)
+  }
 
   // Filtered posts calculation
   const filteredPosts = useMemo(() => {
@@ -32,7 +58,7 @@ export default function HomePage() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       list = list.filter(
-        p =>
+        (p) =>
           p.title.toLowerCase().includes(q) ||
           p.category.toLowerCase().includes(q) ||
           p.brand.toLowerCase().includes(q) ||
@@ -42,22 +68,22 @@ export default function HomePage() {
     }
 
     if (activeCategory !== 'all') {
-      list = list.filter(p => p.category.toLowerCase() === activeCategory.toLowerCase())
+      list = list.filter((p) => p.category.toLowerCase() === activeCategory.toLowerCase())
     }
 
     if (activeCondition !== 'all') {
-      list = list.filter(p => p.condition.toLowerCase() === activeCondition.toLowerCase())
+      list = list.filter((p) => p.condition.toLowerCase() === activeCondition.toLowerCase())
     }
 
     if (activeDistance !== 'all') {
       const maxDist = parseFloat(activeDistance.replace('km', ''))
       if (!isNaN(maxDist)) {
-        list = list.filter(p => p.distance <= maxDist)
+        list = list.filter((p) => p.distance <= maxDist)
       }
     }
 
     if (verifiedOnly) {
-      list = list.filter(p => p.seller.verified)
+      list = list.filter((p) => p.seller.verified)
     }
 
     if (activeSort === 'price_low') {
@@ -87,17 +113,17 @@ export default function HomePage() {
   }
 
   return (
-    <div className="page-content" style={{ paddingBottom: 'calc(var(--nav-height) + 24px)' }}>
+    <div className="page-content" style={{ paddingBottom: 'calc(var(--nav-height) + 24px)', position: 'relative' }}>
       {/* 1. Sticky Header */}
-      <HomeHeader onNotificationClick={() => alert('All caught up! No unread notifications.')} />
+      <HomeHeader onNotificationClick={() => navigate('/notifications')} />
 
       {/* 2. Hero Section */}
       <HeroSection />
 
-      {/* 3. Search Bar */}
+      {/* 3. Search Bar with Intent Tracking */}
       <SearchSection
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={handleSearchChange}
         onFilterClick={() => setFilterSheetOpen(true)}
         activeFiltersCount={activeFiltersCount}
       />
@@ -119,15 +145,15 @@ export default function HomePage() {
         onReset={handleResetFilters}
       />
 
-      {/* 5. AI Recommendations */}
+      {/* 5. AI Personalized Recommendations */}
       {!searchQuery && activeCategory === 'all' && (
-        <RecommendationSection recommendedPosts={recommended} onSelectPost={setSelectedPost} />
+        <RecommendationSection recommendedPosts={recommended} onSelectPost={handleSelectPost} />
       )}
 
       {/* 6. Post Feed */}
       <PostFeed
         posts={filteredPosts}
-        onSelectPost={setSelectedPost}
+        onSelectPost={handleSelectPost}
         onToggleLike={handleToggleLike}
         onToggleSave={handleToggleSave}
         onResetFilters={handleResetFilters}
@@ -146,6 +172,49 @@ export default function HomePage() {
           isLiked={selectedPost.liked}
           onSave={() => handleToggleSave(selectedPost.id)}
           isSaved={selectedPost.saved}
+        />
+      )}
+
+      {/* 9. AI Recommendation Engine Debugger (Admin/Dev Mode) */}
+      {user?.role === 'admin' && debugScores.length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 80,
+            right: 20,
+            zIndex: 90,
+          }}
+        >
+          <button
+            onClick={() => setShowDebugModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 14px',
+              borderRadius: 999,
+              background: '#0d1f17',
+              border: '1.5px solid var(--accent)',
+              color: '#34d399',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              cursor: 'pointer',
+            }}
+          >
+            <Icon name="sparkles" size={14} color="var(--accent)" />
+            <span>AI Rec Scores ({debugScores.length})</span>
+          </button>
+        </div>
+      )}
+
+      {showDebugModal && (
+        <RecommendationDebugModal
+          isOpen={showDebugModal}
+          onClose={() => setShowDebugModal(false)}
+          scores={debugScores}
+          userId={user?.id}
+          role={user?.role}
         />
       )}
     </div>

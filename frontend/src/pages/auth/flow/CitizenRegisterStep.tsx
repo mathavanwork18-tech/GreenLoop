@@ -1,7 +1,9 @@
 import React, { useState, useRef } from 'react'
 import Icon from '../../../components/Icon'
+import PasswordRequirements2Ticks from '../../../components/PasswordRequirements2Ticks'
 import type { LanguageCode } from '../../../types/common.types'
 import { getAuthTranslation } from '../../../utils/translations'
+import { normalizePhone } from '../../../utils/phone'
 
 interface Props {
   language: LanguageCode
@@ -27,27 +29,28 @@ export default function CitizenRegisterStep({
   const [email, setEmail] = useState(initialData.email || '')
   const [password, setPassword] = useState(initialData.password || '')
   const [confirmPassword, setConfirmPassword] = useState(initialData.confirmPassword || '')
-  const [area, setArea] = useState(initialData.area || 'Guindy')
-  const [city, setCity] = useState(initialData.city || 'Chennai')
+  const [area, setArea] = useState(initialData.area || '')
+  const [city, setCity] = useState(initialData.city || '')
   const [landmark, setLandmark] = useState(initialData.landmark || '')
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(
-    initialData.coordinates || { lat: 13.0067, lng: 80.2023 }
+    initialData.coordinates || null
   )
 
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
   const [locationSuccess, setLocationSuccess] = useState(Boolean(initialData.coordinates))
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  // Password requirement tests
-  const passLength = password.length >= 8
-  const passUpper = /[A-Z]/.test(password)
-  const passLower = /[a-z]/.test(password)
-  const passNumber = /[0-9]/.test(password)
-  const passSpecial = /[@$!%*?&#^()_-]/.test(password)
-  const allPassReqsMet = passLength && passUpper && passLower && passNumber && passSpecial
+  // Simplified password policy: 6-16 chars, letters/numbers, symbols optional
+  const isPasswordMin = password.length >= 6
+  const isPasswordMax = password.length <= 16
+  const isPasswordLengthValid = isPasswordMin && isPasswordMax
+  const isPasswordMismatch = Boolean(confirmPassword && password !== confirmPassword)
+  const isPasswordValid = isPasswordLengthValid && !isPasswordMismatch && Boolean(confirmPassword)
 
   // Autosave draft helper
   const handleFieldChange = (field: string, val: any) => {
@@ -140,16 +143,18 @@ export default function CitizenRegisterStep({
       }
     }
 
-    // Password validation
+    // Password validation (6-16 characters)
     if (!password) {
       newErrors.password = 'Password is required'
-    } else if (!allPassReqsMet) {
-      newErrors.password = 'Password must meet all 5 requirements below'
+    } else if (password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters.'
+    } else if (password.length > 16) {
+      newErrors.password = 'Password must be 16 characters or fewer.'
     }
 
     // Confirm password validation
     if (password !== confirmPassword) {
-      newErrors.confirmPassword = t.passwordMismatchError
+      newErrors.confirmPassword = "Passwords don't match."
     }
 
     // Area & City validation
@@ -392,7 +397,7 @@ export default function CitizenRegisterStep({
               fontWeight: 600,
             }}
           >
-            <span>+91 {phone}</span>
+            <span>{normalizePhone(phone).display || ('+91 ' + phone)}</span>
             <span
               style={{
                 fontSize: '0.72rem',
@@ -403,100 +408,150 @@ export default function CitizenRegisterStep({
                 fontWeight: 700,
               }}
             >
-              Verified ✓
+              Verified
             </span>
           </div>
         </div>
 
         {/* Password & Confirm Password */}
         <div>
-          <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, marginBottom: 6 }}>
-            {t.password} <span style={{ color: '#ef4444' }}>*</span>
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value)
-              handleFieldChange('password', e.target.value)
-            }}
-            placeholder={t.passwordPlaceholder}
-            style={{
-              width: '100%',
-              height: 48,
-              borderRadius: '12px',
-              border: errors.password ? '2px solid #ef4444' : '1.5px solid var(--border-color)',
-              background: 'var(--bg-surface)',
-              color: 'var(--text-primary)',
-              padding: '0 14px',
-              fontSize: '0.95rem',
-              outline: 'none',
-              marginBottom: 10,
-            }}
-          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <label style={{ fontSize: '0.84rem', fontWeight: 700, margin: 0 }}>
+              {t.password} <span style={{ color: '#ef4444' }}>*</span>
+            </label>
+            <span
+              style={{
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                color: password.length > 16 ? '#ef4444' : password.length >= 6 ? 'var(--accent)' : 'var(--text-tertiary)',
+              }}
+            >
+              {password.length}/16
+            </span>
+          </div>
 
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => {
-              setConfirmPassword(e.target.value)
-              handleFieldChange('confirmPassword', e.target.value)
-            }}
-            placeholder={t.confirmPasswordPlaceholder}
-            style={{
-              width: '100%',
-              height: 48,
-              borderRadius: '12px',
-              border: errors.confirmPassword ? '2px solid #ef4444' : '1.5px solid var(--border-color)',
-              background: 'var(--bg-surface)',
-              color: 'var(--text-primary)',
-              padding: '0 14px',
-              fontSize: '0.95rem',
-              outline: 'none',
-            }}
-          />
-          {errors.confirmPassword && (
-            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
-              {errors.confirmPassword}
+          {/* Password Input with Show/Hide Toggle */}
+          <div style={{ position: 'relative', marginBottom: 10 }}>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                handleFieldChange('password', e.target.value)
+              }}
+              placeholder="Enter 6–16 characters"
+              style={{
+                width: '100%',
+                height: 48,
+                borderRadius: '12px',
+                border:
+                  errors.password || (password.length > 0 && !isPasswordLengthValid)
+                    ? '2px solid #ef4444'
+                    : '1.5px solid var(--border-color)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                padding: '0 44px 0 14px',
+                fontSize: '0.95rem',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                padding: 4,
+              }}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} color="var(--text-secondary)" />
+            </button>
+          </div>
+
+          {/* Inline password validation messages */}
+          {password.length > 0 && password.length < 6 && (
+            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: 10, display: 'block' }}>
+              Password must be at least 6 characters.
+            </span>
+          )}
+          {password.length > 16 && (
+            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: 10, display: 'block' }}>
+              Password must be 16 characters or fewer.
+            </span>
+          )}
+          {errors.password && password.length >= 6 && password.length <= 16 && (
+            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: 10, display: 'block' }}>
+              {errors.password}
             </span>
           )}
 
-          {/* Progressive Password Requirements Checklist */}
-          <div
-            style={{
-              marginTop: 10,
-              padding: '12px',
-              borderRadius: '10px',
-              background: 'rgba(255,255,255,0.03)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-            }}
-          >
-            {[
-              { label: t.passReqLength, valid: passLength },
-              { label: t.passReqUpper, valid: passUpper },
-              { label: t.passReqLower, valid: passLower },
-              { label: t.passReqNumber, valid: passNumber },
-              { label: t.passReqSpecial, valid: passSpecial },
-            ].map((req, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontSize: '0.76rem',
-                  color: req.valid ? '#34d399' : 'var(--text-tertiary)',
-                  fontWeight: req.valid ? 700 : 500,
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <Icon name={req.valid ? 'check' : 'close'} size={12} color={req.valid ? '#34d399' : 'var(--text-tertiary)'} />
-                <span>{req.label}</span>
-              </div>
-            ))}
+          {/* Confirm Password Input with Show/Hide Toggle */}
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value)
+                handleFieldChange('confirmPassword', e.target.value)
+              }}
+              placeholder={t.confirmPasswordPlaceholder}
+              style={{
+                width: '100%',
+                height: 48,
+                borderRadius: '12px',
+                border:
+                  errors.confirmPassword || isPasswordMismatch
+                    ? '2px solid #ef4444'
+                    : '1.5px solid var(--border-color)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                padding: '0 44px 0 14px',
+                fontSize: '0.95rem',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={{
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                padding: 4,
+              }}
+              aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+            >
+              <Icon name={showConfirmPassword ? 'eye-off' : 'eye'} size={18} color="var(--text-secondary)" />
+            </button>
           </div>
+
+          {(errors.confirmPassword || isPasswordMismatch) && (
+            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
+              Passwords don't match.
+            </span>
+          )}
+
+          {/* 2-Tick Password Acceptance Indicator */}
+          <PasswordRequirements2Ticks
+            password={password}
+            confirmPassword={confirmPassword}
+          />
         </div>
 
         {/* Location Section */}
@@ -600,7 +655,7 @@ export default function CitizenRegisterStep({
               </div>
               {locationSuccess && (
                 <span style={{ fontSize: '0.72rem', color: '#34d399', fontWeight: 700 }}>
-                  Active ✓
+                  Active
                 </span>
               )}
             </div>
@@ -703,7 +758,7 @@ export default function CitizenRegisterStep({
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !password || !isPasswordValid}
           className="btn btn-primary btn-lg btn-full"
           style={{
             height: 52,
@@ -716,6 +771,8 @@ export default function CitizenRegisterStep({
             justifyContent: 'center',
             gap: 10,
             marginTop: 10,
+            opacity: loading || !password || !isPasswordValid ? 0.6 : 1,
+            cursor: loading || !password || !isPasswordValid ? 'not-allowed' : 'pointer',
           }}
         >
           {loading ? (

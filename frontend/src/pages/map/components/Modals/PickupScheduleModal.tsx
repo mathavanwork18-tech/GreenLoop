@@ -2,6 +2,8 @@ import { useState } from 'react'
 import Modal from '../../../../components/ui/Modal'
 import Icon from '../../../../components/Icon'
 import type { EcosystemPartner } from '../../../../types/map.types'
+import { useAuth } from '../../../../context/AuthContext'
+import { pickupService } from '../../../../services/pickup/pickupService'
 
 interface PickupScheduleModalProps {
   isOpen: boolean
@@ -16,20 +18,47 @@ export default function PickupScheduleModal({
   partner,
   onScheduleSuccess
 }: PickupScheduleModalProps) {
+  const { user, updateCoins } = useAuth()
   const [date, setDate] = useState('2025-09-03')
   const [timeSlot, setTimeSlot] = useState('10:00 AM – 1:00 PM')
   const [address, setAddress] = useState('45 Cross Cut Road, RS Puram, Coimbatore')
   const [items, setItems] = useState('1 Laptop, 2 Mobile Phones, 1 Battery')
   const [isSuccess, setIsSuccess] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSuccess(true)
-    onScheduleSuccess()
-    setTimeout(() => {
-      setIsSuccess(false)
-      onClose()
-    }, 2000)
+    if (!user?.id) {
+      setError('Please log in to schedule a pickup.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      await pickupService.schedulePickup({
+        userId: user.id,
+        scheduledDate: date,
+        itemsDescription: `${items} (Preferred Slot: ${timeSlot})`,
+        pickupAddress: address,
+        partnerName: partner?.name,
+      })
+
+      updateCoins(25)
+      setIsSuccess(true)
+      onScheduleSuccess()
+      setTimeout(() => {
+        setIsSuccess(false)
+        onClose()
+      }, 2000)
+    } catch (err: any) {
+      console.error('[Green Loop] Pickup scheduling failed:', err)
+      setError(err?.message || 'Database error: unable to save pickup request.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -169,12 +198,28 @@ export default function PickupScheduleModal({
             <span>Earn +25 Green Coins upon driver collection scan</span>
           </div>
 
+          {error && (
+            <div
+              style={{
+                padding: '10px 12px',
+                background: '#fef2f2',
+                border: '1px solid #fca5a5',
+                borderRadius: 'var(--radius-md)',
+                color: '#991b1b',
+                fontSize: '0.8rem',
+                fontWeight: 600
+              }}
+            >
+              {error}
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-            <button type="button" onClick={onClose} className="btn btn-ghost btn-full">
+            <button type="button" onClick={onClose} disabled={loading} className="btn btn-ghost btn-full">
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary btn-full">
-              Confirm Pickup
+            <button type="submit" disabled={loading} className="btn btn-primary btn-full">
+              {loading ? 'Saving...' : 'Confirm Pickup'}
             </button>
           </div>
         </form>

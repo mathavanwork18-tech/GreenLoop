@@ -13,25 +13,17 @@ const ROLES: { id: Role; icon: IconName; name: string; desc: string; color: stri
     id: 'GENERAL_USER',
     icon: 'user',
     name: 'General User',
-    desc: 'Scan, sell, donate, repair, recycle your e-waste. Earn Green Coins.',
+    desc: 'For citizens who want to post e-waste, sell electronics, and find recycling locations.',
     color: '#059669',
     bg: '#d1fae5'
   },
   {
     id: 'LOCAL_SHOP',
     icon: 'shop',
-    name: 'Local Shop',
-    desc: 'Buy/sell electronics, offer repair services, collect e-waste.',
+    name: 'Local Shop / Company',
+    desc: 'For businesses who want to purchase e-waste, collect bulk materials, and publish bulk listings.',
     color: '#2563eb',
     bg: '#dbeafe'
-  },
-  {
-    id: 'RECYCLER',
-    icon: 'recycle',
-    name: 'Recycling Company',
-    desc: 'Accept e-waste, manage pickups, issue recycling certificates.',
-    color: '#7c3aed',
-    bg: '#ede9fe'
   },
 ]
 

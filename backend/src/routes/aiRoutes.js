@@ -61,4 +61,33 @@ router.post('/analyze-product', async (req, res) => {
   }
 })
 
+/**
+ * POST /api/ai/embed
+ * Generates vector embedding for post semantic understanding & query personalization.
+ */
+router.post('/embed', async (req, res) => {
+  try {
+    const { text, texts } = req.body
+    if (Array.isArray(texts)) {
+      const embeddings = await Promise.all(
+        texts.slice(0, 10).map((t) => GeminiService.generateEmbedding(t).catch(() => []))
+      )
+      return res.json({ success: true, embeddings })
+    }
+
+    if (!text) {
+      return res.status(400).json({ success: false, error: 'Text string is required' })
+    }
+
+    const embedding = await GeminiService.generateEmbedding(text)
+    return res.json({ success: true, embedding })
+  } catch (error) {
+    console.error('[AI Embed Error]:', error.message)
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Embedding generation failed'
+    })
+  }
+})
+
 export default router

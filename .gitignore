@@ -42,4 +42,7 @@ logs/
 .idea/
 .gemini/
 .agents/
+.aider-desk/
+.autohand/
+supabase/.temp/
 implement

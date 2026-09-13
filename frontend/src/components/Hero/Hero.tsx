@@ -99,17 +99,6 @@ export default function Hero({ onExploreClick }: HeroProps) {
             alt="Green Loop electronic waste recycling and reuse illustration"
             className="hero-illustration"
           />
-
-          {/* Floating Live Impact Badge */}
-          <div className="hero-floating-badge" aria-hidden="true">
-            <div className="hero-floating-badge-icon">
-              <Icon name="recycle" size={20} color="#34d399" />
-            </div>
-            <div className="hero-floating-badge-text">
-              <strong>100% Circular Recovery</strong>
-              <span>Verified Safe Processing</span>
-            </div>
-          </div>
         </div>
       </div>
     </section>

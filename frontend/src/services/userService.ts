@@ -1,6 +1,7 @@
 import type { ProfileFormData, PasswordChangeFormData } from '../schemas/profileSchema'
 import { MOCK_USER } from '../data/mockData'
 import type { User } from '../context/AuthContext'
+import { supabase } from '../utils/supabase'
 
 export interface UserSession {
   id: string
@@ -57,11 +58,12 @@ const DEFAULT_SESSIONS: UserSession[] = [
 export const userService = {
   // GET /api/v1/users/me
   async getProfile(): Promise<User> {
-    await new Promise(r => setTimeout(r, 250))
+    await new Promise(r => setTimeout(r, 200))
     const stored = localStorage.getItem('gl_user')
     if (stored) {
       try {
-        return JSON.parse(stored)
+        const parsed = JSON.parse(stored)
+        if (parsed?.id) return parsed
       } catch {}
     }
     return MOCK_USER as any
@@ -106,8 +108,44 @@ export const userService = {
     }
 
     localStorage.setItem('gl_user', JSON.stringify(updated))
+
+    // Persist changes to Supabase public.profiles if user ID exists
+    if (updated.id) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            full_name: updated.name,
+            phone: updated.phone || '',
+            city: updated.city || 'Coimbatore',
+            address: updated.area || '',
+          })
+          .eq('id', updated.id)
+      } catch (e: any) {
+        console.warn('[Green Loop] Failed to sync profile updates to Supabase:', e?.message)
+      }
+    }
+
     return updated
   },
+
+  async updateUserProfile(
+    userId: string,
+    data: { full_name?: string; phone?: string; city?: string; address?: string }
+  ): Promise<boolean> {
+    if (!userId) return false
+    const { error } = await supabase
+      .from('profiles')
+      .update(data)
+      .eq('id', userId)
+
+    if (error) {
+      console.warn('[Green Loop] Failed to update profile:', error.message)
+      throw new Error(error.message)
+    }
+    return true
+  },
+
 
   // POST /api/v1/users/me/profile-image
   async uploadProfileImage(dataUrl: string): Promise<{ avatarUrl: string }> {

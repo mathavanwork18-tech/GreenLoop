@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Icon from '../../../components/Icon'
 
 interface RegisterFormProps {
@@ -10,6 +11,9 @@ interface RegisterFormProps {
 }
 
 export default function RegisterForm({ step, form, updateForm, onNext, onSubmit, loading }: RegisterFormProps) {
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+
   if (step === 2) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -64,28 +68,109 @@ export default function RegisterForm({ step, form, updateForm, onNext, onSubmit,
     )
   }
 
+  const isLengthValid = form.password.length >= 6 && form.password.length <= 16
+  const isMatch = form.password === form.confirm
+  const isTooShort = form.password.length > 0 && form.password.length < 6
+  const isTooLong = form.password.length > 16
+  const isMismatch = Boolean(form.confirm && !isMatch)
+  const isFormValid = isLengthValid && isMatch
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div className="input-group">
-        <label className="input-label">Password *</label>
-        <input
-          className="input"
-          type="password"
-          placeholder="Min. 8 characters"
-          value={form.password}
-          onChange={e => updateForm('password', e.target.value)}
-        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <label className="input-label" style={{ margin: 0 }}>Password *</label>
+          <span
+            style={{
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              color: isTooLong ? '#ef4444' : isLengthValid ? 'var(--accent)' : 'var(--text-tertiary)',
+            }}
+          >
+            {form.password.length}/16
+          </span>
+        </div>
+        <div style={{ position: 'relative' }}>
+          <input
+            className="input"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Enter 6–16 characters"
+            value={form.password}
+            onChange={e => updateForm('password', e.target.value)}
+            style={{ paddingRight: 42 }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            style={{
+              position: 'absolute',
+              right: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              padding: 4,
+            }}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+          >
+            <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} color="var(--text-secondary)" />
+          </button>
+        </div>
+        {isTooShort && (
+          <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
+            Password must be at least 6 characters.
+          </span>
+        )}
+        {isTooLong && (
+          <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
+            Password must be 16 characters or fewer.
+          </span>
+        )}
       </div>
+
       <div className="input-group">
         <label className="input-label">Confirm Password *</label>
-        <input
-          className="input"
-          type="password"
-          placeholder="Re-enter password"
-          value={form.confirm}
-          onChange={e => updateForm('confirm', e.target.value)}
-        />
+        <div style={{ position: 'relative' }}>
+          <input
+            className="input"
+            type={showConfirm ? 'text' : 'password'}
+            placeholder="Re-enter password"
+            value={form.confirm}
+            onChange={e => updateForm('confirm', e.target.value)}
+            style={{ paddingRight: 42 }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirm(!showConfirm)}
+            style={{
+              position: 'absolute',
+              right: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              padding: 4,
+            }}
+            aria-label={showConfirm ? 'Hide confirm password' : 'Show confirm password'}
+          >
+            <Icon name={showConfirm ? 'eye-off' : 'eye'} size={18} color="var(--text-secondary)" />
+          </button>
+        </div>
+        {isMismatch && (
+          <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
+            Passwords don't match.
+          </span>
+        )}
       </div>
+
       <div
         style={{
           background: 'var(--accent-light)',
@@ -95,16 +180,17 @@ export default function RegisterForm({ step, form, updateForm, onNext, onSubmit,
           color: 'var(--accent-text)',
           display: 'flex',
           alignItems: 'center',
-          gap: 8
+          gap: 8,
         }}
       >
         <Icon name="shield" size={15} color="var(--accent-text)" />
-        <span>Your data is encrypted and never shared without your consent.</span>
+        <span>Use 6–16 characters. Letters and numbers are enough; symbols are optional.</span>
       </div>
+
       <button
         className="btn btn-primary btn-lg btn-full"
         style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-        disabled={!form.password || form.password.length < 8 || loading}
+        disabled={!isFormValid || loading}
         onClick={onSubmit}
       >
         {loading ? (
@@ -117,7 +203,7 @@ export default function RegisterForm({ step, form, updateForm, onNext, onSubmit,
                 height: 16,
                 border: '2px solid rgba(255,255,255,0.3)',
                 borderTopColor: '#fff',
-                borderRadius: '50%'
+                borderRadius: '50%',
               }}
             />
             Creating account...

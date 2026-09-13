@@ -90,10 +90,14 @@ export default function HelpSupportModal({ isOpen, onClose }: HelpSupportModalPr
               borderRadius: 'var(--radius-md)',
               fontSize: '0.74rem',
               color: 'var(--accent-text)',
-              fontWeight: 700
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
             }}
           >
-            📞 Emergency TNPCB Helpline: 1800-425-1100 (Toll Free 24/7)
+            <Icon name="phone-call" size={12} color="var(--accent-text)" />
+            <span>Emergency TNPCB Helpline: 1800-425-1100 (Toll Free 24/7)</span>
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>

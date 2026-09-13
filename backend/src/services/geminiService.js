@@ -263,6 +263,42 @@ Return ONLY valid JSON matching this schema:
     // If all models failed, throw controlled error
     throw lastError || new Error('All Gemini models failed to analyze the product image')
   }
+
+  /**
+   * Generates a semantic vector embedding using Gemini text-embedding-004.
+   */
+  static async generateEmbedding(text) {
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey || !apiKey.trim()) {
+      throw new Error('GEMINI_API_KEY is not configured on the server')
+    }
+
+    const cleanText = String(text || '').trim().slice(0, 2048)
+    if (!cleanText) {
+      throw new Error('Text is required to generate an embedding')
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${apiKey}`
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'models/text-embedding-004',
+        content: {
+          parts: [{ text: cleanText }]
+        }
+      })
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(err.error?.message || `Gemini embedding request failed with HTTP ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data.embedding?.values || []
+  }
 }
 
 export default GeminiService

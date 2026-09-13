@@ -80,52 +80,7 @@ export default function HeroSection() {
           Diagnose devices with AI, trade working components, or request certified doorstep recycling with official TNPCB compliance.
         </p>
 
-        {/* 2. Impact Summary Bar */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 10,
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '12px 14px',
-            marginBottom: 20,
-          }}
-        >
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--accent)' }}>
-              1,420 kg
-            </div>
-            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              Diverted from Landfill
-            </div>
-          </div>
-          <div
-            style={{
-              textAlign: 'center',
-              borderLeft: '1px solid var(--border-subtle)',
-              borderRight: '1px solid var(--border-subtle)',
-            }}
-          >
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#38bdf8' }}>
-              940 kg
-            </div>
-            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              CO₂e Offset
-            </div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--coin-color)' }}>
-              {user?.greenCoins?.toLocaleString() || '1,250'}
-            </div>
-            <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-              EcoPoints Balance
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Primary Action Buttons */}
+        {/* Primary Action Buttons */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button
             className="btn btn-primary"

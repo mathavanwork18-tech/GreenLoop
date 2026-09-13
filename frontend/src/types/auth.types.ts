@@ -1,4 +1,4 @@
-export type Role = 'GENERAL_USER' | 'LOCAL_SHOP' | 'RECYCLER' | 'ADMIN'
+export type Role = 'citizen' | 'shop' | 'company' | 'admin' | 'GENERAL_USER' | 'LOCAL_SHOP' | 'COMPANY' | 'RECYCLER' | 'ADMIN'
 
 export interface LoginCredentials {
   email: string

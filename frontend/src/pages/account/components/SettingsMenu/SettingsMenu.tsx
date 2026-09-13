@@ -136,13 +136,22 @@ export default function SettingsMenu({ onOpenHelp, onLogout }: SettingsMenuProps
         onClick={onLogout}
         className="btn btn-ghost btn-full"
         style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
           color: '#ef4444',
+          background: 'rgba(239,68,68,0.06)',
           border: '1px solid rgba(239,68,68,0.3)',
-          marginTop: 8,
-          fontSize: '0.84rem'
+          marginTop: 12,
+          padding: '11px 16px',
+          borderRadius: 'var(--radius-md)',
+          fontSize: '0.84rem',
+          fontWeight: 700
         }}
       >
-        Sign Out
+        <Icon name="logout" size={16} color="#ef4444" />
+        <span>Log Out from Green Loop</span>
       </button>
     </div>
   )

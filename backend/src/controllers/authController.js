@@ -36,8 +36,8 @@ const mockUsers = [
   },
 ];
 
-// In-memory active OTP store: phone -> { otp, createdAt }
-const activeOtps = new Map();
+// DEAD-CODED / REMOVED: Mock in-memory OTP store has been decommissioned.
+// Green Loop now uses real Supabase Auth (supabase.auth.signInWithOtp / supabase.auth.verifyOtp) as the single source of truth.
 
 function cleanPhoneNumber(phone) {
   if (!phone) return '';
@@ -50,104 +50,25 @@ function cleanPhoneNumber(phone) {
 }
 
 /**
- * Send OTP to Indian Mobile Number
+ * [DEAD-CODED / DEPRECATED] Send OTP
+ * Phone OTP is now handled natively via Supabase GoTrue Auth on the frontend.
  */
 export async function sendOtp(req, res) {
-  try {
-    const { phone } = req.body;
-    const cleanPhone = cleanPhoneNumber(phone);
-
-    if (!cleanPhone || cleanPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanPhone)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please enter a valid 10-digit Indian mobile number starting with 6-9.',
-      });
-    }
-
-    // Rate-limit check: 15s debounce
-    const existing = activeOtps.get(cleanPhone);
-    if (existing && Date.now() - existing.createdAt < 15000) {
-      const waitSec = Math.ceil((15000 - (Date.now() - existing.createdAt)) / 1000);
-      return res.status(429).json({
-        success: false,
-        message: `Please wait ${waitSec}s before requesting another OTP.`,
-      });
-    }
-
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    activeOtps.set(cleanPhone, { otp, createdAt: Date.now() });
-
-    console.log(`\n📲 [AUTH] OTP for +91 ${cleanPhone}: ${otp}`);
-
-    res.json({
-      success: true,
-      message: `OTP sent successfully to +91 ${cleanPhone.slice(0, 2)}******${cleanPhone.slice(-2)}`,
-      devOtp: otp, // Returned for effortless local development and automated testing
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  return res.status(410).json({
+    success: false,
+    message: 'DEPRECATED: /api/auth/send-otp has been decommissioned. Use Supabase Auth native phone OTP (supabase.auth.signInWithOtp).',
+  });
 }
 
 /**
- * Verify 6-digit OTP
+ * [DEAD-CODED / DEPRECATED] Verify OTP
+ * Phone OTP verification is now handled natively via Supabase GoTrue Auth on the frontend.
  */
 export async function verifyOtp(req, res) {
-  try {
-    const { phone, otp } = req.body;
-    const cleanPhone = cleanPhoneNumber(phone);
-
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      return res.status(400).json({ success: false, message: 'Valid phone number is required.' });
-    }
-
-    if (!otp || otp.toString().trim().length !== 6) {
-      return res.status(400).json({ success: false, message: 'Please enter a valid 6-digit OTP.' });
-    }
-
-    const stored = activeOtps.get(cleanPhone);
-    const cleanOtp = otp.toString().trim();
-
-    // Verify against generated OTP or universal development bypass '123456'
-    const isValid = (stored && stored.otp === cleanOtp) || cleanOtp === '123456';
-
-    if (!isValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Incorrect OTP. Please enter the valid 6-digit code or use 123456.',
-      });
-    }
-
-    // Clear used OTP
-    activeOtps.delete(cleanPhone);
-
-    // Look for existing user with this phone number
-    const existingUser = mockUsers.find((u) => {
-      const uPhone = cleanPhoneNumber(u.phone);
-      return uPhone === cleanPhone;
-    });
-
-    if (existingUser && existingUser.isProfileComplete) {
-      return res.json({
-        success: true,
-        message: 'Welcome back! Logged in successfully.',
-        isExistingUser: true,
-        isProfileComplete: true,
-        user: existingUser,
-      });
-    }
-
-    return res.json({
-      success: true,
-      message: 'Phone verified successfully! Please complete your account setup.',
-      isExistingUser: Boolean(existingUser),
-      isProfileComplete: false,
-      phone: cleanPhone,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
+  return res.status(410).json({
+    success: false,
+    message: 'DEPRECATED: /api/auth/verify-otp has been decommissioned. Use Supabase Auth native phone OTP (supabase.auth.verifyOtp).',
+  });
 }
 
 /**

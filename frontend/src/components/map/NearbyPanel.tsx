@@ -103,7 +103,9 @@ export default function NearbyPanel({
         <>
           {totalCount === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-secondary)' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+              <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
+                <Icon name="search" size={32} color="var(--text-muted)" />
+              </div>
               <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)', marginBottom: 4 }}>
                 No e-waste found within {radiusKm} km
               </div>
@@ -139,7 +141,7 @@ export default function NearbyPanel({
                     {item.images?.[0] ? (
                       <img src={item.images[0]} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <span style={{ fontSize: 20 }}>📦</span>
+                      <Icon name="package" size={20} color="var(--accent)" />
                     )}
                   </div>
 
@@ -183,11 +185,10 @@ export default function NearbyPanel({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 22,
                       flexShrink: 0,
                     }}
                   >
-                    {partner.type === 'recycler' ? '♻️' : '🏪'}
+                    <Icon name={partner.type === 'recycler' ? 'recycle' : 'shop'} size={22} color={partner.type === 'recycler' ? '#10b981' : '#2563eb'} />
                   </div>
 
                   <div style={{ minWidth: 0, flex: 1 }}>

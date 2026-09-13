@@ -7,9 +7,16 @@ interface Props {
   language: LanguageCode
   phone: string
   devOtp?: string
-  onVerifyOtp: (otp: string) => Promise<{ success: boolean; isExistingUser?: boolean; isProfileComplete?: boolean; message?: string }>
+  onVerifyOtp: (otp: string) => Promise<{
+    success: boolean
+    isExistingUser?: boolean
+    isProfileComplete?: boolean
+    user?: any
+    role?: any
+    message?: string
+  }>
   onResendOtp: () => Promise<{ success: boolean; message: string; devOtp?: string }>
-  onSuccess: (isExistingUser: boolean, isProfileComplete: boolean) => void
+  onSuccess: (isExistingUser: boolean, isProfileComplete: boolean, role?: any) => void
   onBack: () => void
 }
 
@@ -29,6 +36,11 @@ export default function OtpVerifyStep({
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [currentDevOtp, setCurrentDevOtp] = useState(devOtp)
+  const [welcomeTransition, setWelcomeTransition] = useState<{
+    show: boolean
+    name: string
+    roleLabel: string
+  } | null>(null)
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
@@ -61,9 +73,28 @@ export default function OtpVerifyStep({
       const res = await onVerifyOtp(code)
       if (res.success) {
         setSuccess(true)
-        setTimeout(() => {
-          onSuccess(Boolean(res.isExistingUser), Boolean(res.isProfileComplete))
-        }, 500)
+        if (res.isExistingUser && res.isProfileComplete) {
+          const roleLabel =
+            res.role === 'LOCAL_SHOP'
+              ? 'Local Shop / Repair Hub'
+              : res.role === 'RECYCLER'
+              ? 'Industrial Recycler'
+              : 'Citizen / General User'
+
+          setWelcomeTransition({
+            show: true,
+            name: res.user?.name || 'Member',
+            roleLabel,
+          })
+
+          setTimeout(() => {
+            onSuccess(true, true, res.role)
+          }, 950)
+        } else {
+          setTimeout(() => {
+            onSuccess(false, false)
+          }, 400)
+        }
       } else {
         setError(res.message || t.otpInvalidError)
         setLoading(false)
@@ -158,6 +189,115 @@ export default function OtpVerifyStep({
   const formatTimer = (sec: number) => {
     const s = sec < 10 ? `0${sec}` : `${sec}`
     return `00:${s}`
+  }
+
+  if (welcomeTransition?.show) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: 380,
+          padding: '32px 20px',
+          textAlign: 'center',
+          color: 'var(--text-primary)',
+        }}
+      >
+        <div
+          style={{
+            width: 76,
+            height: 76,
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, rgba(16,185,129,0.25), rgba(5,150,105,0.45))',
+            border: '2.5px solid #10b981',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 20,
+            boxShadow: '0 0 32px rgba(16,185,129,0.4)',
+          }}
+        >
+          <Icon name="check" size={36} color="#10b981" />
+        </div>
+
+        <span
+          style={{
+            fontSize: '0.78rem',
+            color: '#34d399',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: 8,
+          }}
+        >
+          Phone Verified
+        </span>
+
+        <h2
+          style={{
+            fontSize: '1.5rem',
+            fontWeight: 800,
+            color: 'var(--text-primary)',
+            margin: '0 0 8px',
+          }}
+        >
+          Welcome back to Green Loop!
+        </h2>
+
+        <p
+          style={{
+            fontSize: '0.92rem',
+            color: 'var(--text-secondary)',
+            margin: '0 0 18px',
+          }}
+        >
+          Recognized as <strong style={{ color: '#fff' }}>{welcomeTransition.name}</strong>
+        </p>
+
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '7px 16px',
+            borderRadius: '20px',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid var(--border-color)',
+            fontSize: '0.82rem',
+            color: 'var(--text-secondary)',
+            marginBottom: 28,
+          }}
+        >
+          <Icon name="user" size={15} color="#10b981" />
+          <span>{welcomeTransition.roleLabel}</span>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            color: '#10b981',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+          }}
+        >
+          <div
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              border: '2px solid #10b981',
+              borderTopColor: 'transparent',
+              animation: 'spin 0.8s linear infinite',
+            }}
+          />
+          <span>Entering your dashboard...</span>
+        </div>
+      </div>
+    )
   }
 
   return (

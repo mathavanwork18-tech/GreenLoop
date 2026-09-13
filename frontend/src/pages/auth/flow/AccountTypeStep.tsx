@@ -123,27 +123,23 @@ export default function AccountTypeStep({
           </div>
 
           <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 4px', color: 'var(--text-primary)' }}>
-            {t.citizenTitle}
+            General User
           </h3>
-          <p style={{ fontSize: '0.88rem', color: role === 'GENERAL_USER' ? 'var(--accent-text)' : 'var(--text-secondary)', margin: 0, fontWeight: 500 }}>
-            {t.citizenDesc}
+          <p style={{ fontSize: '0.86rem', color: role === 'GENERAL_USER' ? 'var(--accent-text)' : 'var(--text-secondary)', margin: '0 0 10px', fontWeight: 600 }}>
+            For citizens who want to:
           </p>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            {['📱 Recycle Devices', '🪙 Earn Green Coins', '🌱 Track CO2 Offset'].map((badge, i) => (
-              <span
-                key={i}
-                style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                {badge}
-              </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {[
+              { icon: 'recycle', text: 'Post e-waste' },
+              { icon: 'coin', text: 'Sell unwanted electronics' },
+              { icon: 'map', text: 'Find recycling locations' },
+              { icon: 'leaf', text: 'Participate in Green Loop' },
+            ].map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <Icon name={item.icon as any} size={14} color="var(--accent)" />
+                <span>{item.text}</span>
+              </div>
             ))}
           </div>
         </div>
@@ -202,27 +198,24 @@ export default function AccountTypeStep({
           </div>
 
           <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 4px', color: 'var(--text-primary)' }}>
-            {t.shopTitle}
+            Local Shop / Company
           </h3>
-          <p style={{ fontSize: '0.88rem', color: role === 'LOCAL_SHOP' ? 'var(--accent-text)' : 'var(--text-secondary)', margin: 0, fontWeight: 500 }}>
-            {t.shopDesc}
+          <p style={{ fontSize: '0.86rem', color: role === 'LOCAL_SHOP' ? 'var(--accent-text)' : 'var(--text-secondary)', margin: '0 0 10px', fontWeight: 600 }}>
+            For businesses who want to:
           </p>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            {['🔧 Repair Services', '📦 E-Waste Collection', '💼 Grow Customer Base'].map((badge, i) => (
-              <span
-                key={i}
-                style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 600,
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                {badge}
-              </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {[
+              { icon: 'shopping-bag', text: 'Purchase e-waste' },
+              { icon: 'package', text: 'Collect bulk materials' },
+              { icon: 'plus', text: 'Publish bulk listings' },
+              { icon: 'activity', text: 'Manage purchases' },
+              { icon: 'sparkles', text: 'Promote offers' },
+            ].map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <Icon name={item.icon as any} size={14} color="var(--accent)" />
+                <span>{item.text}</span>
+              </div>
             ))}
           </div>
         </div>

@@ -393,7 +393,7 @@ export default function EditProfilePage() {
               Edit Profile
             </h1>
             <span style={{ fontSize: '0.72rem', color: isDirty ? '#f59e0b' : 'var(--accent)', fontWeight: 700 }}>
-              {isDirty ? '● Unsaved Changes' : '✓ All Synced'}
+              {isDirty ? 'Unsaved Changes' : 'All Synced'}
             </span>
           </div>
         </div>
@@ -830,11 +830,11 @@ export default function EditProfilePage() {
                   onChange={e => setPreferredAction(e.target.value as any)}
                   style={{ width: '100%' }}
                 >
-                  <option value="Sell">💰 Sell (Earn Cash & Coins)</option>
-                  <option value="Donate">🤝 Donate (Community Education)</option>
-                  <option value="Recycle">♻️ Recycle (Zero-Landfill)</option>
-                  <option value="Repair">🛠️ Repair (Extend Device Life)</option>
-                  <option value="Exchange">🔄 Exchange (Device Swap)</option>
+                  <option value="Sell">Sell (Earn Cash & Coins)</option>
+                  <option value="Donate">Donate (Community Education)</option>
+                  <option value="Recycle">Recycle (Zero-Landfill)</option>
+                  <option value="Repair">Repair (Extend Device Life)</option>
+                  <option value="Exchange">Exchange (Device Swap)</option>
                 </select>
               </div>
 
@@ -848,8 +848,8 @@ export default function EditProfilePage() {
                   onChange={e => setPickupPreference(e.target.value as any)}
                   style={{ width: '100%' }}
                 >
-                  <option value="doorstep">🚚 Doorstep Pickup by Verified Collector</option>
-                  <option value="hub_dropoff">🏪 Self Drop-Off at Partner Shop</option>
+                  <option value="doorstep">Doorstep Pickup by Verified Collector</option>
+                  <option value="hub_dropoff">Self Drop-Off at Partner Shop</option>
                 </select>
               </div>
             </div>
@@ -985,9 +985,9 @@ export default function EditProfilePage() {
                 </label>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {[
-                    { id: 'public', label: '🌍 Public', desc: 'Visible to all community members' },
-                    { id: 'community', label: '👥 Verified Only', desc: 'Visible to registered members' },
-                    { id: 'private', label: '🔒 Private', desc: 'Hidden from search directories' },
+                    { id: 'public', label: 'Public', desc: 'Visible to all community members' },
+                    { id: 'community', label: 'Verified Only', desc: 'Visible to registered members' },
+                    { id: 'private', label: 'Private', desc: 'Hidden from search directories' },
                   ].map(v => (
                     <button
                       key={v.id}

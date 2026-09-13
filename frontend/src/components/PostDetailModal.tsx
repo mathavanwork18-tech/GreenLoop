@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Icon from './Icon'
 import { useAuth } from '../context/AuthContext'
 import { postsApi } from '../services/posts/posts.api'
+import { interactionsApi, type PostCommentItem } from '../services/interactions/interactions.api'
 
 export interface PostItem {
   id: string
@@ -55,10 +56,20 @@ export default function PostDetailModal({
     { sender: 'them', text: 'Hi there! Feel free to ask any questions regarding this device condition or pickup.', time: '10:30 AM' }
   ])
   const [newComment, setNewComment] = useState('')
-  const [commentsList, setCommentsList] = useState<{ user: string; text: string; time: string }[]>([
-    { user: 'Karthik', text: 'Is the original charger available with this?', time: '1 hour ago' },
-    { user: 'Suresh', text: 'Can pickup today at RS Puram if available.', time: '30 mins ago' }
-  ])
+  const [commentsList, setCommentsList] = useState<PostCommentItem[]>([])
+  const [claiming, setClaiming] = useState(false)
+  const [claimStatus, setClaimStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (post?.id && isOpen) {
+      interactionsApi.getComments(post.id).then(setCommentsList)
+      if (user?.id) {
+        interactionsApi.getPostClaim(post.id, user.id).then((c: any) => {
+          if (c) setClaimStatus(c.status)
+        })
+      }
+    }
+  }, [post?.id, isOpen, user?.id])
 
   if (!isOpen || !post) return null
 
@@ -94,10 +105,36 @@ export default function PostDetailModal({
     }, 1000)
   }
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!newComment.trim()) return
-    setCommentsList(prev => [...prev, { user: 'Mathavan (You)', text: newComment, time: 'Just now' }])
-    setNewComment('')
+    if (!user?.id) {
+      alert('Please sign in to comment.')
+      return
+    }
+    try {
+      const added = await interactionsApi.addComment(post.id, user.id, newComment)
+      setCommentsList(prev => [...prev, added])
+      setNewComment('')
+    } catch (err: any) {
+      alert(err.message || 'Could not post comment.')
+    }
+  }
+
+  const handleClaimPost = async () => {
+    if (!user?.id) {
+      alert('Please sign in to claim this listing.')
+      return
+    }
+    setClaiming(true)
+    try {
+      const res = await interactionsApi.claimPost(post.id, user.id)
+      setClaimStatus(res.claim?.status || 'pending')
+      alert('Claim submitted successfully! The seller has been notified.')
+    } catch (err: any) {
+      alert(err.message || 'Could not submit claim.')
+    } finally {
+      setClaiming(false)
+    }
   }
 
   return (
@@ -469,16 +506,33 @@ export default function PostDetailModal({
           ) : (
             <button
               className="btn btn-primary"
-              onClick={() => {
-                setShowChat(true)
+              disabled={claiming || claimStatus === 'pending' || claimStatus === 'approved'}
+              onClick={handleClaimPost}
+              style={{
+                flex: 1,
+                fontSize: '0.88rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                background: claimStatus ? '#059669' : undefined,
               }}
-              style={{ flex: 1, fontSize: '0.88rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
             >
-              {post.purpose === 'Sell' && <><Icon name="coin" size={16} color="#fff" /><span>Make an Offer</span></>}
-              {post.purpose === 'Recycle' && <><Icon name="pickup" size={16} color="#fff" /><span>Request Recycler</span></>}
-              {post.purpose === 'Donate' && <><Icon name="gift" size={16} color="#fff" /><span>Donate Now</span></>}
-              {post.purpose === 'Repair' && <><Icon name="repair" size={16} color="#fff" /><span>Connect Repair</span></>}
-              {post.purpose === 'Exchange' && <><Icon name="refresh" size={16} color="#fff" /><span>Exchange Device</span></>}
+              {claiming ? (
+                <span>Submitting Claim...</span>
+              ) : claimStatus === 'approved' ? (
+                <><Icon name="check" size={16} color="#fff" /><span>Claim Approved</span></>
+              ) : claimStatus === 'pending' ? (
+                <><Icon name="check" size={16} color="#fff" /><span>Claim Pending</span></>
+              ) : post.purpose === 'Sell' ? (
+                <><Icon name="coin" size={16} color="#fff" /><span>Claim & Make Offer</span></>
+              ) : post.purpose === 'Recycle' ? (
+                <><Icon name="pickup" size={16} color="#fff" /><span>Claim for Recycling</span></>
+              ) : post.purpose === 'Donate' ? (
+                <><Icon name="gift" size={16} color="#fff" /><span>Claim Donation</span></>
+              ) : (
+                <><Icon name="refresh" size={16} color="#fff" /><span>Claim Device</span></>
+              )}
             </button>
           )}
         </div>

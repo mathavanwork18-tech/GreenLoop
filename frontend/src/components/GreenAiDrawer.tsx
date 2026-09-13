@@ -34,10 +34,10 @@ export default function GreenAiDrawer({ isOpen, onClose }: GreenAiDrawerProps) {
       text: `Hello ${user?.name || 'there'}! I'm **Green Loop AI** — your verified circular e-waste assistant.\n\nI can help you find nearby electronics, check spare parts in stock, find authorized TNPCB recyclers, inspect battery safety, and estimate fair marketplace value.`,
       timestamp: 'Just now',
       actionChips: [
-        { label: '📍 Find E-Waste Near Me', actionType: 'query', payload: 'Find e-waste near me' },
-        { label: '⚡ Find Laptop Parts', actionType: 'query', payload: 'Find laptop parts within 10 km' },
-        { label: '🔋 Swollen Battery Safety', actionType: 'query', payload: 'How do I recycle a swollen battery?' },
-        { label: '💰 Price of Old Laptop', actionType: 'query', payload: 'How much is my old laptop worth?' }
+        { label: 'Find E-Waste Near Me', actionType: 'query', payload: 'Find e-waste near me' },
+        { label: 'Find Laptop Parts', actionType: 'query', payload: 'Find laptop parts within 10 km' },
+        { label: 'Swollen Battery Safety', actionType: 'query', payload: 'How do I recycle a swollen battery?' },
+        { label: 'Price of Old Laptop', actionType: 'query', payload: 'How much is my old laptop worth?' }
       ]
     }
   ])
@@ -47,34 +47,34 @@ export default function GreenAiDrawer({ isOpen, onClose }: GreenAiDrawerProps) {
     const path = location.pathname
     if (path.includes('map')) {
       return [
-        { label: '📍 Nearby Drop-offs', query: 'Find recycling centers near me' },
-        { label: '🔧 Local Repair Hubs', query: 'Find repair shops near me' },
-        { label: '📏 Radius: 5 km', query: 'Show items within 5 km' },
-        { label: '📏 Radius: 25 km', query: 'Show items within 25 km' }
+        { label: 'Nearby Drop-offs', query: 'Find recycling centers near me' },
+        { label: 'Local Repair Hubs', query: 'Find repair shops near me' },
+        { label: 'Radius: 5 km', query: 'Show items within 5 km' },
+        { label: 'Radius: 25 km', query: 'Show items within 25 km' }
       ]
     }
     if (path.includes('post')) {
       return [
-        { label: '🔋 Battery Safety Protocol', query: 'How do I recycle a swollen battery?' },
-        { label: '💰 Check Market Value', query: 'How much is my old laptop worth?' },
-        { label: '📋 Data Wiping Steps', query: 'Steps to wipe an old laptop before selling' },
-        { label: '🏷️ Best Category for Device', query: 'What category for old circuit boards?' }
+        { label: 'Battery Safety Protocol', query: 'How do I recycle a swollen battery?' },
+        { label: 'Check Market Value', query: 'How much is my old laptop worth?' },
+        { label: 'Data Wiping Steps', query: 'Steps to wipe an old laptop before selling' },
+        { label: 'Best Category for Device', query: 'What category for old circuit boards?' }
       ]
     }
     if (path.includes('activity') || path.includes('account')) {
       return [
-        { label: '🪙 My Green Coins & Rank', query: 'How do I earn more Green Coins?' },
-        { label: '📋 View My Active Posts', query: 'Show my posts' },
-        { label: '📜 TNPCB Certificates', query: 'How do TNPCB recycling certificates work?' },
-        { label: '🗑️ Delete a Listing', query: 'Delete my post' }
+        { label: 'My Green Coins & Rank', query: 'How do I earn more Green Coins?' },
+        { label: 'View My Active Posts', query: 'Show my posts' },
+        { label: 'TNPCB Certificates', query: 'How do TNPCB recycling certificates work?' },
+        { label: 'Delete a Listing', query: 'Delete my post' }
       ]
     }
     // Home / Marketplace default
     return [
-      { label: '🔍 Laptops Under ₹5,000', query: 'Find a laptop under ₹5000' },
-      { label: '⚡ 16GB RAM & SSDs', query: 'Find laptop parts within 10 km' },
-      { label: '🔋 Swollen Battery Hazard', query: 'How do I recycle a swollen battery?' },
-      { label: '📦 Post an Electronic Item', query: 'I want to sell my old phone' }
+      { label: 'Laptops Under ₹5,000', query: 'Find a laptop under ₹5000' },
+      { label: '16GB RAM & SSDs', query: 'Find laptop parts within 10 km' },
+      { label: 'Swollen Battery Hazard', query: 'How do I recycle a swollen battery?' },
+      { label: 'Post an Electronic Item', query: 'I want to sell my old phone' }
     ]
   }, [location.pathname])
 
@@ -168,11 +168,11 @@ export default function GreenAiDrawer({ isOpen, onClose }: GreenAiDrawerProps) {
           {
             id: `del-succ-${Date.now()}`,
             sender: 'ai',
-            text: '✅ Your listing has been successfully deleted from Green Loop.',
+            text: 'Your listing has been successfully deleted from Green Loop.',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             actionChips: [
-              { label: '📦 Post Another Item', actionType: 'navigate', payload: '/post' },
-              { label: '🔍 Browse Marketplace', actionType: 'navigate', payload: '/' }
+              { label: 'Post Another Item', actionType: 'navigate', payload: '/post' },
+              { label: 'Browse Marketplace', actionType: 'navigate', payload: '/' }
             ]
           }
         ])
@@ -492,8 +492,9 @@ export default function GreenAiDrawer({ isOpen, onClose }: GreenAiDrawerProps) {
                               <Icon name="verified" size={14} color="var(--accent)" />
                             )}
                           </div>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                            <span>📍 {partner.address}</span>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Icon name="location-pin" size={12} color="var(--text-tertiary)" />
+                            <span>{partner.address}</span>
                             <span style={{ marginLeft: 6, color: 'var(--accent)', fontWeight: 700 }}>
                               ({partner.distanceKm} km away)
                             </span>

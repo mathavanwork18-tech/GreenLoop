@@ -17,7 +17,6 @@ const PRIMARY_NAV_ITEMS: { path: string; icon: IconName; label: string; isPost?:
 ]
 
 const DESKTOP_EXTRA_NAV: { path: string; icon: IconName; label: string }[] = [
-  { path: '/impact',        icon: 'tree',     label: 'Impact Stats' },
   { path: '/chat',          icon: 'comment',  label: 'Collector Chat' },
   { path: '/notifications', icon: 'bell',     label: 'Notifications' },
   { path: '/support',       icon: 'help',     label: 'Support Desk' },

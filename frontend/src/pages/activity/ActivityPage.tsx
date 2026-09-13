@@ -167,8 +167,9 @@ export default function ActivityPage() {
       {/* Eco Tip Modal */}
       <Modal isOpen={showTipModal} onClose={() => setShowTipModal(false)} title="Daily Eco Recycling Tip">
         <div style={{ padding: '8px 0' }}>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 16px' }}>
-            💡 <strong>Lithium-Ion Safety:</strong> Always tape over exposed battery terminals with non-conductive electrical tape before dropping them off at a Green Loop recycling hub. This prevents accidental short circuits and ensures safe transit!
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 16px', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            <Icon name="sparkles" size={16} color="var(--accent)" style={{ flexShrink: 0, marginTop: 2 }} />
+            <span><strong>Lithium-Ion Safety:</strong> Always tape over exposed battery terminals with non-conductive electrical tape before dropping them off at a Green Loop recycling hub. This prevents accidental short circuits and ensures safe transit!</span>
           </p>
           <button onClick={() => setShowTipModal(false)} className="btn btn-primary btn-full">
             Got It!

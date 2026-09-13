@@ -79,8 +79,14 @@ export default function SupportPage() {
               gap: 4,
             }}
           >
-            <div>📞 Toll-Free Helpline: <strong>1800-425-1100</strong> (Mon–Sat 9AM–7PM)</div>
-            <div>✉️ Compliance Desk: <strong>compliance@greenloop.eco</strong></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="phone-call" size={14} color="var(--accent-text)" />
+              <span>Toll-Free Helpline: <strong>1800-425-1100</strong> (Mon–Sat 9AM–7PM)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="mail" size={14} color="var(--accent-text)" />
+              <span>Compliance Desk: <strong>compliance@greenloop.eco</strong></span>
+            </div>
           </div>
         </Card>
 

@@ -435,8 +435,9 @@ export default function EWasteMap({
                     {isCenter ? center?.address : item?.condition}
                   </div>
                   {isCenter && center?.contact_phone && (
-                    <div style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700, marginTop: 4 }}>
-                      📞 {center.contact_phone}
+                    <div style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 700, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <Icon name="phone-call" size={12} color="var(--accent)" />
+                      <span>{center.contact_phone}</span>
                     </div>
                   )}
                 </div>

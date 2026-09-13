@@ -25,7 +25,7 @@ Resize-Image $src 192 192 "frontend\public\icons\icon-192.png"
 Resize-Image $src 512 512 "frontend\public\icons\icon-512.png"
 Resize-Image $src 180 180 "frontend\public\icons\apple-touch-icon.png"
 
-function Create-MaskableIcon([System.Drawing.Image]$image, [int]$size, [string]$dest) {
+function New-MaskableIcon([System.Drawing.Image]$image, [int]$size, [string]$dest) {
     $maskableBmp = New-Object System.Drawing.Bitmap($size, $size)
     $mg = [System.Drawing.Graphics]::FromImage($maskableBmp)
     $mg.Clear([System.Drawing.Color]::FromArgb(255, 8, 12, 10))
@@ -40,9 +40,9 @@ function Create-MaskableIcon([System.Drawing.Image]$image, [int]$size, [string]$
     Write-Host "Created $dest ($size x $size)"
 }
 
-Create-MaskableIcon $src 192 "frontend\public\icons\icon-maskable-192.png"
-Create-MaskableIcon $src 512 "frontend\public\icons\icon-maskable-512.png"
-Create-MaskableIcon $src 512 "frontend\public\icons\icon-maskable.png"
+New-MaskableIcon $src 192 "frontend\public\icons\icon-maskable-192.png"
+New-MaskableIcon $src 512 "frontend\public\icons\icon-maskable-512.png"
+New-MaskableIcon $src 512 "frontend\public\icons\icon-maskable.png"
 
 $src.Dispose()
 Write-Host "All icons generated successfully!"

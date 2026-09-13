@@ -1,0 +1,251 @@
+import { supabase } from '../../utils/supabase'
+
+export interface PostCommentItem {
+  id: string
+  userId: string
+  user: string
+  text: string
+  time: string
+}
+
+export interface NotificationRecord {
+  id: string
+  recipient_id: string
+  title: string
+  message: string
+  type: string
+  post_id?: string | null
+  is_read: boolean
+  created_at: string
+}
+
+export const interactionsApi = {
+  // --- LIKES ---
+
+  async isPostLiked(postId: string, userId?: string): Promise<boolean> {
+    if (!userId) return false
+    const { data, error } = await supabase
+      .from('post_likes')
+      .select('id')
+      .match({ post_id: postId, user_id: userId })
+      .maybeSingle()
+
+    if (error) {
+      console.warn('[Green Loop] isPostLiked error:', error.message)
+      return false
+    }
+    return Boolean(data)
+  },
+
+  async getLikesCount(postId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('post_likes')
+      .select('*', { count: 'exact', head: true })
+      .eq('post_id', postId)
+
+    if (error) {
+      console.warn('[Green Loop] getLikesCount error:', error.message)
+      return 0
+    }
+    return count || 0
+  },
+
+  async toggleLike(postId: string, userId: string): Promise<{ liked: boolean; count: number }> {
+    if (!userId) {
+      throw new Error('You must be logged in to like a post.')
+    }
+
+    const currentlyLiked = await this.isPostLiked(postId, userId)
+
+    if (currentlyLiked) {
+      // Unlike: remove row
+      const { error } = await supabase
+        .from('post_likes')
+        .delete()
+        .match({ post_id: postId, user_id: userId })
+
+      if (error) {
+        console.error('[Green Loop] Unlike error:', error)
+        throw new Error(error.message)
+      }
+    } else {
+      // Like: insert row
+      const { error } = await supabase
+        .from('post_likes')
+        .insert({ post_id: postId, user_id: userId })
+
+      if (error) {
+        console.error('[Green Loop] Like error:', error)
+        throw new Error(error.message)
+      }
+    }
+
+    const count = await this.getLikesCount(postId)
+    return { liked: !currentlyLiked, count }
+  },
+
+  // --- COMMENTS ---
+
+  async getComments(postId: string): Promise<PostCommentItem[]> {
+    const { data, error } = await supabase
+      .from('post_comments')
+      .select('id, post_id, user_id, comment, created_at')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.warn('[Green Loop] Fetch comments error:', error.message)
+      return []
+    }
+
+    if (!data || data.length === 0) return []
+
+    // Fetch author profile names
+    const userIds = Array.from(new Set(data.map((c: any) => c.user_id).filter(Boolean)))
+    let profMap = new Map<string, string>()
+
+    if (userIds.length > 0) {
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds)
+
+      if (profs) {
+        profMap = new Map(profs.map((p: any) => [p.id, p.full_name || 'Community Member']))
+      }
+    }
+
+    return data.map((c: any) => ({
+      id: String(c.id),
+      userId: c.user_id,
+      user: profMap.get(c.user_id) || 'Community Member',
+      text: c.comment,
+      time: c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
+    }))
+  },
+
+  async addComment(postId: string, userId: string, comment: string): Promise<PostCommentItem> {
+    if (!userId) {
+      throw new Error('You must be logged in to comment.')
+    }
+    if (!comment.trim()) {
+      throw new Error('Comment cannot be empty.')
+    }
+
+    const { data, error } = await supabase
+      .from('post_comments')
+      .insert({
+        post_id: postId,
+        user_id: userId,
+        comment: comment.trim(),
+      })
+      .select('id, post_id, user_id, comment, created_at')
+      .single()
+
+    if (error) {
+      console.error('[Green Loop] Add comment error:', error)
+      throw new Error(error.message || 'Failed to post comment.')
+    }
+
+    // Lookup commenter profile name
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', userId)
+      .maybeSingle()
+
+    return {
+      id: String(data.id),
+      userId: data.user_id,
+      user: profile?.full_name || 'You',
+      text: data.comment,
+      time: 'Just now',
+    }
+  },
+
+  // --- CLAIMS ---
+
+  async getPostClaim(postId: string, userId?: string) {
+    if (!userId) return null
+    const { data, error } = await supabase
+      .from('post_claims')
+      .select('*')
+      .match({ post_id: postId, user_id: userId })
+      .maybeSingle()
+
+    if (error) {
+      console.warn('[Green Loop] getPostClaim error:', error.message)
+      return null
+    }
+    return data
+  },
+
+  async claimPost(postId: string, userId: string): Promise<{ success: boolean; claim: any }> {
+    if (!userId) {
+      throw new Error('You must be logged in to claim an e-waste listing.')
+    }
+
+    // Duplicate check
+    const existing = await this.getPostClaim(postId, userId)
+    if (existing) {
+      return { success: true, claim: existing }
+    }
+
+    const { data, error } = await supabase
+      .from('post_claims')
+      .insert({
+        post_id: postId,
+        user_id: userId,
+        status: 'pending',
+      })
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('[Green Loop] Claim post error:', error)
+      throw new Error(error.message || 'Failed to claim listing.')
+    }
+
+    return { success: true, claim: data }
+  },
+
+  // --- NOTIFICATIONS ---
+
+  async getUserNotifications(userId: string): Promise<NotificationRecord[]> {
+    if (!userId) return []
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('recipient_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.warn('[Green Loop] Fetch notifications error:', error.message)
+      return []
+    }
+    return data || []
+  },
+
+  async markAsRead(notificationId: string): Promise<void> {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId)
+
+    if (error) {
+      console.warn('[Green Loop] markAsRead error:', error.message)
+    }
+  },
+
+  async markAllAsRead(userId: string): Promise<void> {
+    if (!userId) return
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('recipient_id', userId)
+
+    if (error) {
+      console.warn('[Green Loop] markAllAsRead error:', error.message)
+    }
+  },
+}

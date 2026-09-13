@@ -25,7 +25,7 @@ export default function UserLocation({
   if (status === 'found') {
     return (
       <div className="gl-location-status-badge">
-        <span style={{ color: '#2563eb' }}>📍</span>
+        <Icon name="location-pin" size={13} color="#2563eb" />
         <span>Your location detected {accuracy ? `(±${Math.round(accuracy)}m)` : ''}</span>
       </div>
     )

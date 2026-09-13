@@ -15,7 +15,7 @@ export default function NearMeButton({ onClick, loading }: NearMeButtonProps) {
       {loading ? (
         <Icon name="refresh" size={15} color="currentColor" />
       ) : (
-        <span style={{ fontSize: 16 }}>📍</span>
+        <Icon name="location-pin" size={15} color="currentColor" />
       )}
       <span>Near Me</span>
     </button>

@@ -100,7 +100,7 @@ export default function PhoneLoginStep({
         </button>
         <div>
           <span style={{ fontSize: '0.78rem', color: '#10b981', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Green Loop ♻️
+            Green Loop
           </span>
           <h1 style={{ fontSize: '1.6rem', fontWeight: 800, margin: '2px 0 0', color: 'var(--text-primary)' }}>
             {t.welcomeBack}
@@ -174,7 +174,7 @@ export default function PhoneLoginStep({
               fontSize: '0.95rem',
             }}
           >
-            <span>🇮🇳</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 800 }}>IN</span>
             <span>+91</span>
           </div>
 

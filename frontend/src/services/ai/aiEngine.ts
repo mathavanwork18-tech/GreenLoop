@@ -273,7 +273,7 @@ export class GreenAiEngine {
     // INTENT 1: BATTERY SAFETY
     // -------------------------------------------------------------
     if (intent === 'BATTERY_SAFETY') {
-      const text = `⚠️ **Battery Safety Protocol (High Priority)**\n\nFor swollen, leaking, damaged, or overheating lithium-ion batteries:\n\n1. **Do NOT puncture, crush, or apply pressure** to the battery.\n2. **Do NOT connect to a charger** or expose to heat/direct sunlight.\n3. **Store in a fire-safe non-metallic container** (or sand bucket) at room temperature.\n4. **Do NOT throw into regular household waste** — this causes landfill fires.\n5. Take it immediately to an authorized, certified TNPCB e-waste collection center.\n\n*Verified battery recycling earns you **+150 Green Coins** and an official TNPCB digital certificate.*`
+      const text = `️ **Battery Safety Protocol (High Priority)**\n\nFor swollen, leaking, damaged, or overheating lithium-ion batteries:\n\n1. **Do NOT puncture, crush, or apply pressure** to the battery.\n2. **Do NOT connect to a charger** or expose to heat/direct sunlight.\n3. **Store in a fire-safe non-metallic container** (or sand bucket) at room temperature.\n4. **Do NOT throw into regular household waste** — this causes landfill fires.\n5. Take it immediately to an authorized, certified TNPCB e-waste collection center.\n\n*Verified battery recycling earns you **+150 Green Coins** and an official TNPCB digital certificate.*`
 
       const centersResult = await aiTools.getNearbyCenters({
         userCoords: coords,
@@ -291,8 +291,8 @@ export class GreenAiEngine {
           intent,
           partnerCards: centersResult.partners.slice(0, 2),
           actionChips: [
-            { label: '📍 Find Recyclers on Map', actionType: 'navigate', payload: '/map' },
-            { label: '📦 Schedule Doorstep Pickup', actionType: 'navigate', payload: '/post' }
+            { label: 'Find Recyclers on Map', actionType: 'navigate', payload: '/map' },
+            { label: 'Schedule Doorstep Pickup', actionType: 'navigate', payload: '/post' }
           ]
         },
         updatedState
@@ -314,8 +314,8 @@ export class GreenAiEngine {
             timestamp,
             intent,
             actionChips: [
-              { label: '📦 Post a New Item', actionType: 'navigate', payload: '/post' },
-              { label: '🔍 Browse Marketplace', actionType: 'navigate', payload: '/' }
+              { label: 'Post a New Item', actionType: 'navigate', payload: '/post' },
+              { label: 'Browse Marketplace', actionType: 'navigate', payload: '/' }
             ]
           },
           updatedState
@@ -413,8 +413,8 @@ export class GreenAiEngine {
             productCards: searchResult.items,
             radiusUsed: radiusKm,
             actionChips: [
-              { label: '📏 Expand to 25 km', actionType: 'set_radius', payload: 25 },
-              { label: '📦 Post Parts for Sale', actionType: 'navigate', payload: '/post' }
+              { label: 'Expand to 25 km', actionType: 'set_radius', payload: 25 },
+              { label: 'Post Parts for Sale', actionType: 'navigate', payload: '/post' }
             ]
           },
           updatedState
@@ -430,9 +430,9 @@ export class GreenAiEngine {
             intent,
             radiusUsed: radiusKm,
             actionChips: [
-              { label: '📏 Expand to 25 km', actionType: 'set_radius', payload: 25 },
-              { label: '📏 Expand to 50 km', actionType: 'set_radius', payload: 50 },
-              { label: '🔍 Browse All Categories', actionType: 'navigate', payload: '/' }
+              { label: 'Expand to 25 km', actionType: 'set_radius', payload: 25 },
+              { label: 'Expand to 50 km', actionType: 'set_radius', payload: 50 },
+              { label: 'Browse All Categories', actionType: 'navigate', payload: '/' }
             ]
           },
           updatedState
@@ -466,9 +466,9 @@ export class GreenAiEngine {
             productCards: searchResult.items,
             radiusUsed: radiusKm,
             actionChips: [
-              { label: '📏 Expand to 25 km', actionType: 'set_radius', payload: 25 },
-              { label: '⚡ Filter Only Parts', actionType: 'query', payload: 'Find only parts near me' },
-              { label: '📦 Post Item', actionType: 'navigate', payload: '/post' }
+              { label: 'Expand to 25 km', actionType: 'set_radius', payload: 25 },
+              { label: 'Filter Only Parts', actionType: 'query', payload: 'Find only parts near me' },
+              { label: 'Post Item', actionType: 'navigate', payload: '/post' }
             ]
           },
           updatedState
@@ -485,9 +485,9 @@ export class GreenAiEngine {
             intent,
             radiusUsed: radiusKm,
             actionChips: [
-              { label: '📏 Try 25 km Radius', actionType: 'set_radius', payload: 25 },
-              { label: '🔍 View All Listings', actionType: 'navigate', payload: '/' },
-              { label: '📦 Post Wanted Device', actionType: 'navigate', payload: '/post' }
+              { label: 'Try 25 km Radius', actionType: 'set_radius', payload: 25 },
+              { label: 'View All Listings', actionType: 'navigate', payload: '/' },
+              { label: 'Post Wanted Device', actionType: 'navigate', payload: '/post' }
             ]
           },
           updatedState
@@ -524,8 +524,8 @@ export class GreenAiEngine {
             productCards: productResult.items.slice(0, 2),
             radiusUsed: radiusKm,
             actionChips: [
-              { label: '🗺️ Open Interactive Map', actionType: 'navigate', payload: '/map' },
-              { label: '📏 Change to 25 km', actionType: 'set_radius', payload: 25 }
+              { label: '️ Open Interactive Map', actionType: 'navigate', payload: '/map' },
+              { label: 'Change to 25 km', actionType: 'set_radius', payload: 25 }
             ]
           },
           updatedState
@@ -539,8 +539,8 @@ export class GreenAiEngine {
             timestamp,
             intent,
             actionChips: [
-              { label: '📏 Expand to 25 km', actionType: 'set_radius', payload: 25 },
-              { label: '🗺️ Open Map Page', actionType: 'navigate', payload: '/map' }
+              { label: 'Expand to 25 km', actionType: 'set_radius', payload: 25 },
+              { label: '️ Open Map Page', actionType: 'navigate', payload: '/map' }
             ]
           },
           updatedState
@@ -555,7 +555,7 @@ export class GreenAiEngine {
       const estimate = await aiTools.estimatePrice(q)
 
       if (estimate.foundMatches) {
-        const text = `💰 **Fair Price Estimate**:\n\n${estimate.disclaimer}\n\n• **Lowest listed:** ₹${estimate.minPrice?.toLocaleString('en-IN')}\n• **Highest listed:** ₹${estimate.maxPrice?.toLocaleString('en-IN')}\n• **Marketplace Average:** ₹${estimate.avgPrice?.toLocaleString('en-IN')}`
+        const text = `**Fair Price Estimate**:\n\n${estimate.disclaimer}\n\n• **Lowest listed:** ₹${estimate.minPrice?.toLocaleString('en-IN')}\n• **Highest listed:** ₹${estimate.maxPrice?.toLocaleString('en-IN')}\n• **Marketplace Average:** ₹${estimate.avgPrice?.toLocaleString('en-IN')}`
         return {
           message: {
             id: `ai-${Date.now()}`,
@@ -564,8 +564,8 @@ export class GreenAiEngine {
             timestamp,
             intent,
             actionChips: [
-              { label: '📦 Post at this Price', actionType: 'navigate', payload: '/post' },
-              { label: '🔍 View Matching Listings', actionType: 'query', payload: 'Find laptop listings' }
+              { label: 'Post at this Price', actionType: 'navigate', payload: '/post' },
+              { label: 'View Matching Listings', actionType: 'query', payload: 'Find laptop listings' }
             ]
           },
           updatedState
@@ -579,8 +579,8 @@ export class GreenAiEngine {
             timestamp,
             intent,
             actionChips: [
-              { label: '📦 Create Custom Listing', actionType: 'navigate', payload: '/post' },
-              { label: '🔍 Browse All Listings', actionType: 'navigate', payload: '/' }
+              { label: 'Create Custom Listing', actionType: 'navigate', payload: '/post' },
+              { label: 'Browse All Listings', actionType: 'navigate', payload: '/' }
             ]
           },
           updatedState
@@ -601,7 +601,7 @@ export class GreenAiEngine {
           timestamp,
           intent,
           actionChips: [
-            { label: '📦 Open Post Item', actionType: 'navigate', payload: '/post' }
+            { label: 'Open Post Item', actionType: 'navigate', payload: '/post' }
           ]
         },
         updatedState
@@ -612,7 +612,7 @@ export class GreenAiEngine {
     // INTENT 9: DISPOSAL & RECYCLING GUIDANCE
     // -------------------------------------------------------------
     if (intent === 'DISPOSAL_GUIDANCE' || intent === 'RECYCLING_GUIDANCE') {
-      const text = `📋 **Safe Device Disposal & Data Sanitization Checklist**:\n\n1. **Backup Data**: Save contacts, photos, and files to cloud or external drive.\n2. **Sign Out of Accounts**: Remove Apple ID, Google Account, Microsoft, Steam.\n3. **Factory Reset**: Perform a secure factory wipe with device encryption enabled.\n4. **Remove Hardware**: Eject SIM tray and microSD memory cards.\n5. **Circular First**: Check if minor repairs can extend device life before scrapping.\n6. **Zero Landfill**: Drop off at a verified TNPCB recycler to avoid heavy metal pollution.`
+      const text = `**Safe Device Disposal & Data Sanitization Checklist**:\n\n1. **Backup Data**: Save contacts, photos, and files to cloud or external drive.\n2. **Sign Out of Accounts**: Remove Apple ID, Google Account, Microsoft, Steam.\n3. **Factory Reset**: Perform a secure factory wipe with device encryption enabled.\n4. **Remove Hardware**: Eject SIM tray and microSD memory cards.\n5. **Circular First**: Check if minor repairs can extend device life before scrapping.\n6. **Zero Landfill**: Drop off at a verified TNPCB recycler to avoid heavy metal pollution.`
 
       return {
         message: {
@@ -622,8 +622,8 @@ export class GreenAiEngine {
           timestamp,
           intent,
           actionChips: [
-            { label: '📍 Find Nearest Recycler', actionType: 'navigate', payload: '/map' },
-            { label: '📦 Schedule Doorstep Pickup', actionType: 'navigate', payload: '/post' }
+            { label: 'Find Nearest Recycler', actionType: 'navigate', payload: '/map' },
+            { label: 'Schedule Doorstep Pickup', actionType: 'navigate', payload: '/post' }
           ]
         },
         updatedState
@@ -634,7 +634,7 @@ export class GreenAiEngine {
     // INTENT 10: REPAIR GUIDANCE
     // -------------------------------------------------------------
     if (intent === 'REPAIR_GUIDANCE') {
-      const text = `🔧 **Electronics Repair & Recovery Guide**:\n\n• **Cracked Screen**: Display replacements typically take 45–60 mins at verified local repair shops.\n• **Water Damage**: Disconnect battery immediately. Do NOT turn on or use rice; take for ultrasonic PCB cleaning.\n• **Slow Performance**: Upgrading to an SSD or adding 8GB/16GB DDR4 RAM can extend laptop lifespan by 3+ years.\n\n*Repairing hardware saves up to 75% compared to buying new and earns **+100 Green Coins**.*`
+      const text = `**Electronics Repair & Recovery Guide**:\n\n• **Cracked Screen**: Display replacements typically take 45–60 mins at verified local repair shops.\n• **Water Damage**: Disconnect battery immediately. Do NOT turn on or use rice; take for ultrasonic PCB cleaning.\n• **Slow Performance**: Upgrading to an SSD or adding 8GB/16GB DDR4 RAM can extend laptop lifespan by 3+ years.\n\n*Repairing hardware saves up to 75% compared to buying new and earns **+100 Green Coins**.*`
 
       const repairShops = await aiTools.getNearbyCenters({
         userCoords: coords,
@@ -651,8 +651,8 @@ export class GreenAiEngine {
           intent,
           partnerCards: repairShops.partners.slice(0, 2),
           actionChips: [
-            { label: '🗺️ View Repair Shops on Map', actionType: 'navigate', payload: '/map' },
-            { label: '⚡ Find Spare Parts', actionType: 'query', payload: 'Find laptop parts near me' }
+            { label: '️ View Repair Shops on Map', actionType: 'navigate', payload: '/map' },
+            { label: 'Find Spare Parts', actionType: 'query', payload: 'Find laptop parts near me' }
           ]
         },
         updatedState
@@ -663,7 +663,7 @@ export class GreenAiEngine {
     // INTENT 11: REUSE GUIDANCE
     // -------------------------------------------------------------
     if (intent === 'REUSE_GUIDANCE') {
-      const text = `♻️ **Circular Electronics Reuse Ideas**:\n\n• **Old Smartphone**: Use as a dedicated home security camera, smart dashcam, or offline music player.\n• **Old Laptop**: Convert into a lightweight home media server, Linux learning station, or donate to a local student.\n• **Old Monitors**: Dual-monitor productivity setup or display for Raspberry Pi projects.\n• **Harvestable Spare Parts**: RAM sticks, SATA/NVMe SSDs, chargers, and cooling fans can be reused in other systems.`
+      const text = `️ **Circular Electronics Reuse Ideas**:\n\n• **Old Smartphone**: Use as a dedicated home security camera, smart dashcam, or offline music player.\n• **Old Laptop**: Convert into a lightweight home media server, Linux learning station, or donate to a local student.\n• **Old Monitors**: Dual-monitor productivity setup or display for Raspberry Pi projects.\n• **Harvestable Spare Parts**: RAM sticks, SATA/NVMe SSDs, chargers, and cooling fans can be reused in other systems.`
 
       return {
         message: {
@@ -673,8 +673,8 @@ export class GreenAiEngine {
           timestamp,
           intent,
           actionChips: [
-            { label: '📦 Donate to Students', actionType: 'navigate', payload: '/post' },
-            { label: '⚡ Browse Harvested Parts', actionType: 'query', payload: 'Find laptop parts' }
+            { label: 'Donate to Students', actionType: 'navigate', payload: '/post' },
+            { label: 'Browse Harvested Parts', actionType: 'query', payload: 'Find laptop parts' }
           ]
         },
         updatedState
@@ -697,7 +697,7 @@ export class GreenAiEngine {
           intent,
           actionChips: [
             { label: '🪙 View Rewards & Wallet', actionType: 'navigate', payload: '/activity' },
-            { label: '📜 View TNPCB Certificates', actionType: 'navigate', payload: '/account' }
+            { label: 'View TNPCB Certificates', actionType: 'navigate', payload: '/account' }
           ]
         },
         updatedState
@@ -720,8 +720,8 @@ export class GreenAiEngine {
           intent,
           productCards: userPosts,
           actionChips: [
-            { label: '📦 Post New Item', actionType: 'navigate', payload: '/post' },
-            { label: '👤 Account Settings', actionType: 'navigate', payload: '/account' }
+            { label: 'Post New Item', actionType: 'navigate', payload: '/post' },
+            { label: 'Account Settings', actionType: 'navigate', payload: '/account' }
           ]
         },
         updatedState
@@ -732,7 +732,7 @@ export class GreenAiEngine {
     // INTENT 14: GENERAL E-WASTE & CERTIFICATES
     // -------------------------------------------------------------
     if (intent === 'GENERAL_EWASTE_QUESTION') {
-      const text = `🌱 **Green Loop Circular Mission**:\n\nGreen Loop is an authorized circular e-waste platform in Tamil Nadu adhering to Central Pollution Control Board (CPCB) and TNPCB e-waste management guidelines.\n\n• **Zero Landfill Target**: Preventing toxic lead, mercury, and cadmium from contaminating soil & groundwater.\n• **Traceable Recycling**: All drop-offs generate an official digital Certificate of Safe Destruction with verifiable serial numbers.`
+      const text = `**Green Loop Circular Mission**:\n\nGreen Loop is an authorized circular e-waste platform in Tamil Nadu adhering to Central Pollution Control Board (CPCB) and TNPCB e-waste management guidelines.\n\n• **Zero Landfill Target**: Preventing toxic lead, mercury, and cadmium from contaminating soil & groundwater.\n• **Traceable Recycling**: All drop-offs generate an official digital Certificate of Safe Destruction with verifiable serial numbers.`
 
       return {
         message: {
@@ -742,8 +742,8 @@ export class GreenAiEngine {
           timestamp,
           intent,
           actionChips: [
-            { label: '📍 Find TNPCB Recyclers', actionType: 'navigate', payload: '/map' },
-            { label: '📦 Post for Recycling', actionType: 'navigate', payload: '/post' }
+            { label: 'Find TNPCB Recyclers', actionType: 'navigate', payload: '/map' },
+            { label: 'Post for Recycling', actionType: 'navigate', payload: '/post' }
           ]
         },
         updatedState
@@ -761,10 +761,10 @@ export class GreenAiEngine {
         timestamp,
         intent: 'UNSUPPORTED_REQUEST',
         actionChips: [
-          { label: '📍 Find E-Waste Near Me', actionType: 'query', payload: 'Find e-waste near me' },
-          { label: '⚡ Find Laptop Parts', actionType: 'query', payload: 'Find laptop parts within 10 km' },
-          { label: '🔋 Battery Safety Guide', actionType: 'query', payload: 'How do I recycle a swollen battery?' },
-          { label: '📦 Post an Item', actionType: 'navigate', payload: '/post' }
+          { label: 'Find E-Waste Near Me', actionType: 'query', payload: 'Find e-waste near me' },
+          { label: 'Find Laptop Parts', actionType: 'query', payload: 'Find laptop parts within 10 km' },
+          { label: 'Battery Safety Guide', actionType: 'query', payload: 'How do I recycle a swollen battery?' },
+          { label: 'Post an Item', actionType: 'navigate', payload: '/post' }
         ]
       },
       updatedState

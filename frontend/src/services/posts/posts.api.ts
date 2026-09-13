@@ -1,111 +1,157 @@
 import type { Post } from '../../types/post.types'
-import { MOCK_POSTS } from '../../data/mockData'
 import { supabase } from '../../utils/supabase'
-import { fetchPosts as fetchSupabasePosts, createPost as createSupabasePost, subscribeToNewPosts } from './supabasePosts'
+import {
+  fetchPosts as fetchSupabasePosts,
+  createPost as createSupabasePost,
+  subscribeToNewPosts,
+} from './supabasePosts'
+import { interactionsApi } from '../interactions/interactions.api'
 
 export { createSupabasePost, fetchSupabasePosts, subscribeToNewPosts }
 export * from './supabasePosts'
 
-function mapSupabasePostToAppPost(sbPost: any): Post {
+function mapSupabasePostToAppPost(sbPost: any, _currentUserId?: string, likesCount: number = 0, liked: boolean = false): Post {
+  const sellerName =
+    sbPost.profiles?.full_name ||
+    'Green Loop Citizen'
+
+  const location =
+    sbPost.profiles?.city ||
+    sbPost.location ||
+    'Coimbatore'
+
   return {
     id: String(sbPost.id),
     title: sbPost.title || 'Untitled Device',
     category: sbPost.category || 'Other Electronics',
-    brand: sbPost.brand || 'Electronics',
-    model: sbPost.model || '',
+    brand: sbPost.subcategory || 'Electronics',
+    model: '',
     condition: sbPost.condition || 'Good',
-    purpose: sbPost.purpose || (sbPost.price ? 'Sell' : 'Donate'),
-    price: sbPost.price ?? null,
-    negotiable: sbPost.negotiable ?? false,
+    purpose: sbPost.asking_price ? 'Sell' : 'Recycle',
+    price: sbPost.asking_price !== null && sbPost.asking_price !== undefined ? Number(sbPost.asking_price) : null,
+    negotiable: false,
     description: sbPost.description || '',
-    location: sbPost.location || 'Coimbatore',
-    locationName: sbPost.location_name || sbPost.location || 'Coimbatore',
-    latitude: sbPost.latitude || 11.0168,
-    longitude: sbPost.longitude || 76.9558,
-    distance: sbPost.distance || 0.8,
+    location,
+    locationName: location,
+    latitude: 11.0168,
+    longitude: 76.9558,
+    distance: 0.8,
     status: sbPost.status || 'available',
     seller: {
-      name: sbPost.profiles?.full_name || 'Community Member',
+      name: sellerName,
       rating: 4.9,
       verified: true,
       avatar: null,
     },
-    images: sbPost.image_url ? [sbPost.image_url] : (sbPost.images || ['https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&q=80']),
+    images: sbPost.image_url
+      ? [sbPost.image_url]
+      : ['https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&q=80'],
     createdAt: sbPost.created_at ? new Date(sbPost.created_at).toLocaleDateString() : 'Just now',
-    likes: sbPost.likes || 0,
-    comments: sbPost.comments || 0,
-    liked: false,
+    likes: likesCount,
+    comments: 0,
+    liked,
     saved: false,
   }
 }
 
 export const postsApi = {
   async getPosts(): Promise<Post[]> {
-    let supabaseItems: Post[] = []
+    let currentUserId: string | undefined
+    try {
+      const { data } = await supabase.auth.getUser()
+      currentUserId = data?.user?.id
+    } catch {}
+
     try {
       const rawPosts = await fetchSupabasePosts(0, 50)
       if (rawPosts && rawPosts.length > 0) {
-        supabaseItems = rawPosts.map(mapSupabasePostToAppPost)
+        // Fetch like statuses and counts in parallel
+        const postIds = rawPosts.map((p: any) => p.id)
+
+        // Likes query
+        const { data: likesData } = await supabase
+          .from('post_likes')
+          .select('post_id, user_id')
+          .in('post_id', postIds)
+
+        const likesByPost = new Map<string, number>()
+        const userLikedPosts = new Set<string>()
+
+        ;(likesData || []).forEach((l: any) => {
+          likesByPost.set(l.post_id, (likesByPost.get(l.post_id) || 0) + 1)
+          if (currentUserId && l.user_id === currentUserId) {
+            userLikedPosts.add(l.post_id)
+          }
+        })
+
+        const mapped = rawPosts.map((sbPost: any) =>
+          mapSupabasePostToAppPost(
+            sbPost,
+            currentUserId,
+            likesByPost.get(sbPost.id) || 0,
+            userLikedPosts.has(sbPost.id)
+          )
+        )
+
+        localStorage.setItem('gl_posts', JSON.stringify(mapped))
+        return mapped
       }
     } catch (e) {
-      console.warn('Supabase fetch failed, using local/cached posts:', e)
+      console.warn('[Green Loop] Supabase fetch failed, falling back to cached posts:', e)
     }
 
+    // Cache fallback
     const stored = localStorage.getItem('gl_posts')
-    let localItems: Post[] = []
     if (stored) {
       try {
-        localItems = JSON.parse(stored)
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
       } catch {}
-    } else {
-      localItems = MOCK_POSTS as unknown as Post[]
     }
 
-    if (supabaseItems.length > 0) {
-      // Merge unique by ID
-      const existingIds = new Set(supabaseItems.map(p => p.id))
-      const combined = [...supabaseItems, ...localItems.filter(p => !existingIds.has(p.id))]
-      return combined
-    }
-
-    return localItems
+    // Honest empty state: no mock data returned
+    return []
   },
 
-  async createPost(post: Omit<Post, 'id' | 'createdAt' | 'likes' | 'comments' | 'liked' | 'saved'>): Promise<Post> {
-    const existing = await this.getPosts()
+  async createPost(
+    post: Omit<Post, 'id' | 'createdAt' | 'likes' | 'comments' | 'liked' | 'saved'>
+  ): Promise<Post> {
+    // 1. Create real database listing in public.e_waste_posts
+    const inserted = await createSupabasePost({
+      title: post.title,
+      description: post.description,
+      category: post.category,
+      subcategory: post.brand,
+      condition: post.condition,
+      price: post.price,
+      asking_price: post.price,
+      image_url: post.images?.[0] || null,
+      status: 'available',
+    })
+
     const newPost: Post = {
       ...post,
-      id: 'p_' + Date.now(),
+      id: String(inserted.id),
       createdAt: 'Just now',
       likes: 0,
       comments: 0,
       liked: false,
       saved: false,
+      seller: {
+        name: inserted.profiles?.full_name || post.seller?.name || 'You',
+        rating: 4.9,
+        verified: true,
+        avatar: null,
+      },
     }
 
-    // Try syncing to Supabase if authenticated
+    // Sync cached storage
     try {
-      const { data: authData } = await supabase.auth.getUser()
-      if (authData?.user) {
-        await supabase.from('posts').insert({
-          user_id: authData.user.id,
-          title: post.title,
-          description: post.description,
-          image_url: post.images?.[0] || null,
-          category: post.category,
-          brand: post.brand,
-          model: post.model,
-          condition: post.condition,
-          price: post.price,
-          status: 'active'
-        })
-      }
-    } catch (err) {
-      console.warn('Supabase post insert skipped/failed:', err)
-    }
+      const existing = await this.getPosts()
+      const updated = [newPost, ...existing.filter(p => p.id !== newPost.id)]
+      localStorage.setItem('gl_posts', JSON.stringify(updated))
+    } catch {}
 
-    const updated = [newPost, ...existing]
-    localStorage.setItem('gl_posts', JSON.stringify(updated))
     // Trigger cross-component sync event
     window.dispatchEvent(new Event('gl_posts_updated'))
     return newPost
@@ -118,10 +164,21 @@ export const postsApi = {
       throw new Error('Post not found (404)')
     }
 
-    // Authorization check
     if (currentUserName && targetPost.seller?.name && targetPost.seller.name !== currentUserName) {
       throw new Error('Unauthorized to edit this post (403)')
     }
+
+    // Update in Supabase e_waste_posts
+    await supabase
+      .from('e_waste_posts')
+      .update({
+        title: updates.title,
+        description: updates.description,
+        category: updates.category,
+        condition: updates.condition,
+        asking_price: updates.price,
+      })
+      .eq('id', postId)
 
     let modifiedPost: Post = targetPost
     const updated = existing.map(p => {
@@ -138,6 +195,20 @@ export const postsApi = {
   },
 
   async toggleLike(postId: string): Promise<Post[]> {
+    let currentUserId: string | undefined
+    try {
+      const { data } = await supabase.auth.getUser()
+      currentUserId = data?.user?.id
+    } catch {}
+
+    if (currentUserId) {
+      try {
+        await interactionsApi.toggleLike(postId, currentUserId)
+      } catch (err) {
+        console.warn('[Green Loop] DB toggleLike error:', err)
+      }
+    }
+
     const existing = await this.getPosts()
     const updated = existing.map(p => {
       if (p.id === postId) {
@@ -145,7 +216,7 @@ export const postsApi = {
         return {
           ...p,
           liked,
-          likes: liked ? p.likes + 1 : Math.max(0, p.likes - 1)
+          likes: liked ? p.likes + 1 : Math.max(0, p.likes - 1),
         }
       }
       return p
@@ -170,15 +241,24 @@ export const postsApi = {
     const existing = await this.getPosts()
     const targetPost = existing.find(p => p.id === postId)
 
-    // Authorization check if username provided
     if (targetPost && currentUserName && targetPost.seller?.name && targetPost.seller.name !== currentUserName) {
       throw new Error('Unauthorized to delete this post (403)')
     }
 
+    // Delete from Supabase e_waste_posts
+    const { error } = await supabase
+      .from('e_waste_posts')
+      .delete()
+      .eq('id', postId)
+
+    if (error) {
+      console.error('[Green Loop] Delete e_waste_posts error:', error)
+      throw new Error(error.message || 'Failed to delete listing from database.')
+    }
+
     const updated = existing.filter(p => p.id !== postId)
     localStorage.setItem('gl_posts', JSON.stringify(updated))
-    // Trigger cross-component sync event
     window.dispatchEvent(new Event('gl_posts_updated'))
     return updated
-  }
+  },
 }

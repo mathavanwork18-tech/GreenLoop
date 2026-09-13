@@ -11,6 +11,7 @@ import ShopRegisterStep from './ShopRegisterStep'
 import { usePwaInstall } from '../../../context/PwaInstallContext'
 import InstallButton from '../../../components/InstallButton'
 import ResumePromptModal from './ResumePromptModal'
+import { normalizeRole, getRoleDashboardPath } from '../../../services/role/roleService'
 
 export type AuthStep =
   | 'LANGUAGE'
@@ -94,10 +95,11 @@ export default function AuthFlowContainer() {
   }
 
   // Step 3: OTP Verified
-  const handleOtpSuccess = (isExistingUser: boolean, isProfileComplete: boolean) => {
+  const handleOtpSuccess = (isExistingUser: boolean, isProfileComplete: boolean, detectedRole?: Role) => {
     if (isExistingUser && isProfileComplete) {
-      // Existing user with completed profile immediately enters the main app!
-      navigate('/')
+      // Existing user with completed profile immediately enters the appropriate dashboard!
+      const targetRole = normalizeRole(detectedRole || role)
+      navigate(getRoleDashboardPath(targetRole), { replace: true })
       return
     }
 
@@ -118,13 +120,14 @@ export default function AuthFlowContainer() {
 
   // Final Step: Complete Registration (Citizen or Shop)
   const handleFinalSubmit = async (formData: any) => {
-    await completeProfile(role, {
+    const completed = await completeProfile(role, {
       ...formData,
       phone,
     })
 
-    // Profile is completed! Navigate to existing main Green Loop app
-    navigate('/')
+    // Profile is completed! Navigate to appropriate dashboard based on user's role
+    const targetRole = normalizeRole(completed.role)
+    navigate(getRoleDashboardPath(targetRole), { replace: true })
   }
 
   // Save intermediate form draft

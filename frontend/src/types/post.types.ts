@@ -34,6 +34,7 @@ export interface Post {
   longitude?: number
   locationName?: string
   status?: 'available' | 'reserved' | 'recycled' | 'sold'
+  recommendationReason?: string
 }
 
 export interface AIAnalysisResult {

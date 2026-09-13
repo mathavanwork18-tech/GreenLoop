@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Icon from '../../components/Icon'
 import type { IconName } from '../../components/Icon'
+import PasswordRequirements2Ticks from '../../components/PasswordRequirements2Ticks'
+import { normalizeRole, getRoleDashboardPath } from '../../services/role/roleService'
 
 type Step = 1 | 2 | 3
 type Role = 'GENERAL_USER' | 'LOCAL_SHOP' | 'RECYCLER'
@@ -40,18 +42,30 @@ export default function RegisterPage() {
   const [step, setStep] = useState<Step>(1)
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)
   const [form, setForm] = useState({ name: '', email: '', phone: '', city: '', password: '', confirm: '' })
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const isPasswordMin = form.password.length >= 6
+  const isPasswordMax = form.password.length <= 16
+  const isPasswordLengthValid = isPasswordMin && isPasswordMax
+  const isPasswordMismatch = Boolean(form.confirm && form.password !== form.confirm)
+  const isPasswordValid = isPasswordLengthValid && !isPasswordMismatch && Boolean(form.confirm)
+
   const handleSubmit = async () => {
-    if (form.password !== form.confirm) { setError('Passwords do not match'); return }
+    if (!form.password) { setError('Password is required'); return }
+    if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return }
+    if (form.password.length > 16) { setError('Password must be 16 characters or fewer.'); return }
+    if (form.password !== form.confirm) { setError("Passwords don't match."); return }
     if (!selectedRole) { setError('Please select a role'); return }
     setLoading(true); setError('')
     try {
-      await register({ ...form, role: selectedRole })
-      navigate('/')
-    } catch {
-      setError('Registration failed. Please try again.')
+      const newUser = await register({ ...form, role: selectedRole })
+      const targetPath = getRoleDashboardPath(normalizeRole(newUser?.role || selectedRole))
+      navigate(targetPath, { replace: true })
+    } catch (err: any) {
+      setError(err?.message || 'Registration failed. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -198,24 +212,121 @@ export default function RegisterPage() {
           {step === 3 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="input-group">
-                <label className="input-label">Password *</label>
-                <input className="input" type="password" placeholder="Min. 8 characters" value={form.password} onChange={e => updateForm('password', e.target.value)} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label className="input-label" style={{ margin: 0 }}>Password *</label>
+                  <span
+                    style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      color: form.password.length > 16 ? '#ef4444' : form.password.length >= 6 ? 'var(--accent)' : 'var(--text-tertiary)',
+                    }}
+                  >
+                    {form.password.length}/16
+                  </span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="input"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter 6–16 characters"
+                    value={form.password}
+                    onChange={e => updateForm('password', e.target.value)}
+                    style={{
+                      paddingRight: 44,
+                      borderColor: form.password.length > 0 && !isPasswordLengthValid ? '#ef4444' : undefined,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 4,
+                    }}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} color="var(--text-secondary)" />
+                  </button>
+                </div>
+                {form.password.length > 0 && form.password.length < 6 && (
+                  <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
+                    Password must be at least 6 characters.
+                  </span>
+                )}
+                {form.password.length > 16 && (
+                  <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
+                    Password must be 16 characters or fewer.
+                  </span>
+                )}
               </div>
+
               <div className="input-group">
                 <label className="input-label">Confirm Password *</label>
-                <input className="input" type="password" placeholder="Re-enter password" value={form.confirm} onChange={e => updateForm('confirm', e.target.value)} />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="input"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Re-enter password"
+                    value={form.confirm}
+                    onChange={e => updateForm('confirm', e.target.value)}
+                    style={{
+                      paddingRight: 44,
+                      borderColor: isPasswordMismatch ? '#ef4444' : undefined,
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 4,
+                    }}
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  >
+                    <Icon name={showConfirmPassword ? 'eye-off' : 'eye'} size={18} color="var(--text-secondary)" />
+                  </button>
+                </div>
+                {isPasswordMismatch && (
+                  <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
+                    Passwords don't match.
+                  </span>
+                )}
               </div>
-              <div style={{
-                background: 'var(--accent-light)', borderRadius: 10, padding: '10px 14px',
-                fontSize: '0.8rem', color: 'var(--accent-text)', display: 'flex', alignItems: 'center', gap: 8
-              }}>
-                <Icon name="shield" size={15} color="var(--accent-text)" />
-                <span>Your data is encrypted and never shared without your consent.</span>
-              </div>
+
+              {/* 2-Tick Password Acceptance Indicator */}
+              <PasswordRequirements2Ticks
+                password={form.password}
+                confirmPassword={form.confirm}
+              />
+
               <button
                 className="btn btn-primary btn-lg btn-full"
-                style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                disabled={!form.password || form.password.length < 8 || loading}
+                style={{
+                  marginTop: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  opacity: loading || !form.password || !isPasswordValid ? 0.6 : 1,
+                  cursor: loading || !form.password || !isPasswordValid ? 'not-allowed' : 'pointer',
+                }}
+                disabled={loading || !form.password || !isPasswordValid}
                 onClick={handleSubmit}
               >
                 {loading ? (

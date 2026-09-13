@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Card, Badge, Button } from '../../components/ui'
+import Icon from '../../components/Icon'
 
 export default function ShopPage() {
   const [requests, setRequests] = useState([
@@ -53,7 +54,10 @@ export default function ShopPage() {
             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Weekly Pipeline</div>
           </div>
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', padding: 12, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--coin-color)' }}>4.9 ★</div>
+            <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--coin-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <span>4.9</span>
+              <Icon name="star" size={14} color="var(--coin-color)" />
+            </div>
             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Rating</div>
           </div>
         </div>

@@ -8,6 +8,7 @@ import RewardsStore from './components/RewardsStore/RewardsStore'
 import LeaderboardSection from './components/Leaderboard/LeaderboardSection'
 import SettingsMenu from './components/SettingsMenu/SettingsMenu'
 import HelpSupportModal from './components/Modals/HelpSupportModal'
+import Icon from '../../components/Icon'
 import type { Role } from '../../types/auth.types'
 
 export default function AccountPage() {
@@ -28,9 +29,25 @@ export default function AccountPage() {
     alert(`Successfully redeemed "${title}"! Voucher code sent to ${user?.email}.`)
   }
 
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [logoutError, setLogoutError] = useState<string | null>(null)
+
   const handleLogout = async () => {
-    await logout()
-    navigate('/login')
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    setLogoutError(null)
+
+    try {
+      await logout()
+      // Successfully signed out of Supabase:
+      // Navigate to /login with replace: true to prevent Back button re-entry
+      navigate('/login', { replace: true })
+    } catch (err: any) {
+      console.error('[AccountPage] Logout failed:', err)
+      setLogoutError(err?.message || 'Unable to log out from Supabase. Please check your network and try again.')
+    } finally {
+      setIsLoggingOut(false)
+    }
   }
 
   const currentLevelObj =
@@ -85,31 +102,6 @@ export default function AccountPage() {
               currentRole={currentRole as Role}
               onSelectRole={r => setRole(r)}
             />
-            <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
-                Circular Impact Statistics
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center' }}>
-                <div style={{ background: 'var(--bg-surface-2)', padding: 10, borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent)' }}>
-                    {user?.transactions || 0}
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Eco Actions</div>
-                </div>
-                <div style={{ background: 'var(--bg-surface-2)', padding: 10, borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent)' }}>
-                    {((user?.greenCoins || 0) * 0.12).toFixed(1)}kg
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>E-Waste Saved</div>
-                </div>
-                <div style={{ background: 'var(--bg-surface-2)', padding: 10, borderRadius: 'var(--radius-md)' }}>
-                  <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent)' }}>
-                    {((user?.greenCoins || 0) * 0.08).toFixed(1)}kg
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>CO₂e Offset</div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -130,6 +122,89 @@ export default function AccountPage() {
             onLogout={handleLogout}
           />
         )}
+
+        {/* 4. Clearly Separated Account & Security Section near bottom of Account Page */}
+        <div
+          className="card"
+          style={{
+            marginTop: 24,
+            marginBottom: 16,
+            padding: '16px 18px',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-sm)'
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 12,
+              paddingBottom: 10,
+              borderBottom: '1px solid var(--border-subtle)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="shield" size={18} color="var(--accent)" />
+              <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                Account & Security
+              </span>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
+              Session Management
+            </span>
+          </div>
+
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0 0 14px 0', lineHeight: 1.4 }}>
+            Signed in as <strong>{user?.email || user?.phone || user?.name || 'Green Loop Citizen'}</strong>. Sign out to safely terminate your authenticated Supabase session on this device.
+          </p>
+
+          {logoutError && (
+            <div
+              style={{
+                marginBottom: 12,
+                padding: '10px 12px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#ef4444',
+                fontSize: '0.78rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+              }}
+            >
+              <Icon name="alert" size={16} color="#ef4444" />
+              <span>{logoutError}</span>
+            </div>
+          )}
+
+          <button
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="btn btn-ghost btn-full"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-md)',
+              color: '#ef4444',
+              background: 'rgba(239, 68, 68, 0.06)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              cursor: isLoggingOut ? 'not-allowed' : 'pointer',
+              transition: 'all var(--transition-fast)'
+            }}
+          >
+            <Icon name="logout" size={18} color="#ef4444" />
+            <span>{isLoggingOut ? 'Signing out from Supabase...' : 'Log Out from Green Loop'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Help Modal */}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import Icon from '../../components/Icon'
+import { normalizeRole, getRoleDashboardPath } from '../../services/role/roleService'
 
 type Step = 'welcome' | 'login'
 
@@ -20,10 +21,11 @@ export default function LoginPage() {
     if (!email || !password) { setError('Please fill all fields'); return }
     setLoading(true); setError('')
     try {
-      await login(email, password)
-      navigate('/')
-    } catch {
-      setError('Invalid credentials. Try again.')
+      const user = await login(email, password)
+      const targetPath = getRoleDashboardPath(normalizeRole(user?.role))
+      navigate(targetPath, { replace: true })
+    } catch (err: any) {
+      setError(err?.message || 'Invalid credentials. Try again.')
     } finally {
       setLoading(false)
     }
