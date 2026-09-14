@@ -201,9 +201,10 @@ export const postsApi = {
       currentUserId = data?.user?.id
     } catch {}
 
+    let dbResult: { liked: boolean; count: number } | null = null
     if (currentUserId) {
       try {
-        await interactionsApi.toggleLike(postId, currentUserId)
+        dbResult = await interactionsApi.toggleLike(postId, currentUserId)
       } catch (err) {
         console.warn('[Green Loop] DB toggleLike error:', err)
       }
@@ -212,16 +213,18 @@ export const postsApi = {
     const existing = await this.getPosts()
     const updated = existing.map(p => {
       if (p.id === postId) {
-        const liked = !p.liked
+        const liked = dbResult ? dbResult.liked : !p.liked
+        const likes = dbResult ? dbResult.count : (liked ? p.likes + 1 : Math.max(0, p.likes - 1))
         return {
           ...p,
           liked,
-          likes: liked ? p.likes + 1 : Math.max(0, p.likes - 1),
+          likes,
         }
       }
       return p
     })
     localStorage.setItem('gl_posts', JSON.stringify(updated))
+    window.dispatchEvent(new Event('gl_posts_updated'))
     return updated
   },
 

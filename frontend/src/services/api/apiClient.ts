@@ -33,17 +33,13 @@ export async function apiClient<T>(
       const json = await response.json()
       return json as T
     }
-  } catch (error) {
-    // Graceful fallback for offline / mock mode
-    console.warn(`[API Client] Network call to ${url} failed, using local simulation.`, error)
-  }
 
-  const delay = options?.delayMs ?? 150
-  if (delay > 0) {
-    await new Promise(r => setTimeout(r, delay))
+    const errorBody = await response.text().catch(() => '')
+    throw new Error(`API request failed [${response.status}]: ${errorBody || response.statusText}`)
+  } catch (error: any) {
+    console.error(`[API Client] Network call to ${url} failed:`, error?.message || error)
+    throw error
   }
-
-  return { endpoint, options } as unknown as T
 }
 
 export function handleApiResponse<T>(data: T, message = 'Success', statusCode = 200): ApiResponse<T> {

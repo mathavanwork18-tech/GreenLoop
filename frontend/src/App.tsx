@@ -36,25 +36,43 @@ import {
   LocalShopAccountPage,
 } from './pages/shop'
 
-// Green Loop Administrator Modular Components
-import AdminAppShell from './features/dashboard/admin/AdminAppShell'
-import AdminOverview from './features/dashboard/admin/AdminOverview'
-import AdminUsers from './features/dashboard/admin/AdminUsers'
-import AdminShops from './features/dashboard/admin/AdminShops'
-import AdminCompanies from './features/dashboard/admin/AdminCompanies'
-import AdminPosts from './features/dashboard/admin/AdminPosts'
-import AdminPickups from './features/dashboard/admin/AdminPickups'
-import AdminRecyclingCenters from './features/dashboard/admin/AdminRecyclingCenters'
-import AdminReports from './features/dashboard/admin/AdminReports'
-import AdminNotifications from './features/dashboard/admin/AdminNotifications'
-import AdminRecommendations from './features/dashboard/admin/AdminRecommendations'
-import AdminDatabaseHealth from './features/dashboard/admin/AdminDatabaseHealth'
-import AdminAnalytics from './features/dashboard/admin/AdminAnalytics'
-import AdminAuditLogs from './features/dashboard/admin/AdminAuditLogs'
-import AdminSettings from './features/dashboard/admin/AdminSettings'
-
 function AppRoutes() {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, isInitializing, user } = useAuth()
+
+  // Initializing session gate: prevent premature redirect to login/register during cold start
+  if (isInitializing) {
+    return (
+      <div
+        style={{
+          minHeight: '100dvh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg-base)',
+          color: 'var(--text-primary)',
+        }}
+      >
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            border: '3px solid var(--border-color)',
+            borderTopColor: 'var(--accent)',
+            animation: 'spin 0.8s linear infinite',
+            marginBottom: 14,
+          }}
+        />
+        <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+          Loading Green Loop...
+        </div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+          Determining secure authentication state...
+        </div>
+      </div>
+    )
+  }
 
   // Unauthenticated Flow
   if (!isAuthenticated) {
@@ -69,33 +87,8 @@ function AppRoutes() {
   }
 
   // Centralized role resolution from database profile
+  // Current roles strictly: 1. GENERAL USER, 2. LOCAL SHOP / COMPANY
   const userRole = normalizeRole(user?.role)
-
-  // 0. GREEN LOOP ADMINISTRATOR CONTROL CENTER (Authenticated profiles only)
-  if (userRole === 'admin') {
-    return (
-      <AdminAppShell>
-        <Routes>
-          <Route path="/admin" element={<AdminOverview />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/admin/shops" element={<AdminShops />} />
-          <Route path="/admin/companies" element={<AdminCompanies />} />
-          <Route path="/admin/posts" element={<AdminPosts />} />
-          <Route path="/admin/pickups" element={<AdminPickups />} />
-          <Route path="/admin/centers" element={<AdminRecyclingCenters />} />
-          <Route path="/admin/reports" element={<AdminReports />} />
-          <Route path="/admin/notifications" element={<AdminNotifications />} />
-          <Route path="/admin/recommendations" element={<AdminRecommendations />} />
-          <Route path="/admin/health" element={<AdminDatabaseHealth />} />
-          <Route path="/admin/analytics" element={<AdminAnalytics />} />
-          <Route path="/admin/audit-logs" element={<AdminAuditLogs />} />
-          <Route path="/admin/settings" element={<AdminSettings />} />
-          {/* Strict Role Guard: Any other route redirects to /admin */}
-          <Route path="*" element={<Navigate to="/admin" replace />} />
-        </Routes>
-      </AdminAppShell>
-    )
-  }
 
   // 1. LOCAL SHOP / COMPANY MARKETPLACE DASHBOARD (Home | Map | Post | Orders | Account)
   if (userRole === 'shop' || userRole === 'company') {

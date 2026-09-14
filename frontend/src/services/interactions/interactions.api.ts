@@ -19,11 +19,21 @@ export interface NotificationRecord {
   created_at: string
 }
 
+// In-flight mutex to prevent duplicate clicks per post
+const inFlightLikeMutex = new Set<string>()
+
 export const interactionsApi = {
   // --- LIKES ---
 
   async isPostLiked(postId: string, userId?: string): Promise<boolean> {
+    if (!userId) {
+      try {
+        const { data } = await supabase.auth.getUser()
+        userId = data?.user?.id
+      } catch {}
+    }
     if (!userId) return false
+
     const { data, error } = await supabase
       .from('post_likes')
       .select('id')
@@ -50,38 +60,76 @@ export const interactionsApi = {
     return count || 0
   },
 
-  async toggleLike(postId: string, userId: string): Promise<{ liked: boolean; count: number }> {
-    if (!userId) {
-      throw new Error('You must be logged in to like a post.')
+  async toggleLike(postId: string, suppliedUserId?: string): Promise<{ liked: boolean; count: number }> {
+    // 1. Double-click concurrency protection
+    if (inFlightLikeMutex.has(postId)) {
+      const count = await this.getLikesCount(postId)
+      const liked = await this.isPostLiked(postId, suppliedUserId)
+      return { liked, count }
     }
 
-    const currentlyLiked = await this.isPostLiked(postId, userId)
+    inFlightLikeMutex.add(postId)
 
-    if (currentlyLiked) {
-      // Unlike: remove row
-      const { error } = await supabase
-        .from('post_likes')
-        .delete()
-        .match({ post_id: postId, user_id: userId })
-
-      if (error) {
-        console.error('[Green Loop] Unlike error:', error)
-        throw new Error(error.message)
+    try {
+      // 2. Authoritative identity verification from Supabase Auth
+      let authUserId = suppliedUserId
+      const { data: authData } = await supabase.auth.getUser()
+      if (authData?.user?.id) {
+        authUserId = authData.user.id
       }
-    } else {
-      // Like: insert row
-      const { error } = await supabase
-        .from('post_likes')
-        .insert({ post_id: postId, user_id: userId })
 
-      if (error) {
-        console.error('[Green Loop] Like error:', error)
-        throw new Error(error.message)
+      if (!authUserId) {
+        throw new Error('You must be signed in to like a post.')
       }
+
+      // 3. Check existing database record
+      const { data: existingLike, error: fetchErr } = await supabase
+        .from('post_likes')
+        .select('id')
+        .match({ post_id: postId, user_id: authUserId })
+        .maybeSingle()
+
+      if (fetchErr) {
+        throw new Error(fetchErr.message || 'Database error while checking like status.')
+      }
+
+      let isNowLiked = false
+
+      if (existingLike) {
+        // Unlike: delete database record
+        const { error: deleteErr } = await supabase
+          .from('post_likes')
+          .delete()
+          .match({ post_id: postId, user_id: authUserId })
+
+        if (deleteErr) {
+          throw new Error(deleteErr.message || 'Failed to remove like from database.')
+        }
+        isNowLiked = false
+      } else {
+        // Like: insert database record
+        const { error: insertErr } = await supabase
+          .from('post_likes')
+          .insert({ post_id: postId, user_id: authUserId })
+
+        if (insertErr) {
+          // If code is 23505, unique constraint caught duplicate concurrent insert
+          if (insertErr.code === '23505') {
+            isNowLiked = true
+          } else {
+            throw new Error(insertErr.message || 'Failed to record like in database.')
+          }
+        } else {
+          isNowLiked = true
+        }
+      }
+
+      // 4. Return database count and state
+      const count = await this.getLikesCount(postId)
+      return { liked: isNowLiked, count }
+    } finally {
+      inFlightLikeMutex.delete(postId)
     }
-
-    const count = await this.getLikesCount(postId)
-    return { liked: !currentlyLiked, count }
   },
 
   // --- COMMENTS ---

@@ -12,8 +12,9 @@ export type AppRole = 'citizen' | 'shop' | 'company' | 'admin'
 export function normalizeRole(rawRole?: string | null): AppRole {
   if (!rawRole) return 'citizen'
   const lower = rawRole.toLowerCase().trim()
+  // Admin role is disabled for current build — defaults safely to citizen
   if (lower === 'admin' || lower === 'administrator') {
-    return 'admin'
+    return 'citizen'
   }
   if (lower === 'shop' || lower === 'local_shop' || lower === 'shop_owner') {
     return 'shop'
@@ -29,8 +30,6 @@ export function normalizeRole(rawRole?: string | null): AppRole {
  */
 export function getRoleDashboardPath(role: AppRole): string {
   switch (role) {
-    case 'admin':
-      return '/admin'
     case 'shop':
       return '/shop'
     case 'company':
@@ -48,9 +47,9 @@ export function getRoleDashboardPath(role: AppRole): string {
 export function canAccessRoute(userRole: AppRole, pathname: string): boolean {
   const cleanPath = pathname.toLowerCase()
 
-  // 1. Admin routes isolation: ONLY admin can access
+  // 1. Admin routes are disabled in this build
   if (cleanPath.startsWith('/admin')) {
-    return userRole === 'admin'
+    return false
   }
 
   // 2. Local Shop routes isolation

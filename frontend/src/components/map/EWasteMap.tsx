@@ -15,6 +15,7 @@ import {
   clusterPoints,
   DEFAULT_COORDS,
 } from '../../utils/mapHelpers'
+import { geocodeCoimbatoreArea } from '../../utils/coimbatoreGeocoding'
 
 import MapSearch from './MapSearch'
 import MapFilters, { type MapCategoryFilter } from './MapFilters'
@@ -234,11 +235,15 @@ export default function EWasteMap({
       lng: c.longitude,
     }))
 
-    const postPoints = filteredPosts.map((p, idx) => {
-      const latOffsets = [0.008, -0.011, 0.014, -0.006, 0.019, -0.015, 0.003]
-      const lngOffsets = [-0.007, 0.012, -0.014, 0.016, 0.004, -0.009, 0.018]
-      const lat = p.latitude ?? (DEFAULT_COORDS[0] + (latOffsets[idx % latOffsets.length] || 0.005))
-      const lng = p.longitude ?? (DEFAULT_COORDS[1] + (lngOffsets[idx % lngOffsets.length] || -0.005))
+    const postPoints = filteredPosts.map((p) => {
+      let lat = p.latitude
+      let lng = p.longitude
+
+      if (!lat || !lng || !isValidCoordinate(lat, lng)) {
+        const geo = geocodeCoimbatoreArea(p.location || p.locationName)
+        lat = geo.lat
+        lng = geo.lng
+      }
 
       return {
         ...p,

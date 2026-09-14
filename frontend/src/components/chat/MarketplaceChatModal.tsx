@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Icon from '../Icon'
-import { useAuth } from '../../context/AuthContext'
+import { chatService } from '../../services/chat/chatService'
 
 export interface ChatListingContext {
   id: string
@@ -36,7 +36,6 @@ export default function MarketplaceChatModal({
   onClose,
   onViewListing,
 }: Props) {
-  const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -44,19 +43,68 @@ export default function MarketplaceChatModal({
   const [lastSentText, setLastSentText] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Initialize conversation with welcome seller prompt when a listing is opened
+  // Initialize and load real messages from Supabase
   useEffect(() => {
-    if (isOpen && listing) {
-      const seller = listing.sellerName || 'Seller'
-      const initialGreeting: Message = {
-        id: 'init-1',
-        sender: 'them',
-        senderName: seller,
-        text: `Hello! I am ${seller}. Feel free to ask about the condition, pickup location, or pricing for "${listing.title}".`,
-        time: new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: 'numeric', hour12: true }).format(new Date()),
-        timestamp: Date.now(),
-      }
-      setMessages([initialGreeting])
+    if (!isOpen || !listing?.id) return
+
+    let isMounted = true
+
+    chatService
+      .getMessages(listing.id)
+      .then((history) => {
+        if (!isMounted) return
+        if (history.length > 0) {
+          setMessages(
+            history.map((m) => ({
+              id: m.id,
+              sender: m.isMe ? 'me' : 'them',
+              senderName: m.senderName,
+              text: m.text,
+              time: m.createdAt,
+              timestamp: Date.now(),
+            }))
+          )
+        } else {
+          const seller = listing.sellerName || 'Seller'
+          setMessages([
+            {
+              id: 'init-1',
+              sender: 'them',
+              senderName: seller,
+              text: `Hello! I am ${seller}. Feel free to ask about the condition, pickup location, or pricing for "${listing.title}".`,
+              time: 'Active',
+              timestamp: Date.now(),
+            },
+          ])
+        }
+      })
+      .catch((err) => {
+        console.warn('[ChatModal] Error loading messages:', err)
+      })
+
+    const unsubscribe = chatService.subscribeToThread(listing.id, (newMsg) => {
+      if (!isMounted) return
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id || (m.text === newMsg.text && m.sender === (newMsg.isMe ? 'me' : 'them')))) {
+          return prev
+        }
+        return [
+          ...prev,
+          {
+            id: newMsg.id,
+            sender: newMsg.isMe ? 'me' : 'them',
+            senderName: newMsg.senderName,
+            text: newMsg.text,
+            time: newMsg.createdAt,
+            timestamp: Date.now(),
+          },
+        ]
+      })
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
     }
   }, [isOpen, listing?.id])
 
@@ -69,21 +117,13 @@ export default function MarketplaceChatModal({
 
   if (!isOpen || !listing) return null
 
-  const formatCurrentTime = () => {
-    return new Intl.DateTimeFormat('en-IN', {
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: true,
-    }).format(new Date())
-  }
-
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const raw = textToSend !== undefined ? textToSend : inputText
     const trimmed = raw.trim()
 
     // 1. Validation: reject empty or oversized messages
     if (!trimmed || trimmed.length > 1000) return
-    if (sendCooldown) return
+    if (sendCooldown || isSending) return
 
     // 2. Spam protection: duplicate prevention within 10 seconds
     if (trimmed === lastSentText && Date.now() - (messages[messages.length - 1]?.timestamp || 0) < 10000) {
@@ -92,45 +132,31 @@ export default function MarketplaceChatModal({
 
     setIsSending(true)
     setSendCooldown(true)
-    setTimeout(() => setSendCooldown(false), 1000) // 1s cooldown
+    setTimeout(() => setSendCooldown(false), 1000)
 
-    const userMessage: Message = {
-      id: 'msg-' + Date.now(),
-      sender: 'me',
-      senderName: user?.name || 'You',
-      text: trimmed,
-      time: formatCurrentTime(),
-      timestamp: Date.now(),
+    try {
+      const sent = await chatService.sendMessage(listing.id, trimmed)
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === sent.id)) return prev
+        return [
+          ...prev,
+          {
+            id: sent.id,
+            sender: 'me',
+            senderName: sent.senderName,
+            text: sent.text,
+            time: sent.createdAt,
+            timestamp: Date.now(),
+          },
+        ]
+      })
+      setLastSentText(trimmed)
+      if (textToSend === undefined) setInputText('')
+    } catch (err: any) {
+      alert(err.message || 'Could not send message. Please make sure you are signed in.')
+    } finally {
+      setIsSending(false)
     }
-
-    setMessages((prev) => [...prev, userMessage])
-    setLastSentText(trimmed)
-    if (textToSend === undefined) setInputText('')
-    setIsSending(false)
-
-    // Automated seller response simulation for interactive testing
-    setTimeout(() => {
-      let replyText = `Thanks for reaching out! Regarding "${listing.title}", I am available for handover or pickup in ${listing.location}.`
-      if (trimmed.toLowerCase().includes('available')) {
-        replyText = `Yes, "${listing.title}" is currently available! When would you like to arrange pickup or inspection?`
-      } else if (trimmed.toLowerCase().includes('price') || trimmed.toLowerCase().includes('offer')) {
-        replyText = `The listed price is ${
-          listing.askingPrice !== null ? `₹${listing.askingPrice.toLocaleString()}` : 'open for reasonable offers'
-        }. What price did you have in mind?`
-      } else if (trimmed.toLowerCase().includes('pickup') || trimmed.toLowerCase().includes('meet')) {
-        replyText = `Doorstep collection or meetup near ${listing.location} works great. Let me know your preferred time.`
-      }
-
-      const sellerReply: Message = {
-        id: 'reply-' + Date.now(),
-        sender: 'them',
-        senderName: listing.sellerName,
-        text: replyText,
-        time: formatCurrentTime(),
-        timestamp: Date.now(),
-      }
-      setMessages((prev) => [...prev, sellerReply])
-    }, 1100)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

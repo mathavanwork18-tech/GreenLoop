@@ -3,6 +3,7 @@ import Icon from './Icon'
 import { useAuth } from '../context/AuthContext'
 import { postsApi } from '../services/posts/posts.api'
 import { interactionsApi, type PostCommentItem } from '../services/interactions/interactions.api'
+import { chatService } from '../services/chat/chatService'
 import MarketplaceChatModal from './chat/MarketplaceChatModal'
 
 export interface PostItem {
@@ -92,19 +93,16 @@ export default function PostDetailModal({
     }
   }
 
-  const handleSendChat = () => {
+  const handleSendChat = async () => {
     if (!chatInput.trim()) return
-    const msg = { sender: 'me' as const, text: chatInput, time: 'Just now' }
-    setChatMessages(prev => [...prev, msg])
+    const text = chatInput.trim()
     setChatInput('')
-
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, {
-        sender: 'them',
-        text: `Thanks for your interest in ${post.title}! I am available for meetup or pickup at ${post.location}.`,
-        time: 'Just now'
-      }])
-    }, 1000)
+    try {
+      const sent = await chatService.sendMessage(post.id, text)
+      setChatMessages(prev => [...prev, { sender: 'me', text: sent.text, time: sent.createdAt }])
+    } catch {
+      setChatMessages(prev => [...prev, { sender: 'me', text, time: 'Just now' }])
+    }
   }
 
   const handleAddComment = async () => {

@@ -55,29 +55,29 @@ npm run dev
 
 Browser-la open pannina interactive map varum.
 
-♻️ But un project-ku இதுவே final இல்லை
+[Note] But this is not the final step for your project
 
-Basic map vandha apram namma E-Waste specific UI/UX build pannuvom:
+Basic map comes up, then we build E-Waste specific UI/UX:
 
-                 🔍 Search e-waste...
+                 [Search] Search e-waste...
 ┌──────────────────────────────────────────┐
 │ [All] [Items] [Parts] [Shops] [Centers] │
 │                                          │
-│             📦                           │
-│                    📱                    │
-│         ♻️              📍 You           │
-│                         🏪               │
-│                    🔧                    │
+│             [Box]                        │
+│                    [Phone]               │
+│         [Recycle]       [Pin] You        │
+│                         [Shop]           │
+│                    [Wrench]              │
 │                                          │
 │ ┌──────────────────────────────────────┐ │
-│ │ 💻 Dell Laptop                      │ │
+│ │ [Laptop] Dell Laptop                 │ │
 │ │ Used • 2.1 km away                  │ │
-│ │ ₹2,500                    View →     │ │
+│ │ ₹2,500                    View ->     │ │
 │ └──────────────────────────────────────┘ │
 └──────────────────────────────────────────┘
-🔥 Next level architecture
+Next level architecture
 
-User item post pannumbothu:
+User item post:
 
 Post "Old Laptop"
        ↓
@@ -85,18 +85,18 @@ Get Location
        ↓
 latitude + longitude
        ↓
-MongoDB
+Database
        ↓
 Map fetch
        ↓
-📦 Marker automatically appears
+Marker automatically appears
 
-Delete pannina:
+Delete item:
 
 Delete Item
      ↓
-MongoDB
+Database
      ↓
 Map refresh
      ↓
-📦 Marker disappears
+Marker disappears

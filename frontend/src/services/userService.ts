@@ -1,5 +1,4 @@
 import type { ProfileFormData, PasswordChangeFormData } from '../schemas/profileSchema'
-import { MOCK_USER } from '../data/mockData'
 import type { User } from '../context/AuthContext'
 import { supabase } from '../utils/supabase'
 
@@ -66,7 +65,7 @@ export const userService = {
         if (parsed?.id) return parsed
       } catch {}
     }
-    return MOCK_USER as any
+    throw new Error('No authenticated user session found.')
   },
 
   // PATCH /api/v1/users/me

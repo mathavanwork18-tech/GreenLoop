@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import Icon from '../../../components/Icon'
 import type { LanguageCode } from '../../../types/common.types'
 import { getAuthTranslation } from '../../../utils/translations'
+import { isAuthTestMode } from '../../../utils/supabase'
 
 interface Props {
   language: LanguageCode
@@ -48,18 +49,9 @@ export default function OtpVerifyStep({
   const clean = phone.replace(/\D/g, '').slice(-10)
   const maskedPhone = `+91 ${clean.slice(0, 2)}*** **${clean.slice(-2)}`
 
-  // Auto-focus and trigger temporary automatic OTP autofill on mount
+  // Focus the first input on mount
   useEffect(() => {
     inputRefs.current[0]?.focus()
-    const autoCode = currentDevOtp || '123456'
-    const autoTimer = setTimeout(() => {
-      const digits = autoCode.split('').slice(0, 6)
-      while (digits.length < 6) digits.push('')
-      setOtp(digits)
-      triggerVerify(autoCode)
-    }, 450)
-
-    return () => clearTimeout(autoTimer)
   }, [])
 
   // 30s Countdown timer
@@ -359,67 +351,87 @@ export default function OtpVerifyStep({
         </div>
       </div>
 
-      {/* Instructions / Temporary OTP Autofill Banner */}
-      <div
-        onClick={handleAutofill}
-        style={{
-          background: 'rgba(16,185,129,0.14)',
-          border: '1.5px solid rgba(16,185,129,0.45)',
-          borderRadius: '14px',
-          padding: '12px 16px',
-          marginBottom: 20,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              background: 'rgba(16,185,129,0.22)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name="sparkles" size={18} color="#10b981" />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.72rem', color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
-              Temporary OTP (Auto-filling)
-            </div>
-            <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '2px' }}>
-              {currentDevOtp || '123456'}
-            </div>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            handleAutofill()
-          }}
-          disabled={loading || success}
+      {/* Test Mode / Production Information Banner */}
+      {isAuthTestMode ? (
+        <div
+          onClick={handleAutofill}
           style={{
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            border: 'none',
-            borderRadius: '8px',
-            color: '#ffffff',
-            fontWeight: 800,
-            fontSize: '0.8rem',
-            padding: '8px 14px',
+            background: 'rgba(16,185,129,0.14)',
+            border: '1.5px solid rgba(16,185,129,0.45)',
+            borderRadius: '14px',
+            padding: '12px 16px',
+            marginBottom: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+            transition: 'all 0.2s ease',
           }}
         >
-          {loading ? 'Verifying...' : 'Re-fill OTP'}
-        </button>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'rgba(16,185,129,0.22)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="sparkles" size={18} color="#10b981" />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.72rem', color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+                Dev Test Mode Code
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '2px' }}>
+                {currentDevOtp || '123456'}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleAutofill()
+            }}
+            disabled={loading || success}
+            style={{
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#ffffff',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              padding: '8px 14px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+            }}
+          >
+            {loading ? 'Verifying...' : 'Fill Code'}
+          </button>
+        </div>
+      ) : (
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '12px',
+            padding: '12px 16px',
+            marginBottom: 20,
+            fontSize: '0.82rem',
+            color: 'var(--text-secondary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <Icon name="shield" size={18} color="#10b981" />
+          <span>Enter the 6-digit verification code sent to your mobile phone via SMS.</span>
+        </div>
+      )}
 
       {/* 6 OTP Boxes Container */}
       <div

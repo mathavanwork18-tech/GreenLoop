@@ -120,7 +120,7 @@ export default function LocalShopHomePage() {
 
   // Handle Enquiry Submission (routes through post_comments with trigger to notifications)
   const handleSendEnquiry = async () => {
-    if (!enquiryPost || !user?.id) return
+    if (!enquiryPost) return
     setIsEnquiring(true)
     setEnquiryError(null)
 
@@ -128,7 +128,8 @@ export default function LocalShopHomePage() {
 
     try {
       const { data: authData } = await supabase.auth.getUser()
-      if (!authData?.user) {
+      const authUserId = authData?.user?.id || user?.id
+      if (!authUserId) {
         throw new Error('You must be signed in to send an enquiry.')
       }
 
@@ -136,7 +137,7 @@ export default function LocalShopHomePage() {
         .from('post_comments')
         .insert({
           post_id: enquiryPost.id,
-          user_id: authData.user.id,
+          user_id: authUserId,
           comment: commentText,
         })
 
@@ -160,29 +161,49 @@ export default function LocalShopHomePage() {
 
   // Handle Buy / Claim Submission (routes through post_claims with trigger to notifications)
   const handleSendBuy = async () => {
-    if (!buyPost || !user?.id) return
+    if (!buyPost) return
     setIsBuying(true)
     setBuyError(null)
 
     try {
       const { data: authData } = await supabase.auth.getUser()
-      if (!authData?.user) {
-        throw new Error('You must be signed in to purchase a listing.')
+      const authUserId = authData?.user?.id || user?.id
+      if (!authUserId) {
+        throw new Error('You must be signed in to purchase a listing. Please sign in with a shop account.')
+      }
+
+      if (buyPost.userId && buyPost.userId === authUserId) {
+        throw new Error('You cannot purchase your own listing.')
+      }
+
+      // Concurrency duplicate prevention
+      const { data: existingClaim } = await supabase
+        .from('post_claims')
+        .select('id, status')
+        .eq('post_id', buyPost.id)
+        .eq('user_id', authUserId)
+        .maybeSingle()
+
+      if (existingClaim) {
+        throw new Error(`You have already submitted a purchase order for this listing (Status: ${existingClaim.status}).`)
       }
 
       // Insert purchase claim into post_claims
-      const { error: claimErr } = await supabase
+      const { data: createdClaim, error: claimErr } = await supabase
         .from('post_claims')
         .insert({
           post_id: buyPost.id,
-          user_id: authData.user.id,
+          user_id: authUserId,
           status: 'pending',
         })
+        .select('id, status, created_at')
+        .maybeSingle()
 
       if (claimErr) {
         throw new Error(claimErr.message || 'Could not create purchase request in database.')
       }
 
+      console.log('[Green Loop Shop] Purchase order created successfully:', createdClaim?.id)
       setBuySuccess(true)
       setTimeout(() => {
         setBuyPost(null)
@@ -199,6 +220,7 @@ export default function LocalShopHomePage() {
   // Filter categories
   const categories = [
     { id: 'all', label: 'All Items' },
+    { id: 'bulk', label: 'Bulk Lots' },
     { id: 'mobile', label: 'Smartphones' },
     { id: 'laptop', label: 'Laptops' },
     { id: 'parts', label: 'Components' },
@@ -207,6 +229,16 @@ export default function LocalShopHomePage() {
 
   const filteredPosts = posts.filter(p => {
     if (activeCategory === 'all') return true
+    if (activeCategory === 'bulk') {
+      return (
+        p.description?.includes('[BULK_LISTING]') ||
+        p.subcategory?.includes('Pieces') ||
+        p.subcategory?.includes('KG') ||
+        p.subcategory?.includes('Boxes') ||
+        p.subcategory?.includes('Bags') ||
+        p.subcategory?.includes('Units')
+      )
+    }
     const cat = (p.category || '').toLowerCase()
     if (activeCategory === 'mobile') return cat.includes('mobile') || cat.includes('phone')
     if (activeCategory === 'laptop') return cat.includes('laptop') || cat.includes('computer')
@@ -329,12 +361,20 @@ export default function LocalShopHomePage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 16 }}>
             {filteredPosts.map(post => {
               const formattedDate = post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Recent'
+              const isBulk =
+                post.description?.includes('[BULK_LISTING]') ||
+                post.subcategory?.includes('Pieces') ||
+                post.subcategory?.includes('KG') ||
+                post.subcategory?.includes('Boxes') ||
+                post.subcategory?.includes('Bags') ||
+                post.subcategory?.includes('Units')
+
               return (
                 <div
                   key={post.id}
                   style={{
                     background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-color)',
+                    border: isBulk ? '1.5px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-color)',
                     borderRadius: 'var(--radius-lg)',
                     overflow: 'hidden',
                     display: 'flex',
@@ -385,6 +425,28 @@ export default function LocalShopHomePage() {
                     >
                       Condition: {post.condition}
                     </div>
+
+                    {/* Bulk Badge */}
+                    {isBulk && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 10,
+                          right: 10,
+                          background: '#f59e0b',
+                          color: '#ffffff',
+                          padding: '4px 10px',
+                          borderRadius: 'var(--radius-full)',
+                          fontSize: '0.70rem',
+                          fontWeight: 800,
+                          letterSpacing: '0.04em',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                        }}
+                      >
+                        BULK
+                      </div>
+                    )}
+
                     {/* Price Pill */}
                     <div
                       style={{

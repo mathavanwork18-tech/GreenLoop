@@ -12,6 +12,7 @@ import { usePwaInstall } from '../../../context/PwaInstallContext'
 import InstallButton from '../../../components/InstallButton'
 import ResumePromptModal from './ResumePromptModal'
 import { normalizeRole, getRoleDashboardPath } from '../../../services/role/roleService'
+import { isAuthTestMode } from '../../../utils/supabase'
 
 export type AuthStep =
   | 'LANGUAGE'
@@ -24,6 +25,9 @@ export type AuthStep =
 export default function AuthFlowContainer() {
   const navigate = useNavigate()
   const {
+    user,
+    isAuthenticated,
+    isInitializing,
     language,
     setLanguage,
     sendOtp,
@@ -32,17 +36,30 @@ export default function AuthFlowContainer() {
     saveRegistrationDraft,
     getRegistrationDraft,
     clearRegistrationDraft,
+    devLogin,
   } = useAuth()
 
   const { openInstallModal } = usePwaInstall()
 
-  const [step, setStep] = useState<AuthStep>('LANGUAGE')
+  // Avoid sending user back to Language selection if language has already been selected
+  const [step, setStep] = useState<AuthStep>(() => {
+    const savedLang = localStorage.getItem('gl_language')
+    return savedLang ? 'PHONE' : 'LANGUAGE'
+  })
   const [phone, setPhone] = useState('')
   const [devOtp, setDevOtp] = useState('123456')
   const [role, setRole] = useState<Role>('GENERAL_USER')
   const [draftData, setDraftData] = useState<Record<string, any>>({})
   const [showResumeModal, setShowResumeModal] = useState(false)
   const [activeDraft, setActiveDraft] = useState<any | null>(null)
+
+  // If user is already securely authenticated, route directly to their dashboard
+  useEffect(() => {
+    if (!isInitializing && isAuthenticated && user?.id) {
+      const targetRole = normalizeRole(user.role)
+      navigate(getRoleDashboardPath(targetRole), { replace: true })
+    }
+  }, [isAuthenticated, isInitializing, user, navigate])
 
   // Check for any incomplete registration draft on initial mount
   useEffect(() => {
@@ -193,6 +210,73 @@ export default function AuthFlowContainer() {
       >
         <InstallButton onFallback={openInstallModal} label="Install App" />
       </div>
+
+      {/* Isolated Development Test Mode Floating Switcher (Active ONLY when VITE_AUTH_TEST_MODE=true) */}
+      {isAuthTestMode && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 18,
+            left: 20,
+            zIndex: 40,
+            background: 'rgba(24, 24, 27, 0.95)',
+            border: '1px solid #3b82f6',
+            borderRadius: '12px',
+            padding: '6px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#60a5fa', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            🛠️ DEV TEST MODE
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              if (devLogin) {
+                await devLogin('citizen')
+                navigate('/', { replace: true })
+              }
+            }}
+            style={{
+              background: '#2563eb',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '5px 10px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Quick Test: General User
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              if (devLogin) {
+                await devLogin('shop')
+                navigate('/shop', { replace: true })
+              }
+            }}
+            style={{
+              background: '#059669',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '5px 10px',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Quick Test: Local Shop
+          </button>
+        </div>
+      )}
 
       {/* Responsive Centered Card Container */}
       <div className="auth-card-container">

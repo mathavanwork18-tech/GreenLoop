@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { ROUTES } from '../constants/routes'
 import UserLayout from '../layouts/UserLayout'
 import AuthLayout from '../layouts/AuthLayout'
@@ -21,7 +21,6 @@ import { ImpactPage } from '../pages/impact'
 import { SupportPage } from '../pages/support'
 import { ShopPage } from '../pages/shop'
 import { RecyclerPage } from '../pages/recycler'
-import { AdminPage } from '../pages/admin'
 
 export const router = createBrowserRouter([
   // Core user app with layout shell
@@ -163,11 +162,7 @@ export const router = createBrowserRouter([
   },
   {
     path: ROUTES.ADMIN,
-    element: (
-      <UserLayout>
-        <AdminPage />
-      </UserLayout>
-    ),
+    element: <Navigate to={ROUTES.HOME} replace />,
   },
 
   // Auth pages

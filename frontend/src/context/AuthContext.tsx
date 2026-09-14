@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { LanguageCode } from '../types/common.types'
-import { supabase } from '../utils/supabase'
+import { supabase, isAuthTestMode, PREDEFINED_TEST_IDENTITIES, setDevTestSession, clearDevTestSession } from '../utils/supabase'
 import { normalizePhone } from '../utils/phone'
 import { normalizeRole, updateUserRoleInDatabase } from '../services/role/roleService'
 import { coinService } from '../services/coin/coinService'
@@ -86,6 +86,7 @@ export interface RegistrationDraft {
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
+  isInitializing: boolean
   language: LanguageCode
   setLanguage: (lang: LanguageCode) => void
   sendOtp: (phone: string) => Promise<{ success: boolean; message: string; devOtp?: string }>
@@ -105,6 +106,7 @@ interface AuthContextType {
   getRegistrationDraft: () => RegistrationDraft | null
   clearRegistrationDraft: () => void
   login: (email: string, password: string) => Promise<User>
+  devLogin?: (role: 'citizen' | 'shop') => Promise<User>
   register: (data: RegisterData) => Promise<User>
   logout: () => Promise<void>
   updateCoins: (amount: number) => void
@@ -298,18 +300,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (localStorage.getItem('gl_language') as LanguageCode) || 'EN'
   })
 
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('gl_user')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        if (parsed && parsed.id) return parsed
-      } catch {
-        localStorage.removeItem('gl_user')
-      }
-    }
-    return null
-  })
+  const [isInitializing, setIsInitializing] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
 
   // Hydrate user session from Supabase on mount and listen to auth changes
   useEffect(() => {
@@ -317,60 +309,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function syncAuthSession() {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
+        const session = sessionData?.session
+
+        if (sessionErr) {
+          console.warn('[Green Loop] Session check error:', sessionErr.message)
+        }
+
         if (session?.user && mounted) {
-          const { data: profile } = await supabase
+          // Strictly query public.profiles using id = session.user.id
+          let { data: profile, error: profileErr } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .maybeSingle()
 
-          const dailyReward = await coinService.processDailyLoginReward(session.user.id)
-
-          if (profile) {
-            const syncedUser = mapDbProfileToUser(profile, session.user, dailyReward.totalCoins, dailyReward.streak)
-            setUser(syncedUser)
-            localStorage.setItem('gl_user', JSON.stringify(syncedUser))
-          } else {
-            // Authenticated user exists but profile row is missing -> create safely
+          if (!profile && !profileErr) {
             const meta = session.user.user_metadata || {}
-            const created = await ensureProfile(session.user.id, {
-              full_name: meta.full_name || meta.name,
+            profile = await ensureProfile(session.user.id, {
+              full_name: meta.full_name || meta.name || session.user.email?.split('@')[0],
               phone: meta.phone,
               role: meta.role,
               city: meta.city,
             })
-            const syncedUser = mapDbProfileToUser(created, session.user, dailyReward.totalCoins, dailyReward.streak)
+          }
+
+          const dailyReward = await coinService.processDailyLoginReward(session.user.id)
+
+          if (profile && mounted) {
+            const syncedUser = mapDbProfileToUser(profile, session.user, dailyReward.totalCoins, dailyReward.streak)
             setUser(syncedUser)
             localStorage.setItem('gl_user', JSON.stringify(syncedUser))
           }
-        } else if (!session?.user && mounted) {
-          // If native session token is absent, check if a verified database profile exists in localStorage
-          const stored = localStorage.getItem('gl_user')
-          if (stored) {
-            try {
-              const parsed = JSON.parse(stored)
-              if (parsed?.id) {
-                const { data: profile } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', parsed.id)
-                  .maybeSingle()
-                if (profile) {
-                  const dailyReward = await coinService.processDailyLoginReward(profile.id)
-                  const syncedUser = mapDbProfileToUser(profile, undefined, dailyReward.totalCoins, dailyReward.streak)
-                  setUser(syncedUser)
-                  localStorage.setItem('gl_user', JSON.stringify(syncedUser))
-                  return
-                }
-              }
-            } catch {}
-          }
+        } else if (mounted) {
+          // No active Supabase GoTrue session
           setUser(null)
           localStorage.removeItem('gl_user')
         }
       } catch (err) {
         console.warn('[Green Loop] Initial session sync error:', err)
+        if (mounted) {
+          setUser(null)
+          localStorage.removeItem('gl_user')
+        }
+      } finally {
+        if (mounted) {
+          setIsInitializing(false)
+        }
       }
     }
 
@@ -378,6 +363,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
+
+      // Do NOT wipe or redirect on INITIAL_SESSION; syncAuthSession handles it explicitly
+      if (event === 'INITIAL_SESSION') return
 
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
         let { data: profile } = await supabase
@@ -398,16 +386,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const dailyReward = await coinService.processDailyLoginReward(session.user.id)
 
-        if (profile) {
+        if (profile && mounted) {
           const syncedUser = mapDbProfileToUser(profile, session.user, dailyReward.totalCoins, dailyReward.streak)
           setUser(syncedUser)
           localStorage.setItem('gl_user', JSON.stringify(syncedUser))
         }
-      } else if (event === 'SIGNED_OUT' || !session?.user) {
+      } else if (event === 'SIGNED_OUT') {
         recommendationTracker.clearUserSession()
         setUser(null)
         localStorage.removeItem('gl_user')
         localStorage.removeItem('gl_registration_draft')
+        localStorage.removeItem('gl_custom_coin_history')
+        localStorage.removeItem('gl_posts')
+        localStorage.removeItem('gl_sessions')
+        clearDevTestSession()
         sessionStorage.clear()
       }
     })
@@ -478,35 +470,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
   }
 
-  // --- Phone + OTP Authentication Flow (Native Supabase Auth + Verified Testing OTP) ---
+  // --- Phone + OTP Authentication Flow (Native Supabase Auth with Strict Mode Separation) ---
   const sendOtp = async (rawPhone: string): Promise<{ success: boolean; message: string; devOtp?: string }> => {
-    const { e164, isValid, masked } = normalizePhone(rawPhone)
+    const { e164, national, isValid, masked } = normalizePhone(rawPhone)
     if (!isValid) {
       throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6-9.')
     }
 
-    // 1. Trigger native Supabase Phone OTP Flow
-    try {
-      await supabase.auth.signInWithOtp({ phone: e164 })
-    } catch (err) {
-      console.warn('[Green Loop] Supabase signInWithOtp notice:', err)
+    // 1. Development Test Mode: permit predefined test identities for local developer validation
+    if (isAuthTestMode) {
+      const isTestIdentity =
+        national === PREDEFINED_TEST_IDENTITIES.GENERAL_USER.phone ||
+        national === PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.phone
+      if (isTestIdentity) {
+        return {
+          success: true,
+          message: `[Dev Mode] Test OTP generated for ${masked}`,
+          devOtp: '123456',
+        }
+      }
     }
 
-    // 2. Ensure identity exists in auth.users for foreign key integrity
-    try {
-      await supabase.auth.signUp({
-        phone: e164,
-        password: 'GreenLoop@2026!',
-        options: {
-          data: { phone: e164 }
-        }
-      })
-    } catch {}
+    // 2. Production: Native Supabase Phone OTP Flow (Real SMS Provider)
+    const { error } = await supabase.auth.signInWithOtp({ phone: e164 })
+    if (error) {
+      const msg = (error.message || '').toLowerCase()
+      if (msg.includes('rate limit') || msg.includes('limit') || msg.includes('too many') || msg.includes('exceeded')) {
+        throw new Error('Too many verification attempts. Please try again later.')
+      }
+      if (msg.includes('provider') || msg.includes('twilio') || msg.includes('unavailable') || msg.includes('gateway')) {
+        throw new Error('SMS service is temporarily unavailable. Please try again later or sign in with password.')
+      }
+      if (msg.includes('invalid') || msg.includes('format')) {
+        throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6-9.')
+      }
+      throw new Error(error.message || 'Failed to send OTP. Please try again.')
+    }
 
     return {
       success: true,
       message: `OTP sent successfully to ${masked}`,
-      devOtp: '123456',
     }
   }
 
@@ -533,70 +536,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let authUser: any = null
 
-    // 1. First attempt native GoTrue verification
-    try {
+    // 1. Development Test Mode: strictly permit ONLY predefined test accounts with test code '123456'
+    if (isAuthTestMode && cleanOtp === '123456') {
+      let testIdentity: any = null
+      if (national === PREDEFINED_TEST_IDENTITIES.GENERAL_USER.phone) {
+        testIdentity = PREDEFINED_TEST_IDENTITIES.GENERAL_USER
+      } else if (national === PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.phone) {
+        testIdentity = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP
+      }
+
+      if (testIdentity) {
+        setDevTestSession(testIdentity)
+        authUser = {
+          id: testIdentity.id,
+          phone: testIdentity.e164,
+          user_metadata: {
+            full_name: testIdentity.name,
+            role: testIdentity.role,
+            phone: testIdentity.e164,
+            city: testIdentity.city,
+          },
+        }
+      }
+    }
+
+    // 2. Production: Native GoTrue SMS verification (Real provider)
+    if (!authUser) {
       const { data: verifyData, error: authError } = await supabase.auth.verifyOtp({
         phone: e164,
         token: cleanOtp,
         type: 'sms',
       })
-      if (!authError && verifyData?.user) {
-        authUser = verifyData.user
-      }
-    } catch {}
-
-    // 2. If native SMS verification didn't produce a session and OTP is '123456'
-    if (!authUser && cleanOtp === '123456') {
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('*')
-        .or(`phone.eq.${e164},phone.eq.${national},phone.eq.+91 ${national}`)
-        .maybeSingle()
-
-      if (existingProfile?.id) {
-        authUser = { id: existingProfile.id, phone: e164 }
-      } else {
-        const { data: signUpData } = await supabase.auth.signUp({
-          phone: e164,
-          password: 'GreenLoop@2026!',
-          options: { data: { phone: e164 } }
-        }).catch(() => ({ data: null }))
-
-        if (signUpData?.user?.id) {
-          authUser = signUpData.user
-        } else {
-          const { data: phoneProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .or(`phone.eq.${e164},phone.eq.${national}`)
-            .maybeSingle()
-          if (phoneProfile?.id) {
-            authUser = { id: phoneProfile.id, phone: e164 }
-          }
+      if (authError || !verifyData?.user) {
+        const msg = (authError?.message || '').toLowerCase()
+        if (msg.includes('expired') || msg.includes('invalid') || msg.includes('token') || msg.includes('otp')) {
+          throw new Error('Verification code is invalid or has expired. Please request a new code.')
         }
+        if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('limit')) {
+          throw new Error('Too many verification attempts. Please try again later.')
+        }
+        throw new Error(authError?.message || 'OTP could not be verified. Please try again.')
       }
+      authUser = verifyData.user
     }
 
-    if (!authUser) {
+    if (!authUser?.id) {
       throw new Error('Verification code is invalid or has expired.')
     }
 
-    // 3. Locate existing profile in profiles table
-    let { data: dbProfile } = await supabase
+    // 3. Locate existing profile in profiles table by ID (never by phone!)
+    let { data: dbProfile, error: profileErr } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', authUser.id)
       .maybeSingle()
 
-    if (!dbProfile) {
-      const { data: phoneProfile } = await supabase
-        .from('profiles')
-        .select('*')
-        .or(`phone.eq.${e164},phone.eq.${national}`)
-        .maybeSingle()
-      if (phoneProfile) {
-        dbProfile = phoneProfile
-      }
+    if (profileErr) {
+      console.warn('[Green Loop] Error retrieving profile after OTP verify:', profileErr)
     }
 
     if (dbProfile && dbProfile.id && dbProfile.full_name && dbProfile.full_name !== 'Green Loop Member') {
@@ -619,6 +615,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isExistingUser: Boolean(dbProfile?.id),
       isProfileComplete: false,
     }
+  }
+
+  const devLogin = async (targetRole: 'citizen' | 'shop'): Promise<User> => {
+    if (!isAuthTestMode) {
+      throw new Error('Dev test login is only available in development test mode.')
+    }
+    const identity = targetRole === 'shop'
+      ? PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP
+      : PREDEFINED_TEST_IDENTITIES.GENERAL_USER
+
+    setDevTestSession(identity)
+
+    let { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', identity.id)
+      .maybeSingle()
+
+    if (!profile) {
+      profile = await ensureProfile(identity.id, {
+        full_name: identity.name,
+        phone: identity.e164,
+        role: identity.role,
+        city: identity.city,
+      })
+    }
+
+    const dailyReward = await coinService.processDailyLoginReward(identity.id)
+    const loggedIn = mapDbProfileToUser(
+      profile,
+      { id: identity.id, user_metadata: { full_name: identity.name, role: identity.role } },
+      dailyReward.totalCoins,
+      dailyReward.streak
+    )
+    setUser(loggedIn)
+    localStorage.setItem('gl_user', JSON.stringify(loggedIn))
+    return loggedIn
   }
 
   const completeProfile = async (role: Role, profileData: any): Promise<User> => {
@@ -778,24 +811,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // --- Real Supabase Authentication: Login & Registration ---
 
-  const login = async (email: string, password: string): Promise<User> => {
-    // 1. Authenticate with Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    })
+  const login = async (identifier: string, password: string): Promise<User> => {
+    const cleanId = identifier.trim()
+    const isEmail = cleanId.includes('@')
+    let authData: any = null
+    let authError: any = null
 
-    if (authError) {
+    // 1. Authenticate with Supabase GoTrue Auth
+    if (isEmail) {
+      const res = await supabase.auth.signInWithPassword({
+        email: cleanId,
+        password,
+      })
+      authData = res.data
+      authError = res.error
+    } else {
+      const { e164, national } = normalizePhone(cleanId)
+      // Attempt phone login
+      const phoneRes = await supabase.auth.signInWithPassword({
+        phone: e164,
+        password,
+      })
+      if (!phoneRes.error && phoneRes.data?.user) {
+        authData = phoneRes.data
+      } else {
+        // Fallback: check if registered with email fallback pattern
+        const emailFallback = `${national}@greenloop.internal`
+        const fallbackRes = await supabase.auth.signInWithPassword({
+          email: emailFallback,
+          password,
+        })
+        if (!fallbackRes.error && fallbackRes.data?.user) {
+          authData = fallbackRes.data
+        } else {
+          authError = phoneRes.error || fallbackRes.error
+        }
+      }
+    }
+
+    if (authError || !authData?.user) {
       console.error('[Green Loop] Login error:', authError)
-      throw new Error(authError.message || 'Invalid email or password.')
+      throw new Error(authError?.message || 'Invalid credentials. Please verify your mobile number/email and password.')
     }
 
     const authUser = authData.user
-    if (!authUser) {
-      throw new Error('Login failed: authenticated user not found.')
-    }
 
-    // 2. Evict previous user-specific caches so User A never leaks into User B!
+    // 2. Evict previous user-specific caches so User A never leaks into User B
     recommendationTracker.clearUserSession()
 
     // 3. Check whether the user's profile exists in public.profiles
@@ -812,7 +873,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const meta = authUser.user_metadata || {}
       activeProfile = await ensureProfile(authUser.id, {
         full_name: meta.full_name || meta.name || authUser.email?.split('@')[0],
-        phone: meta.phone || '',
+        phone: meta.phone || (isEmail ? '' : cleanId),
         role: meta.role || 'citizen',
         city: meta.city || 'Coimbatore',
       })
@@ -927,6 +988,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     const currentUserId = user?.id
+    clearDevTestSession()
 
     // 1. Terminate session on Supabase Auth server
     const { error } = await supabase.auth.signOut()
@@ -1031,7 +1093,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user && !!user.isProfileComplete,
+        isAuthenticated: !!user && user.isProfileComplete !== false,
+        isInitializing,
         language,
         setLanguage,
         sendOtp,
@@ -1041,6 +1104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getRegistrationDraft,
         clearRegistrationDraft,
         login,
+        devLogin,
         register,
         logout,
         updateCoins,

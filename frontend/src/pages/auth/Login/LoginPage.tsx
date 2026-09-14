@@ -1,5 +1,5 @@
-import AuthFlowContainer from '../flow/AuthFlowContainer'
+import DedicatedLoginPage from './DedicatedLoginPage'
 
 export default function LoginPage() {
-  return <AuthFlowContainer />
+  return <DedicatedLoginPage />
 }

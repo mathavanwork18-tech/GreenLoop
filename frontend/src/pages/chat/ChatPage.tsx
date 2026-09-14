@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Icon, { type IconName } from '../../components/Icon'
 import { Button } from '../../components/ui'
+import { chatService } from '../../services/chat/chatService'
 
 interface Message {
   id: string
@@ -143,6 +144,37 @@ export default function ChatPage() {
   const [cooldown, setCooldown] = useState(false)
   const [filterType, setFilterType] = useState<'all' | 'marketplace' | 'dispatch'>('all')
 
+  // Load real active conversations from Supabase
+  useEffect(() => {
+    chatService.getUserConversations().then((threads) => {
+      if (threads && threads.length > 0) {
+        const liveConvs: ConversationItem[] = threads.map((t) => ({
+          id: `conv-listing-${t.postId}`,
+          name: t.sellerName || 'Listing Seller',
+          role: t.isBulk ? 'Bulk Seller • Verified' : 'Community Seller',
+          type: 'marketplace',
+          avatarIcon: t.isBulk ? 'building' : 'user',
+          lastMessage: t.lastMessage,
+          time: t.lastMessageTime,
+          verified: true,
+          listing: {
+            id: t.postId,
+            title: t.title,
+            price: t.price,
+            location: t.location,
+            category: t.category,
+          },
+          messages: [],
+        }))
+
+        setConversations((prev) => {
+          const dispatchOnly = prev.filter((c) => c.type === 'dispatch')
+          return [...dispatchOnly, ...liveConvs]
+        })
+      }
+    })
+  }, [])
+
   // Check if URL search params specify a listing or seller
   useEffect(() => {
     const listingId = searchParams.get('listingId')
@@ -186,19 +218,83 @@ export default function ChatPage() {
         setActiveConvId(newConv.id)
       }
     }
-  }, [searchParams])
+  }, [searchParams, conversations])
 
   const activeConv = useMemo(
     () => conversations.find((c) => c.id === activeConvId) || conversations[0],
     [conversations, activeConvId]
   )
 
+  // Sync real-time messages for active listing conversation
+  useEffect(() => {
+    if (!activeConv?.listing?.id) return
+
+    const listingId = activeConv.listing.id
+
+    // 1. Fetch existing comments
+    chatService.getMessages(listingId).then((msgs) => {
+      if (msgs.length > 0) {
+        setConversations((prev) =>
+          prev.map((c) => {
+            if (c.id === activeConv.id) {
+              return {
+                ...c,
+                messages: msgs.map((m) => ({
+                  id: m.id,
+                  senderId: m.senderId,
+                  senderName: m.senderName,
+                  text: m.text,
+                  time: m.createdAt,
+                  isMe: m.isMe,
+                })),
+              }
+            }
+            return c
+          })
+        )
+      }
+    })
+
+    // 2. Subscribe to realtime comments
+    const unsubscribe = chatService.subscribeToThread(listingId, (newMsg) => {
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id === activeConv.id) {
+            const alreadyExists = c.messages.some((m) => m.id === newMsg.id)
+            if (alreadyExists) return c
+            return {
+              ...c,
+              lastMessage: newMsg.text,
+              time: newMsg.createdAt,
+              messages: [
+                ...c.messages,
+                {
+                  id: newMsg.id,
+                  senderId: newMsg.senderId,
+                  senderName: newMsg.senderName,
+                  text: newMsg.text,
+                  time: newMsg.createdAt,
+                  isMe: newMsg.isMe,
+                },
+              ],
+            }
+          }
+          return c
+        })
+      )
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [activeConv?.id, activeConv?.listing?.id])
+
   const filteredConversations = useMemo(() => {
     if (filterType === 'all') return conversations
     return conversations.filter((c) => c.type === filterType)
   }, [conversations, filterType])
 
-  const handleSendMessage = (textToSend?: string) => {
+  const handleSendMessage = async (textToSend?: string) => {
     const content = (textToSend || inputText).trim()
     if (!content || cooldown || !activeConv) return
 
@@ -229,6 +325,15 @@ export default function ChatPage() {
     setInputText('')
     setCooldown(true)
     setTimeout(() => setCooldown(false), 800)
+
+    // Persist to Supabase if it's a listing conversation
+    if (activeConv.listing?.id) {
+      try {
+        await chatService.sendMessage(activeConv.listing.id, content)
+      } catch (err) {
+        console.warn('[ChatPage] Message persistence note:', err)
+      }
+    }
   }
 
   const dispatchChips = [
