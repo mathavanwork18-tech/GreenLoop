@@ -8,6 +8,7 @@ import OtpVerifyStep from './OtpVerifyStep'
 import AccountTypeStep from './AccountTypeStep'
 import CitizenRegisterStep from './CitizenRegisterStep'
 import ShopRegisterStep from './ShopRegisterStep'
+import Icon from '../../../components/Icon'
 import { usePwaInstall } from '../../../context/PwaInstallContext'
 import InstallButton from '../../../components/InstallButton'
 import ResumePromptModal from './ResumePromptModal'
@@ -230,8 +231,9 @@ export default function AuthFlowContainer() {
             backdropFilter: 'blur(8px)',
           }}
         >
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#60a5fa', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-            🛠️ DEV TEST MODE
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, color: '#60a5fa', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <Icon name="repair" size={13} color="#60a5fa" />
+            DEV TEST MODE
           </span>
           <button
             type="button"
