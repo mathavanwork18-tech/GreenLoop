@@ -39,10 +39,20 @@ export const PREDEFINED_TEST_IDENTITIES = {
   },
 } as const
 
+export interface DevSessionIdentity {
+  id: string
+  name: string
+  phone?: string
+  e164?: string
+  role: string
+  city?: string
+}
+
 const DEV_TEST_SESSION_KEY = 'gl_dev_test_session'
 
-export function setDevTestSession(identity: typeof PREDEFINED_TEST_IDENTITIES[keyof typeof PREDEFINED_TEST_IDENTITIES]) {
+export function setDevTestSession(identity: DevSessionIdentity) {
   if (!isAuthTestMode) return
+  const phoneVal = identity.e164 || (identity.phone ? (identity.phone.startsWith('+91') ? identity.phone : '+91' + identity.phone) : '+919999999999')
   const testSession = {
     access_token: 'dev_test_token_' + identity.id,
     token_type: 'bearer',
@@ -50,12 +60,12 @@ export function setDevTestSession(identity: typeof PREDEFINED_TEST_IDENTITIES[ke
       id: identity.id,
       aud: 'authenticated',
       role: 'authenticated',
-      phone: identity.e164,
+      phone: phoneVal,
       user_metadata: {
         full_name: identity.name,
         role: identity.role,
-        phone: identity.e164,
-        city: identity.city,
+        phone: phoneVal,
+        city: identity.city || 'Coimbatore',
       },
     },
   }
@@ -103,6 +113,16 @@ if (isAuthTestMode) {
       return { data: { user: testSession.user as any }, error: null }
     }
     return res
+  }
+
+  const originalSignOut = supabase.auth.signOut.bind(supabase.auth)
+  supabase.auth.signOut = async (options?: any) => {
+    clearDevTestSession()
+    try {
+      return await originalSignOut(options)
+    } catch {
+      return { error: null }
+    }
   }
 }
 

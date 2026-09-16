@@ -477,17 +477,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6-9.')
     }
 
-    // 1. Development Test Mode: permit predefined test identities for local developer validation
+    // 1. Development Test Mode: Pure Dummy OTP Flow for ANY phone number
     if (isAuthTestMode) {
-      const isTestIdentity =
-        national === PREDEFINED_TEST_IDENTITIES.GENERAL_USER.phone ||
-        national === PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.phone
-      if (isTestIdentity) {
-        return {
-          success: true,
-          message: `[Dev Mode] Test OTP generated for ${masked}`,
-          devOtp: '123456',
-        }
+      // Scoped temporary 6-digit OTP for this specific authentication attempt
+      const dynamicOtp = Math.floor(100000 + Math.random() * 900000).toString()
+      sessionStorage.setItem('gl_demo_otp_' + national, dynamicOtp)
+      return {
+        success: true,
+        message: `[Dev Mode] Test OTP generated for ${masked}`,
+        devOtp: dynamicOtp,
       }
     }
 
@@ -534,51 +532,114 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Please enter a valid 6-digit OTP.')
     }
 
-    let authUser: any = null
-
-    // 1. Development Test Mode: strictly permit ONLY predefined test accounts with test code '123456'
-    if (isAuthTestMode && cleanOtp === '123456') {
-      let testIdentity: any = null
-      if (national === PREDEFINED_TEST_IDENTITIES.GENERAL_USER.phone) {
-        testIdentity = PREDEFINED_TEST_IDENTITIES.GENERAL_USER
-      } else if (national === PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.phone) {
-        testIdentity = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP
+    // 1. Development Test Mode: Pure Dummy OTP Verification for ANY phone number
+    if (isAuthTestMode) {
+      const storedOtp = sessionStorage.getItem('gl_demo_otp_' + national)
+      // Strictly enforce the scoped temporary dummy OTP generated for this phone attempt
+      if (storedOtp && cleanOtp !== storedOtp) {
+        throw new Error('Invalid verification code.')
       }
 
-      if (testIdentity) {
-        setDevTestSession(testIdentity)
-        authUser = {
-          id: testIdentity.id,
-          phone: testIdentity.e164,
-          user_metadata: {
-            full_name: testIdentity.name,
-            role: testIdentity.role,
-            phone: testIdentity.e164,
-            city: testIdentity.city,
+      // DO NOT call supabase.auth.verifyOtp()!
+
+      // Check if this phone number already has a profile in public.profiles
+      const { data: matchedProfiles, error: profileErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`phone.eq.${e164},phone.eq.${national},phone.eq.91${national},phone.eq.+91 ${national}`)
+
+      if (profileErr) {
+        console.warn('[Green Loop] Dev mode profile lookup notice:', profileErr.message)
+      }
+
+      // Existing profile found for this phone
+      if (matchedProfiles && matchedProfiles.length > 0) {
+        // Pick best match: prioritize profile with custom full_name (not generic 'Green Loop Member')
+        const dbProfile =
+          matchedProfiles.find(p => p.full_name && p.full_name !== 'Green Loop Member') ||
+          matchedProfiles[0]
+
+        const isComplete = Boolean(
+          dbProfile.full_name &&
+          dbProfile.full_name !== 'Green Loop Member' &&
+          dbProfile.role
+        )
+
+        // Set dev test session with this existing profile's authentic ID
+        setDevTestSession({
+          id: dbProfile.id,
+          name: dbProfile.full_name,
+          phone: e164,
+          e164,
+          role: dbProfile.role,
+          city: dbProfile.city,
+        })
+
+        const dailyReward = await coinService.processDailyLoginReward(dbProfile.id)
+        const loggedIn = mapDbProfileToUser(
+          dbProfile,
+          {
+            id: dbProfile.id,
+            user_metadata: {
+              full_name: dbProfile.full_name,
+              role: dbProfile.role,
+              phone: e164,
+              city: dbProfile.city,
+            },
           },
+          dailyReward.totalCoins,
+          dailyReward.streak
+        )
+
+        setUser(loggedIn)
+        localStorage.setItem('gl_user', JSON.stringify(loggedIn))
+
+        return {
+          success: true,
+          isExistingUser: true,
+          isProfileComplete: isComplete,
+          user: loggedIn,
+          role: loggedIn.role,
         }
+      }
+
+      // Brand new phone number (no profile in public.profiles)
+      // Establish an initial demo session identity for the new phone
+      const newUserId = crypto.randomUUID()
+      setDevTestSession({
+        id: newUserId,
+        name: 'New Member',
+        phone: e164,
+        e164,
+        role: 'citizen',
+        city: 'Coimbatore',
+      })
+
+      return {
+        success: true,
+        isExistingUser: false,
+        isProfileComplete: false,
       }
     }
 
     // 2. Production: Native GoTrue SMS verification (Real provider)
-    if (!authUser) {
-      const { data: verifyData, error: authError } = await supabase.auth.verifyOtp({
-        phone: e164,
-        token: cleanOtp,
-        type: 'sms',
-      })
-      if (authError || !verifyData?.user) {
-        const msg = (authError?.message || '').toLowerCase()
-        if (msg.includes('expired') || msg.includes('invalid') || msg.includes('token') || msg.includes('otp')) {
-          throw new Error('Verification code is invalid or has expired. Please request a new code.')
-        }
-        if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('limit')) {
-          throw new Error('Too many verification attempts. Please try again later.')
-        }
-        throw new Error(authError?.message || 'OTP could not be verified. Please try again.')
+    let authUser: any = null
+    const { data: verifyData, error: authError } = await supabase.auth.verifyOtp({
+      phone: e164,
+      token: cleanOtp,
+      type: 'sms',
+    })
+    if (authError || !verifyData?.user) {
+      const msg = (authError?.message || '').toLowerCase()
+      if (msg.includes('expired') || msg.includes('invalid') || msg.includes('token') || msg.includes('otp')) {
+        throw new Error('Verification code is invalid or has expired. Please request a new code.')
       }
-      authUser = verifyData.user
+      if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('limit')) {
+        throw new Error('Too many verification attempts. Please try again later.')
+      }
+      throw new Error(authError?.message || 'OTP could not be verified. Please try again.')
     }
+    authUser = verifyData.user
 
     if (!authUser?.id) {
       throw new Error('Verification code is invalid or has expired.')
@@ -692,6 +753,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sessionData } = await supabase.auth.getSession()
     if (sessionData?.session?.user) {
       authUserId = sessionData.session.user.id
+    } else if (isAuthTestMode) {
+      authUserId = crypto.randomUUID()
     } else {
       const defaultPassword = profileData.password || 'GreenLoop@2026!'
       try {
@@ -800,6 +863,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         landmark: profileData.landmark || '',
         coordinates: profileData.coordinates || null,
       },
+    }
+
+    if (isAuthTestMode) {
+      setDevTestSession({
+        id: completedUser.id,
+        name: completedUser.name,
+        phone: e164,
+        e164,
+        role: completedUser.role,
+        city: completedUser.city,
+      })
     }
 
     setUser(completedUser)
@@ -991,10 +1065,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearDevTestSession()
 
     // 1. Terminate session on Supabase Auth server
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error('[Green Loop] Supabase signOut error:', error)
-      throw new Error(error.message || 'Logout failed on authentication server. Please check connection.')
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error && !isAuthTestMode) {
+        console.error('[Green Loop] Supabase signOut error:', error)
+        throw new Error(error.message || 'Logout failed on authentication server. Please check connection.')
+      }
+    } catch (err: any) {
+      if (!isAuthTestMode) {
+        throw err
+      }
+      console.warn('[Green Loop] Test mode signOut notice:', err?.message)
     }
 
     // 2. Clear user state, local caches, and recommendation trackers to prevent data leakage

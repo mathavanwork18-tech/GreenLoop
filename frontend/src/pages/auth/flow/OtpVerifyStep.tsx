@@ -24,7 +24,7 @@ interface Props {
 export default function OtpVerifyStep({
   language,
   phone,
-  devOtp = '123456',
+  devOtp = '',
   onVerifyOtp,
   onResendOtp,
   onSuccess,
@@ -32,7 +32,7 @@ export default function OtpVerifyStep({
 }: Props) {
   const t = getAuthTranslation(language)
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', ''])
-  const [currentDevOtp, setCurrentDevOtp] = useState(devOtp || '123456')
+  const [currentDevOtp, setCurrentDevOtp] = useState(devOtp || '')
   const [timer, setTimer] = useState(30)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -49,19 +49,39 @@ export default function OtpVerifyStep({
   const clean = phone.replace(/\D/g, '').slice(-10)
   const maskedPhone = `+91 ${clean.slice(0, 2)}*** **${clean.slice(-2)}`
 
+  // Sync devOtp if prop changes
+  useEffect(() => {
+    if (devOtp && devOtp !== currentDevOtp) {
+      setCurrentDevOtp(devOtp)
+    }
+  }, [devOtp])
+
   // Focus the first input on mount
   useEffect(() => {
     inputRefs.current[0]?.focus()
   }, [])
 
-  // 30s Countdown timer
+  // Auto-fill and auto-verify in development demo/test mode
   useEffect(() => {
+    if (isAuthTestMode && currentDevOtp && currentDevOtp.length === 6 && !loading && !success) {
+      const digits = currentDevOtp.split('')
+      setOtp(digits)
+      const timerId = setTimeout(() => {
+        triggerVerify(currentDevOtp)
+      }, 350)
+      return () => clearTimeout(timerId)
+    }
+  }, [currentDevOtp, isAuthTestMode])
+
+  // 30s Countdown timer (only active in production; disabled in demo mode to prevent artificial expiry)
+  useEffect(() => {
+    if (isAuthTestMode) return
     if (timer <= 0) return
     const interval = setInterval(() => {
       setTimer((prev) => prev - 1)
     }, 1000)
     return () => clearInterval(interval)
-  }, [timer])
+  }, [timer, isAuthTestMode])
 
   // Automatically trigger verification when all 6 digits are entered
   const triggerVerify = async (code: string) => {
@@ -166,7 +186,8 @@ export default function OtpVerifyStep({
   }
 
   const handleAutofill = () => {
-    const code = currentDevOtp || '123456'
+    const code = currentDevOtp || ''
+    if (!code) return
     const digits = code.split('').slice(0, 6)
     while (digits.length < 6) digits.push('')
     setOtp(digits)
@@ -387,7 +408,7 @@ export default function OtpVerifyStep({
                 Dev Test Mode Code
               </div>
               <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '2px' }}>
-                {currentDevOtp || '123456'}
+                {currentDevOtp}
               </div>
             </div>
           </div>
@@ -584,7 +605,12 @@ export default function OtpVerifyStep({
           gap: 6,
         }}
       >
-        {timer > 0 ? (
+        {isAuthTestMode ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.84rem', color: '#10b981' }}>
+            <Icon name="sparkles" size={14} color="#10b981" />
+            <span>Demo Mode Active • Auto-Verification</span>
+          </div>
+        ) : timer > 0 ? (
           <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
             <span>{t.resendIn} </span>
             <strong style={{ color: '#10b981', fontWeight: 800 }}>{formatTimer(timer)}</strong>
