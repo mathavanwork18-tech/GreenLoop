@@ -49,25 +49,46 @@ function cleanPhoneNumber(phone) {
   return digits.slice(-10);
 }
 
+const DUMMY_OTP = '123456';
+
 /**
- * [DEAD-CODED / DEPRECATED] Send OTP
- * Phone OTP is now handled natively via Supabase GoTrue Auth on the frontend.
+ * Send OTP (Development & Testing fallback)
  */
 export async function sendOtp(req, res) {
-  return res.status(410).json({
-    success: false,
-    message: 'DEPRECATED: /api/auth/send-otp has been decommissioned. Use Supabase Auth native phone OTP (supabase.auth.signInWithOtp).',
+  const { phone } = req.body || {};
+  const cleanPhone = cleanPhoneNumber(phone);
+  return res.json({
+    success: true,
+    message: `OTP sent successfully to ${cleanPhone || 'phone'}`,
+    devOtp: DUMMY_OTP,
   });
 }
 
 /**
- * [DEAD-CODED / DEPRECATED] Verify OTP
- * Phone OTP verification is now handled natively via Supabase GoTrue Auth on the frontend.
+ * Verify OTP (Development & Testing fallback)
+ * Accepts DUMMY_OTP = '123456'
  */
 export async function verifyOtp(req, res) {
-  return res.status(410).json({
+  const { otp, phone } = req.body || {};
+  const cleanOtp = (otp || '').toString().trim();
+
+  if (cleanOtp === DUMMY_OTP) {
+    const cleanPhone = cleanPhoneNumber(phone);
+    const existingUser = mockUsers.find((u) => cleanPhoneNumber(u.phone) === cleanPhone);
+
+    return res.json({
+      success: true,
+      message: 'OTP verified',
+      isExistingUser: Boolean(existingUser),
+      isProfileComplete: Boolean(existingUser?.isProfileComplete),
+      user: existingUser || null,
+      role: existingUser?.role || 'GENERAL_USER',
+    });
+  }
+
+  return res.status(400).json({
     success: false,
-    message: 'DEPRECATED: /api/auth/verify-otp has been decommissioned. Use Supabase Auth native phone OTP (supabase.auth.verifyOtp).',
+    message: 'Invalid OTP',
   });
 }
 

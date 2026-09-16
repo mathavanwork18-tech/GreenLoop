@@ -48,7 +48,7 @@ export default function AuthFlowContainer() {
     return savedLang ? 'PHONE' : 'LANGUAGE'
   })
   const [phone, setPhone] = useState('')
-  const [devOtp, setDevOtp] = useState('')
+  const [devOtp, setDevOtp] = useState('123456')
   const [role, setRole] = useState<Role>('GENERAL_USER')
   const [draftData, setDraftData] = useState<Record<string, any>>({})
   const [showResumeModal, setShowResumeModal] = useState(false)

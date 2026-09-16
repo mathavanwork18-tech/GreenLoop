@@ -95,12 +95,12 @@ async function sendOtp(rawPhone, isAuthTestMode) {
   if (!isValid) throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6-9.')
 
   if (isAuthTestMode) {
-    const dynamicOtp = Math.floor(100000 + Math.random() * 900000).toString()
-    mockSessionStorage.setItem('gl_demo_otp_' + national, dynamicOtp)
+    const dummyOtp = '123456'
+    mockSessionStorage.setItem('gl_demo_otp_' + national, dummyOtp)
     return {
       success: true,
       message: `[Dev Mode] Test OTP generated for ${masked}`,
-      devOtp: dynamicOtp,
+      devOtp: dummyOtp,
       calledSupabase: false,
     }
   }
@@ -122,8 +122,8 @@ async function verifyOtp(rawPhone, otp, isAuthTestMode) {
   if (cleanOtp.length !== 6) throw new Error('Please enter a valid 6-digit OTP.')
 
   if (isAuthTestMode) {
-    const storedOtp = mockSessionStorage.getItem('gl_demo_otp_' + national)
-    if (storedOtp && cleanOtp !== storedOtp) {
+    const storedOtp = mockSessionStorage.getItem('gl_demo_otp_' + national) || '123456'
+    if (cleanOtp !== '123456' && storedOtp && cleanOtp !== storedOtp) {
       throw new Error('Invalid verification code.')
     }
 

@@ -479,13 +479,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 1. Development Test Mode: Pure Dummy OTP Flow for ANY phone number
     if (isAuthTestMode) {
-      // Scoped temporary 6-digit OTP for this specific authentication attempt
-      const dynamicOtp = Math.floor(100000 + Math.random() * 900000).toString()
-      sessionStorage.setItem('gl_demo_otp_' + national, dynamicOtp)
+      const dummyOtp = '123456'
+      sessionStorage.setItem('gl_demo_otp_' + national, dummyOtp)
       return {
         success: true,
         message: `[Dev Mode] Test OTP generated for ${masked}`,
-        devOtp: dynamicOtp,
+        devOtp: dummyOtp,
       }
     }
 
@@ -534,10 +533,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 1. Development Test Mode: Pure Dummy OTP Verification for ANY phone number
     if (isAuthTestMode) {
-      const storedOtp = sessionStorage.getItem('gl_demo_otp_' + national)
-      // Strictly enforce the scoped temporary dummy OTP generated for this phone attempt
-      if (storedOtp && cleanOtp !== storedOtp) {
-        throw new Error('Invalid verification code.')
+      const storedOtp = sessionStorage.getItem('gl_demo_otp_' + national) || '123456'
+      // Accept standard DUMMY_OTP "123456" or any stored session OTP
+      if (cleanOtp !== '123456' && cleanOtp !== storedOtp) {
+        throw new Error('Verification code is invalid.')
       }
 
       // DO NOT call supabase.auth.verifyOtp()!

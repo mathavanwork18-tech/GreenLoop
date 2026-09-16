@@ -21,18 +21,22 @@ interface Props {
   onBack: () => void
 }
 
+const DUMMY_OTP = '123456'
+
 export default function OtpVerifyStep({
   language,
   phone,
-  devOtp = '',
+  devOtp = '123456',
   onVerifyOtp,
   onResendOtp,
   onSuccess,
   onBack,
 }: Props) {
   const t = getAuthTranslation(language)
-  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', ''])
-  const [currentDevOtp, setCurrentDevOtp] = useState(devOtp || '')
+  const [otp, setOtp] = useState<string[]>(() =>
+    isAuthTestMode ? ['1', '2', '3', '4', '5', '6'] : ['', '', '', '', '', '']
+  )
+  const [currentDevOtp, setCurrentDevOtp] = useState(devOtp || (isAuthTestMode ? DUMMY_OTP : ''))
   const [timer, setTimer] = useState(30)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -49,10 +53,23 @@ export default function OtpVerifyStep({
   const clean = phone.replace(/\D/g, '').slice(-10)
   const maskedPhone = `+91 ${clean.slice(0, 2)}*** **${clean.slice(-2)}`
 
+  // When OTP page opens in test mode, automatically pre-fill six boxes with [1] [2] [3] [4] [5] [6]
+  useEffect(() => {
+    if (isAuthTestMode) {
+      setOtp(['1', '2', '3', '4', '5', '6'])
+      setCurrentDevOtp(DUMMY_OTP)
+    }
+  }, [])
+
   // Sync devOtp if prop changes
   useEffect(() => {
     if (devOtp && devOtp !== currentDevOtp) {
       setCurrentDevOtp(devOtp)
+      if (isAuthTestMode) {
+        const digits = devOtp.split('').slice(0, 6)
+        while (digits.length < 6) digits.push('')
+        setOtp(digits)
+      }
     }
   }, [devOtp])
 
@@ -63,15 +80,14 @@ export default function OtpVerifyStep({
 
   // Auto-fill and auto-verify in development demo/test mode
   useEffect(() => {
-    if (isAuthTestMode && currentDevOtp && currentDevOtp.length === 6 && !loading && !success) {
-      const digits = currentDevOtp.split('')
-      setOtp(digits)
+    if (isAuthTestMode && !loading && !success) {
+      setOtp(['1', '2', '3', '4', '5', '6'])
       const timerId = setTimeout(() => {
-        triggerVerify(currentDevOtp)
-      }, 350)
+        triggerVerify(DUMMY_OTP)
+      }, 600)
       return () => clearTimeout(timerId)
     }
-  }, [currentDevOtp, isAuthTestMode])
+  }, [isAuthTestMode])
 
   // 30s Countdown timer (only active in production; disabled in demo mode to prevent artificial expiry)
   useEffect(() => {
@@ -83,15 +99,16 @@ export default function OtpVerifyStep({
     return () => clearInterval(interval)
   }, [timer, isAuthTestMode])
 
-  // Automatically trigger verification when all 6 digits are entered
-  const triggerVerify = async (code: string) => {
-    if (code.length !== 6 || loading || success) return
+  // Trigger verification on code entry or button click
+  const triggerVerify = async (code?: string) => {
+    const codeToVerify = (code || otp.join('') || (isAuthTestMode ? DUMMY_OTP : '')).trim()
+    if (codeToVerify.length !== 6 || loading || success) return
 
     setLoading(true)
     setError('')
 
     try {
-      const res = await onVerifyOtp(code)
+      const res = await onVerifyOtp(codeToVerify)
       if (res.success) {
         setSuccess(true)
         if (res.isExistingUser && res.isProfileComplete) {
@@ -117,11 +134,11 @@ export default function OtpVerifyStep({
           }, 400)
         }
       } else {
-        setError(res.message || t.otpInvalidError)
+        setError(res.message || 'Verification code is invalid')
         setLoading(false)
       }
     } catch (err: any) {
-      setError(err.message || t.otpInvalidError)
+      setError(err?.message || 'Verification code is invalid')
       setLoading(false)
     }
   }
@@ -186,8 +203,7 @@ export default function OtpVerifyStep({
   }
 
   const handleAutofill = () => {
-    const code = currentDevOtp || ''
-    if (!code) return
+    const code = currentDevOtp || DUMMY_OTP
     const digits = code.split('').slice(0, 6)
     while (digits.length < 6) digits.push('')
     setOtp(digits)
@@ -405,10 +421,10 @@ export default function OtpVerifyStep({
             </div>
             <div>
               <div style={{ fontSize: '0.72rem', color: '#a7f3d0', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
-                Dev Test Mode Code
+                TEMPORARY OTP (AUTO-FILLING)
               </div>
               <div style={{ fontSize: '1rem', fontWeight: 800, color: '#ffffff', letterSpacing: '2px' }}>
-                {currentDevOtp}
+                {currentDevOtp || DUMMY_OTP}
               </div>
             </div>
           </div>
@@ -505,30 +521,30 @@ export default function OtpVerifyStep({
       {/* Explicit Verify Button */}
       <button
         type="button"
-        onClick={() => triggerVerify(otp.join(''))}
-        disabled={otp.join('').length !== 6 || loading || success}
+        onClick={() => triggerVerify(otp.join('') || (isAuthTestMode ? DUMMY_OTP : ''))}
+        disabled={((!isAuthTestMode && otp.join('').length !== 6) || loading || success)}
         style={{
           width: '100%',
           height: 48,
           borderRadius: '12px',
           border: 'none',
-          background: otp.join('').length === 6 && !loading && !success
+          background: (otp.join('').length === 6 || isAuthTestMode) && !loading && !success
             ? 'linear-gradient(135deg, #10b981, #059669)'
             : 'rgba(255,255,255,0.08)',
-          color: otp.join('').length === 6 && !loading && !success ? '#ffffff' : 'rgba(255,255,255,0.4)',
+          color: (otp.join('').length === 6 || isAuthTestMode) && !loading && !success ? '#ffffff' : 'rgba(255,255,255,0.4)',
           fontWeight: 700,
           fontSize: '0.92rem',
-          cursor: otp.join('').length === 6 && !loading && !success ? 'pointer' : 'not-allowed',
+          cursor: (otp.join('').length === 6 || isAuthTestMode) && !loading && !success ? 'pointer' : 'not-allowed',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
           marginBottom: 16,
           transition: 'all 0.2s ease',
-          boxShadow: otp.join('').length === 6 ? '0 4px 14px rgba(16,185,129,0.25)' : 'none',
+          boxShadow: (otp.join('').length === 6 || isAuthTestMode) ? '0 4px 14px rgba(16,185,129,0.25)' : 'none',
         }}
       >
-        <Icon name="check" size={18} color={otp.join('').length === 6 ? '#ffffff' : 'rgba(255,255,255,0.4)'} />
+        <Icon name="check" size={18} color={(otp.join('').length === 6 || isAuthTestMode) ? '#ffffff' : 'rgba(255,255,255,0.4)'} />
         <span>{loading ? t.verifying : 'Verify OTP & Continue'}</span>
       </button>
 
