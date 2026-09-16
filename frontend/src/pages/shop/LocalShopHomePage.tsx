@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../utils/supabase'
+import { useNavigate } from 'react-router-dom'
+import { supabase, isAuthTestMode, PREDEFINED_TEST_IDENTITIES, setDevTestSession } from '../../utils/supabase'
 import { useAuth } from '../../context/AuthContext'
 import Icon from '../../components/Icon'
 import MarketplaceChatModal, { type ChatListingContext } from '../../components/chat/MarketplaceChatModal'
@@ -22,6 +23,7 @@ interface GeneralUserPost {
 }
 
 export default function LocalShopHomePage() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const [posts, setPosts] = useState<GeneralUserPost[]>([])
   const [loading, setLoading] = useState(true)
@@ -128,9 +130,15 @@ export default function LocalShopHomePage() {
 
     try {
       const { data: authData } = await supabase.auth.getUser()
-      const authUserId = authData?.user?.id || user?.id
+      let authUserId = authData?.user?.id || user?.id
+
+      if (!authUserId && isAuthTestMode) {
+        authUserId = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.id
+        setDevTestSession(PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP)
+      }
+
       if (!authUserId) {
-        throw new Error('You must be signed in to send an enquiry.')
+        throw new Error('You must be signed in to send an enquiry. Please sign in with a shop account.')
       }
 
       const { error: insertErr } = await supabase
@@ -167,7 +175,13 @@ export default function LocalShopHomePage() {
 
     try {
       const { data: authData } = await supabase.auth.getUser()
-      const authUserId = authData?.user?.id || user?.id
+      let authUserId = authData?.user?.id || user?.id
+
+      if (!authUserId && isAuthTestMode) {
+        authUserId = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.id
+        setDevTestSession(PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP)
+      }
+
       if (!authUserId) {
         throw new Error('You must be signed in to purchase a listing. Please sign in with a shop account.')
       }
@@ -674,8 +688,28 @@ export default function LocalShopHomePage() {
                 </p>
 
                 {buyError && (
-                  <div style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: 10, fontWeight: 600 }}>
-                    {buyError}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: 6, fontWeight: 600 }}>
+                      {buyError}
+                    </div>
+                    {buyError.includes('signed in') && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/auth')}
+                        style={{
+                          background: 'rgba(37, 99, 235, 0.15)',
+                          border: '1px solid #2563eb',
+                          borderRadius: '8px',
+                          color: '#60a5fa',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          padding: '6px 12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Sign In with Shop Account →
+                      </button>
+                    )}
                   </div>
                 )}
 
