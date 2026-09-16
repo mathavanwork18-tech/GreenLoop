@@ -1,47 +1,26 @@
 -- =========================================================================
 -- GREEN LOOP SUPABASE FIX: PURCHASE CLAIMS, PERMISSIONS & SHOP PROFILE
 -- =========================================================================
--- Copy and paste this script into your Supabase Dashboard SQL Editor
--- (https://supabase.com/dashboard/project/pzjczufhflhjcoorvubr/sql/new)
--- and click "RUN".
+-- In your Supabase SQL Editor:
+-- 1. Delete whatever is currently in the editor (Ctrl+A -> Backspace)
+-- 2. Paste this entire script
+-- 3. Click "RUN"
 
--- 1. Ensure Local Shop Profile is properly configured with role 'shop'
+-- 1. Ensure columns exist on profiles table (prevents missing column errors)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT true;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_profile_complete BOOLEAN DEFAULT true;
+
+-- 2. Ensure Local Shop Profile is configured as role 'shop'
 UPDATE public.profiles
 SET 
   role = 'shop',
   full_name = 'Vimal raj (Local Shop)',
-  city = 'Coimbatore'
-WHERE phone LIKE '%9876543210%';
+  city = 'Coimbatore',
+  is_verified = true,
+  is_profile_complete = true
+WHERE phone LIKE '%9876543210%' OR id = 'b0879f51-1ef1-493c-88c4-e8e6c1e55de3';
 
--- Ensure dev shop user exists in public.profiles (exact schema columns)
-INSERT INTO public.profiles (
-  id,
-  full_name,
-  phone,
-  address,
-  city,
-  role,
-  coins,
-  current_streak,
-  longest_streak
-)
-VALUES (
-  'b0879f51-1ef1-493c-88c4-e8e6c1e55de3',
-  'Vimal raj (Local Shop)',
-  '+919876543210',
-  'RS Puram',
-  'Coimbatore',
-  'shop',
-  100,
-  1,
-  1
-)
-ON CONFLICT (id) DO UPDATE SET
-  role = 'shop',
-  full_name = 'Vimal raj (Local Shop)',
-  city = 'Coimbatore';
-
--- 2. Ensure post_claims table structure exists
+-- 3. Ensure post_claims table structure exists
 CREATE TABLE IF NOT EXISTS public.post_claims (
   id BIGSERIAL PRIMARY KEY,
   post_id UUID NOT NULL REFERENCES public.e_waste_posts(id) ON DELETE CASCADE,
@@ -55,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.post_claims (
 -- Drop restrictive user_id foreign key constraint so any valid profile/test account can claim
 ALTER TABLE public.post_claims DROP CONSTRAINT IF EXISTS post_claims_user_id_fkey;
 
--- 3. Row Level Security (RLS) policies for post_claims
+-- 4. Row Level Security (RLS) policies for post_claims
 ALTER TABLE public.post_claims ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view claims" ON public.post_claims;
@@ -90,7 +69,7 @@ ON public.post_claims FOR DELETE
 TO public 
 USING (true);
 
--- 4. Enable secure notification dispatch to seller on claim creation
+-- 5. Enable secure notification dispatch to seller on claim creation
 CREATE OR REPLACE FUNCTION public.handle_new_post_claim()
 RETURNS TRIGGER
 LANGUAGE plpgsql
