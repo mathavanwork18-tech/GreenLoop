@@ -13,38 +13,35 @@ SET
   city = 'Coimbatore'
 WHERE phone LIKE '%9876543210%';
 
--- Ensure dev shop user exists in public.profiles
+-- Ensure dev shop user exists in public.profiles (exact schema columns)
 INSERT INTO public.profiles (
   id,
   full_name,
   phone,
+  address,
   city,
   role,
   coins,
   current_streak,
-  longest_streak,
-  is_verified,
-  is_profile_complete
+  longest_streak
 )
 VALUES (
   'b0879f51-1ef1-493c-88c4-e8e6c1e55de3',
   'Vimal raj (Local Shop)',
   '+919876543210',
+  'RS Puram',
   'Coimbatore',
   'shop',
   100,
   1,
-  1,
-  true,
-  true
+  1
 )
 ON CONFLICT (id) DO UPDATE SET
   role = 'shop',
   full_name = 'Vimal raj (Local Shop)',
-  city = 'Coimbatore',
-  is_profile_complete = true;
+  city = 'Coimbatore';
 
--- 2. Ensure post_claims table structure and foreign key resilience
+-- 2. Ensure post_claims table structure exists
 CREATE TABLE IF NOT EXISTS public.post_claims (
   id BIGSERIAL PRIMARY KEY,
   post_id UUID NOT NULL REFERENCES public.e_waste_posts(id) ON DELETE CASCADE,
@@ -55,11 +52,8 @@ CREATE TABLE IF NOT EXISTS public.post_claims (
   CONSTRAINT post_claims_post_id_user_id_key UNIQUE (post_id, user_id)
 );
 
--- Drop restrictive foreign key to auth.users and link to public.profiles
+-- Drop restrictive user_id foreign key constraint so any valid profile/test account can claim
 ALTER TABLE public.post_claims DROP CONSTRAINT IF EXISTS post_claims_user_id_fkey;
-ALTER TABLE public.post_claims 
-  ADD CONSTRAINT post_claims_user_id_fkey 
-  FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
 
 -- 3. Row Level Security (RLS) policies for post_claims
 ALTER TABLE public.post_claims ENABLE ROW LEVEL SECURITY;
@@ -151,51 +145,3 @@ CREATE TRIGGER on_post_claim_created
   AFTER INSERT ON public.post_claims
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_post_claim();
-
--- 5. Safe RPC function for creating purchase claims
-CREATE OR REPLACE FUNCTION public.create_purchase_claim(
-  p_post_id UUID,
-  p_user_id UUID DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_effective_user UUID;
-  v_existing_claim RECORD;
-  v_new_id BIGINT;
-BEGIN
-  -- Determine effective user (explicit parameter or auth.uid() or fallback to test shop)
-  v_effective_user := COALESCE(
-    p_user_id,
-    auth.uid(),
-    'b0879f51-1ef1-493c-88c4-e8e6c1e55de3'::UUID
-  );
-
-  -- Check existing claim
-  SELECT id, status INTO v_existing_claim
-  FROM public.post_claims
-  WHERE post_id = p_post_id AND user_id = v_effective_user
-  LIMIT 1;
-
-  IF v_existing_claim.id IS NOT NULL THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'error', 'You have already submitted a purchase order for this listing (Status: ' || v_existing_claim.status || ').'
-    );
-  END IF;
-
-  -- Insert claim
-  INSERT INTO public.post_claims (post_id, user_id, status)
-  VALUES (p_post_id, v_effective_user, 'pending')
-  RETURNING id INTO v_new_id;
-
-  RETURN jsonb_build_object(
-    'success', true,
-    'claim_id', v_new_id,
-    'status', 'pending'
-  );
-END;
-$$;
