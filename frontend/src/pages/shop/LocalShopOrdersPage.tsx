@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../utils/supabase'
+import { useAuth } from '../../context/AuthContext'
 import Icon from '../../components/Icon'
 
 interface PurchaseRecord {
@@ -27,6 +28,7 @@ interface MyListingRecord {
 }
 
 export default function LocalShopOrdersPage() {
+  const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'purchases' | 'listings'>('purchases')
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([])
   const [myListings, setMyListings] = useState<MyListingRecord[]>([])
@@ -45,13 +47,19 @@ export default function LocalShopOrdersPage() {
     setLoading(true)
     setError(null)
     try {
-      const { data: authData } = await supabase.auth.getUser()
-      if (!authData?.user) {
+      let currentUserId = user?.id
+
+      if (!currentUserId) {
+        try {
+          const { data: authData } = await supabase.auth.getUser()
+          currentUserId = authData?.user?.id
+        } catch {}
+      }
+
+      if (!currentUserId) {
         setLoading(false)
         return
       }
-
-      const currentUserId = authData.user.id
 
       // 1. Query real post_claims for this user
       const { data: claimsData, error: claimsErr } = await supabase
