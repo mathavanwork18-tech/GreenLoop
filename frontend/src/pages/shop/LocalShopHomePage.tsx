@@ -129,8 +129,18 @@ export default function LocalShopHomePage() {
     const commentText = enquiryMessage.trim() || `[Shop Enquiry] Hello, our repair shop is interested in your listing "${enquiryPost.title}". Please let us know if it is available for inspection.`
 
     try {
-      const { data: authData } = await supabase.auth.getUser()
-      let authUserId = authData?.user?.id || user?.id
+      // Resolve authenticated user ID: prefer AuthContext user (already hydrated),
+      // then GoTrue session, then dev test mode fallback
+      let authUserId: string | undefined = user?.id
+
+      if (!authUserId) {
+        try {
+          const { data: authData } = await supabase.auth.getUser()
+          authUserId = authData?.user?.id
+        } catch {
+          // GoTrue call may fail in dev/offline scenarios — continue to fallback
+        }
+      }
 
       if (!authUserId && isAuthTestMode) {
         authUserId = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.id
@@ -174,8 +184,18 @@ export default function LocalShopHomePage() {
     setBuyError(null)
 
     try {
-      const { data: authData } = await supabase.auth.getUser()
-      let authUserId = authData?.user?.id || user?.id
+      // Resolve authenticated user ID: prefer AuthContext user (already hydrated),
+      // then GoTrue session, then dev test mode fallback
+      let authUserId: string | undefined = user?.id
+
+      if (!authUserId) {
+        try {
+          const { data: authData } = await supabase.auth.getUser()
+          authUserId = authData?.user?.id
+        } catch {
+          // GoTrue call may fail in dev/offline scenarios — continue to fallback
+        }
+      }
 
       if (!authUserId && isAuthTestMode) {
         authUserId = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.id
