@@ -37,6 +37,7 @@ export default function AuthFlowContainer() {
     saveRegistrationDraft,
     getRegistrationDraft,
     clearRegistrationDraft,
+    signInWithGoogle,
     devLogin,
   } = useAuth()
 
@@ -298,6 +299,7 @@ export default function AuthFlowContainer() {
             initialPhone={phone}
             onSendOtp={(p: string) => sendOtp(p)}
             onOtpSent={handleOtpSent}
+            onGoogleSignIn={signInWithGoogle}
             onBack={() => setStep('LANGUAGE')}
           />
         )}

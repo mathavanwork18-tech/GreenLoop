@@ -106,6 +106,14 @@ interface AuthContextType {
   getRegistrationDraft: () => RegistrationDraft | null
   clearRegistrationDraft: () => void
   login: (email: string, password: string) => Promise<User>
+  signInWithGoogle: (redirectTo?: string) => Promise<void>
+  signUpWithEmail: (
+    email: string,
+    password: string,
+    name: string,
+    role?: Role,
+    city?: string
+  ) => Promise<User>
   devLogin?: (role: 'citizen' | 'shop') => Promise<User>
   register: (data: RegisterData) => Promise<User>
   logout: () => Promise<void>
@@ -376,11 +384,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!profile) {
           const meta = session.user.user_metadata || {}
+          const pendingRole = (localStorage.getItem('gl_pending_role') as Role) || undefined
+          if (pendingRole) {
+            localStorage.removeItem('gl_pending_role')
+          }
           profile = await ensureProfile(session.user.id, {
-            full_name: meta.full_name || meta.name,
+            full_name: meta.full_name || meta.name || meta.user_name || session.user.email?.split('@')[0],
             phone: meta.phone,
-            role: meta.role,
-            city: meta.city,
+            role: pendingRole || meta.role || 'citizen',
+            city: meta.city || 'Coimbatore',
           })
         }
 
@@ -1059,6 +1071,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     throw new Error('Registration failed on authentication server. Please check your mobile number and try again.')
   }
 
+  const signInWithGoogle = async (redirectTo?: string) => {
+    const targetUrl = redirectTo || window.location.origin
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: targetUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    })
+    if (error) {
+      console.error('[Green Loop] Google OAuth error:', error)
+      throw new Error(error.message || 'Could not initiate Google Sign-In')
+    }
+  }
+
+  const signUpWithEmail = async (
+    email: string,
+    password: string,
+    name: string,
+    role: Role = 'citizen',
+    city: string = 'Coimbatore'
+  ): Promise<User> => {
+    const dbRole = normalizeRole(role)
+    if (dbRole === 'admin') {
+      throw new Error('Administrator accounts cannot be registered via public registration.')
+    }
+    const cleanEmail = email.trim().toLowerCase()
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password,
+      options: {
+        data: {
+          full_name: name.trim(),
+          role: dbRole,
+          city: city.trim(),
+        },
+      },
+    })
+
+    if (authError) {
+      if (authError.message?.toLowerCase().includes('already registered')) {
+        return login(cleanEmail, password)
+      }
+      throw new Error(authError.message || 'Email registration failed')
+    }
+
+    if (!authData?.user) {
+      throw new Error('Email registration failed. Please check your credentials.')
+    }
+
+    const authUser = authData.user
+    const createdProfile = await ensureProfile(authUser.id, {
+      full_name: name.trim(),
+      role: dbRole,
+      city: city.trim(),
+    })
+
+    await coinService.awardRegistrationBonus(authUser.id, dbRole)
+    const dailyReward = await coinService.processDailyLoginReward(authUser.id)
+    const newUser = mapDbProfileToUser(createdProfile, authUser, dailyReward.totalCoins, dailyReward.streak)
+    setUser(newUser)
+    localStorage.setItem('gl_user', JSON.stringify(newUser))
+    return newUser
+  }
+
   const logout = async () => {
     const currentUserId = user?.id
     clearDevTestSession()
@@ -1184,6 +1264,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getRegistrationDraft,
         clearRegistrationDraft,
         login,
+        signInWithGoogle,
+        signUpWithEmail,
         devLogin,
         register,
         logout,
