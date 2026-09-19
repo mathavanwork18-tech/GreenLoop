@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, isAuthTestMode, PREDEFINED_TEST_IDENTITIES, setDevTestSession } from '../../utils/supabase'
+import { supabase, isAuthTestMode, getDevDemoSession } from '../../utils/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { normalizeRole } from '../../services/role/roleService'
 import Icon from '../../components/Icon'
 import MarketplaceChatModal, { type ChatListingContext } from '../../components/chat/MarketplaceChatModal'
 
@@ -129,9 +130,9 @@ export default function LocalShopHomePage() {
     const commentText = enquiryMessage.trim() || `[Shop Enquiry] Hello, our repair shop is interested in your listing "${enquiryPost.title}". Please let us know if it is available for inspection.`
 
     try {
-      // Resolve authenticated user ID: prefer AuthContext user (already hydrated),
-      // then GoTrue session, then dev test mode fallback
-      let authUserId: string | undefined = user?.id
+      // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
+      const demoSession = isAuthTestMode ? getDevDemoSession() : null
+      let authUserId: string | undefined = user?.id || demoSession?.profile_id || demoSession?.id
 
       if (!authUserId) {
         try {
@@ -140,11 +141,6 @@ export default function LocalShopHomePage() {
         } catch {
           // GoTrue call may fail in dev/offline scenarios — continue to fallback
         }
-      }
-
-      if (!authUserId && isAuthTestMode) {
-        authUserId = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.id
-        setDevTestSession(PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP)
       }
 
       if (!authUserId) {
@@ -184,57 +180,89 @@ export default function LocalShopHomePage() {
     setBuyError(null)
 
     try {
-      // Resolve authenticated user ID: prefer AuthContext user (already hydrated),
-      // then GoTrue session, then dev test mode fallback
-      let authUserId: string | undefined = user?.id
+      // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
+      // Resolve current application user: prefer AuthContext user, then demo session fallback, then GoTrue session
+      const demoSession = isAuthTestMode ? getDevDemoSession() : null
+      const currentBuyer = user || (demoSession ? {
+        id: demoSession.profile_id || demoSession.id,
+        role: demoSession.role,
+        phone: demoSession.phone,
+        isProfileComplete: demoSession.isProfileComplete ?? (demoSession.registration_status === 'completed'),
+      } : null)
 
-      if (!authUserId) {
+      let buyerId: string | undefined = currentBuyer?.id
+
+      if (!buyerId) {
         try {
           const { data: authData } = await supabase.auth.getUser()
-          authUserId = authData?.user?.id
-        } catch {
-          // GoTrue call may fail in dev/offline scenarios — continue to fallback
-        }
+          buyerId = authData?.user?.id
+        } catch {}
       }
 
-      if (!authUserId && isAuthTestMode) {
-        authUserId = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.id
-        setDevTestSession(PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP)
-      }
-
-      if (!authUserId) {
+      // CHECK 1: A current application user exists
+      if (!buyerId) {
         throw new Error('You must be signed in to purchase a listing. Please sign in with a shop account.')
       }
 
-      if (buyPost.userId && buyPost.userId === authUserId) {
+      // CHECK 2: The user is registered
+      const isRegistered = currentBuyer?.isProfileComplete ?? true
+      if (!isRegistered) {
+        throw new Error('Please complete your shop profile registration before purchasing.')
+      }
+
+      // CHECK 3: The user has an allowed role (Local Shop / Recycler)
+      const buyerRole = normalizeRole(currentBuyer?.role)
+      const allowedRoles = ['shop', 'local_shop', 'company', 'recycler']
+      if (!allowedRoles.includes(buyerRole)) {
+        throw new Error('Only registered local shops or recyclers can purchase e-waste listings.')
+      }
+
+      // CHECK 4: The listing exists in Supabase
+      const { data: freshPost, error: postErr } = await supabase
+        .from('e_waste_posts')
+        .select('id, user_id, status, title')
+        .eq('id', buyPost.id)
+        .maybeSingle()
+
+      if (postErr || !freshPost) {
+        throw new Error('This listing could not be found or has been removed.')
+      }
+
+      // CHECK 5: The listing is available
+      if (freshPost.status && freshPost.status !== 'available') {
+        throw new Error(`This listing is no longer available for purchase (Status: ${freshPost.status}).`)
+      }
+
+      // CHECK 6: The buyer is not the seller
+      if (freshPost.user_id && freshPost.user_id === buyerId) {
         throw new Error('You cannot purchase your own listing.')
       }
 
-      // Concurrency duplicate prevention
+      // CHECK 7: Duplicate active purchase requests are prevented
       const { data: existingClaim } = await supabase
         .from('post_claims')
         .select('id, status')
-        .eq('post_id', buyPost.id)
-        .eq('user_id', authUserId)
+        .eq('post_id', freshPost.id)
+        .eq('user_id', buyerId)
         .maybeSingle()
 
       if (existingClaim) {
         throw new Error(`You have already submitted a purchase order for this listing (Status: ${existingClaim.status}).`)
       }
 
-      // Insert purchase claim into post_claims
+      // CHECK 8: The transaction is actually saved to Supabase
       const { data: createdClaim, error: claimErr } = await supabase
         .from('post_claims')
         .insert({
-          post_id: buyPost.id,
-          user_id: authUserId,
+          post_id: freshPost.id,
+          user_id: buyerId,
           status: 'pending',
         })
-        .select('id, status, created_at')
+        .select('id, post_id, user_id, status, created_at')
         .maybeSingle()
 
-      if (claimErr) {
-        throw new Error(claimErr.message || 'Could not create purchase request in database.')
+      if (claimErr || !createdClaim) {
+        throw new Error(claimErr?.message || 'Could not create purchase request in database.')
       }
 
       console.log('[Green Loop Shop] Purchase order created successfully:', createdClaim?.id)
@@ -242,6 +270,7 @@ export default function LocalShopHomePage() {
       setTimeout(() => {
         setBuyPost(null)
         setBuySuccess(false)
+        loadPosts()
       }, 1600)
     } catch (err: any) {
       console.error('[Green Loop Shop] Buy error:', err)

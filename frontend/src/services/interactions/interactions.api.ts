@@ -1,4 +1,4 @@
-import { supabase } from '../../utils/supabase'
+import { supabase, getDevDemoSession } from '../../utils/supabase'
 
 export interface PostCommentItem {
   id: string
@@ -228,22 +228,58 @@ export const interactionsApi = {
     return data
   },
 
-  async claimPost(postId: string, userId: string): Promise<{ success: boolean; claim: any }> {
-    if (!userId) {
-      throw new Error('You must be logged in to claim an e-waste listing.')
+  // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
+  async claimPost(postId: string, userId?: string): Promise<{ success: boolean; claim: any }> {
+    let resolvedUserId = userId
+    if (!resolvedUserId) {
+      const demoSession = getDevDemoSession()
+      resolvedUserId = demoSession?.profile_id || demoSession?.id
+    }
+    if (!resolvedUserId && typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('gl_user')
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (parsed?.id) resolvedUserId = parsed.id
+        }
+      } catch {}
     }
 
-    // Duplicate check
-    const existing = await this.getPostClaim(postId, userId)
+    if (!resolvedUserId) {
+      throw new Error('You must be signed in to claim an e-waste listing.')
+    }
+
+    // 1. Verify listing exists and is available
+    const { data: post, error: postErr } = await supabase
+      .from('e_waste_posts')
+      .select('id, user_id, status')
+      .eq('id', postId)
+      .maybeSingle()
+
+    if (postErr || !post) {
+      throw new Error('This listing could not be found or has been removed.')
+    }
+
+    if (post.status && post.status !== 'available') {
+      throw new Error(`This listing is no longer available (Status: ${post.status}).`)
+    }
+
+    if (post.user_id && post.user_id === resolvedUserId) {
+      throw new Error('You cannot purchase your own listing.')
+    }
+
+    // 2. Duplicate check
+    const existing = await this.getPostClaim(postId, resolvedUserId)
     if (existing) {
       return { success: true, claim: existing }
     }
 
+    // 3. Insert claim
     const { data, error } = await supabase
       .from('post_claims')
       .insert({
         post_id: postId,
-        user_id: userId,
+        user_id: resolvedUserId,
         status: 'pending',
       })
       .select('*')

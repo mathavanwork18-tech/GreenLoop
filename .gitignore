@@ -46,3 +46,4 @@ logs/
 .autohand/
 supabase/.temp/
 implement
+*.bundle

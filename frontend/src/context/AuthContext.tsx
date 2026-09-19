@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { LanguageCode } from '../types/common.types'
-import { supabase, isAuthTestMode, PREDEFINED_TEST_IDENTITIES, setDevTestSession, clearDevTestSession } from '../utils/supabase'
+import { supabase, isAuthTestMode, PREDEFINED_TEST_IDENTITIES, setDevTestSession, getDevDemoSession, clearDevTestSession } from '../utils/supabase'
 import { normalizePhone } from '../utils/phone'
 import { normalizeRole, updateUserRoleInDatabase } from '../services/role/roleService'
 import { coinService } from '../services/coin/coinService'
@@ -309,7 +309,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   const [isInitializing, setIsInitializing] = useState(true)
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem('gl_user')
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })
 
   // Hydrate user session from Supabase on mount and listen to auth changes
   useEffect(() => {
@@ -350,15 +357,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('gl_user', JSON.stringify(syncedUser))
           }
         } else if (mounted) {
-          // No active Supabase GoTrue session
+          // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
+          if (isAuthTestMode) {
+            const demoSession = getDevDemoSession()
+            if (demoSession?.profile_id || demoSession?.id) {
+              const targetId = demoSession.profile_id || demoSession.id
+              const { data: dbProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', targetId)
+                .maybeSingle()
+
+              if (dbProfile && mounted) {
+                const dailyReward = await coinService.processDailyLoginReward(dbProfile.id)
+                const syncedUser = mapDbProfileToUser(
+                  dbProfile,
+                  {
+                    id: dbProfile.id,
+                    user_metadata: {
+                      profile_id: dbProfile.id,
+                      full_name: dbProfile.full_name,
+                      role: dbProfile.role,
+                      phone: dbProfile.phone || demoSession.phone,
+                      city: dbProfile.city,
+                      language: demoSession.language,
+                      isProfileComplete: demoSession.isProfileComplete,
+                      registration_status: demoSession.registration_status,
+                    },
+                  },
+                  dailyReward.totalCoins,
+                  dailyReward.streak
+                )
+                setUser(syncedUser)
+                localStorage.setItem('gl_user', JSON.stringify(syncedUser))
+                return
+              }
+            }
+          }
+
+          // No active Supabase GoTrue or Demo session
           setUser(null)
           localStorage.removeItem('gl_user')
         }
       } catch (err) {
         console.warn('[Green Loop] Initial session sync error:', err)
         if (mounted) {
-          setUser(null)
-          localStorage.removeItem('gl_user')
+          if (!isAuthTestMode || !getDevDemoSession()) {
+            setUser(null)
+            localStorage.removeItem('gl_user')
+          }
         }
       } finally {
         if (mounted) {
@@ -576,14 +623,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           dbProfile.role
         )
 
-        // Set dev test session with this existing profile's authentic ID
+        // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
+        // Set dev test session with this existing profile's authentic ID and demo session metadata
         setDevTestSession({
           id: dbProfile.id,
           name: dbProfile.full_name,
-          phone: e164,
+          phone: dbProfile.phone || e164,
           e164,
           role: dbProfile.role,
           city: dbProfile.city,
+          language,
+          isProfileComplete: isComplete,
+          registration_status: isComplete ? 'completed' : 'pending',
         })
 
         const dailyReward = await coinService.processDailyLoginReward(dbProfile.id)
@@ -614,6 +665,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
       // Brand new phone number (no profile in public.profiles)
       // Establish an initial demo session identity for the new phone
       const newUserId = crypto.randomUUID()
@@ -624,6 +676,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         e164,
         role: 'citizen',
         city: 'Coimbatore',
+        language,
+        isProfileComplete: false,
+        registration_status: 'pending',
       })
 
       return {
@@ -876,6 +931,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
     }
 
+    // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
     if (isAuthTestMode) {
       setDevTestSession({
         id: completedUser.id,
@@ -884,6 +940,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         e164,
         role: completedUser.role,
         city: completedUser.city,
+        language,
+        isProfileComplete: true,
+        registration_status: 'completed',
       })
     }
 

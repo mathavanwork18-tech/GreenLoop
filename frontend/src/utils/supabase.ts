@@ -8,14 +8,15 @@ const supabaseKey =
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
+// DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
 /**
  * Development test mode flag.
- * STRICT SECURITY: Only active in local development AND when explicitly enabled via env.
- * In production (import.meta.env.PROD), this is always strictly false.
+ * STRICT SECURITY: Only active in local development (import.meta.env.DEV)
+ * and enabled unless explicitly set to 'false'. In production, this is always false.
  */
 export const isAuthTestMode: boolean = Boolean(
   import.meta.env.DEV &&
-  (import.meta.env.VITE_AUTH_TEST_MODE === 'true' || import.meta.env.VITE_AUTH_TEST_MODE === true)
+  (import.meta.env.VITE_AUTH_TEST_MODE !== 'false')
 )
 
 export const PREDEFINED_TEST_IDENTITIES = {
@@ -39,20 +40,42 @@ export const PREDEFINED_TEST_IDENTITIES = {
   },
 } as const
 
+// DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
 export interface DevSessionIdentity {
   id: string
-  name: string
+  name?: string
   phone?: string
   e164?: string
   role: string
   city?: string
+  language?: string
+  isProfileComplete?: boolean
+  registration_status?: 'completed' | 'pending'
+}
+
+export interface DemoSessionData {
+  profile_id: string
+  id: string
+  phone: string
+  role: string
+  language: string
+  registration_status: 'completed' | 'pending'
+  isProfileComplete: boolean
+  name?: string
+  city?: string
+  updatedAt: number
 }
 
 const DEV_TEST_SESSION_KEY = 'gl_dev_test_session'
+const DEMO_SESSION_KEY = 'gl_demo_session'
 
 export function setDevTestSession(identity: DevSessionIdentity) {
   if (!isAuthTestMode) return
   const phoneVal = identity.e164 || (identity.phone ? (identity.phone.startsWith('+91') ? identity.phone : '+91' + identity.phone) : '+919999999999')
+  const langVal = identity.language || (typeof window !== 'undefined' ? localStorage.getItem('gl_language') : null) || 'EN'
+  const isComplete = identity.isProfileComplete ?? true
+  const regStatus = identity.registration_status || (isComplete ? 'completed' : 'pending')
+
   const testSession = {
     access_token: 'dev_test_token_' + identity.id,
     token_type: 'bearer',
@@ -62,14 +85,32 @@ export function setDevTestSession(identity: DevSessionIdentity) {
       role: 'authenticated',
       phone: phoneVal,
       user_metadata: {
-        full_name: identity.name,
+        profile_id: identity.id,
+        full_name: identity.name || 'Green Loop Member',
         role: identity.role,
         phone: phoneVal,
         city: identity.city || 'Coimbatore',
+        language: langVal,
+        isProfileComplete: isComplete,
+        registration_status: regStatus,
       },
     },
   }
   localStorage.setItem(DEV_TEST_SESSION_KEY, JSON.stringify(testSession))
+
+  const demoData: DemoSessionData = {
+    profile_id: identity.id,
+    id: identity.id,
+    phone: phoneVal,
+    role: identity.role,
+    language: langVal,
+    registration_status: regStatus,
+    isProfileComplete: isComplete,
+    name: identity.name || 'Green Loop Member',
+    city: identity.city || 'Coimbatore',
+    updatedAt: Date.now(),
+  }
+  localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(demoData))
 }
 
 export function getDevTestSession() {
@@ -83,8 +124,37 @@ export function getDevTestSession() {
   }
 }
 
+export function getDevDemoSession(): DemoSessionData | null {
+  if (!isAuthTestMode) return null
+  try {
+    const raw = localStorage.getItem(DEMO_SESSION_KEY)
+    if (raw) return JSON.parse(raw)
+
+    const devTest = getDevTestSession()
+    if (devTest?.user) {
+      const meta = devTest.user.user_metadata || {}
+      return {
+        profile_id: devTest.user.id,
+        id: devTest.user.id,
+        phone: devTest.user.phone || meta.phone || '',
+        role: meta.role || 'citizen',
+        language: meta.language || 'EN',
+        registration_status: meta.registration_status || 'completed',
+        isProfileComplete: meta.isProfileComplete ?? true,
+        name: meta.full_name || 'Green Loop Member',
+        city: meta.city || 'Coimbatore',
+        updatedAt: Date.now(),
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export function clearDevTestSession() {
   localStorage.removeItem(DEV_TEST_SESSION_KEY)
+  localStorage.removeItem(DEMO_SESSION_KEY)
 }
 
 // Intercept getSession and getUser ONLY in development test mode if GoTrue has no live session

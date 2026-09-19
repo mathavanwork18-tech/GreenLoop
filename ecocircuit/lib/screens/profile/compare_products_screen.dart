@@ -41,7 +41,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    initialValue: _p1.id,
+                    value: _p1.id,
                     isExpanded: true,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -59,7 +59,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                 ),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    initialValue: _p2.id,
+                    value: _p2.id,
                     isExpanded: true,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

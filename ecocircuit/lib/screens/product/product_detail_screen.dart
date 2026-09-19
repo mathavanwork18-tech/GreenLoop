@@ -435,7 +435,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         Text('Select your device to check interface and socket compatibility:', style: theme.textTheme.bodySmall),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
-                          initialValue: _selectedCompatibilityDevice,
+                          value: _selectedCompatibilityDevice,
                           decoration: InputDecoration(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),

@@ -152,7 +152,7 @@ class _RecyclingScreenState extends State<RecyclingScreen> {
                   const Text('Select Material Type', style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedMaterial,
+                    value: _selectedMaterial,
                     isExpanded: true,
                     decoration: const InputDecoration(border: OutlineInputBorder()),
                     items: _materialOptions.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12)))).toList(),

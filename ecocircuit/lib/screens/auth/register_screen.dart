@@ -114,7 +114,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Text('Primary Location', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                initialValue: _selectedCity,
+                value: _selectedCity,
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.location_city_outlined, size: 20),
                   filled: true,
