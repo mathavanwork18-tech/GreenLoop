@@ -16,7 +16,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey)
  */
 export const isAuthTestMode: boolean = Boolean(
   import.meta.env.DEV &&
-  (import.meta.env.VITE_AUTH_TEST_MODE !== 'false')
+  (import.meta.env.VITE_AUTH_TEST_MODE === 'true')
 )
 
 export const PREDEFINED_TEST_IDENTITIES = {

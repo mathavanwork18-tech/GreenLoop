@@ -27,6 +27,10 @@ export interface AuthTranslations {
   resendOtp: string
   verifying: string
   otpInvalidError: string
+  otpExpiredError: string
+  otpRateLimitError: string
+  otpProviderError: string
+  otpResentSuccess: string
   otpRequiredError: string
   otpSuccess: string
 
@@ -126,7 +130,11 @@ export const AUTH_TRANSLATIONS: Record<LanguageCode, AuthTranslations> = {
     didntReceive: "Didn't receive it?",
     resendOtp: 'Resend OTP',
     verifying: 'Verifying OTP...',
-    otpInvalidError: 'Incorrect OTP. Please enter the valid 6-digit code.',
+    otpInvalidError: 'Incorrect OTP. Please check the code and try again.',
+    otpExpiredError: 'This OTP has expired. Please request a new OTP.',
+    otpRateLimitError: 'Too many OTP requests. Please wait and try again.',
+    otpProviderError: 'OTP service is temporarily unavailable. Please try again later.',
+    otpResentSuccess: 'A new OTP has been sent.',
     otpRequiredError: 'Please enter all 6 digits of the OTP.',
     otpSuccess: 'OTP verified successfully!',
 
@@ -220,7 +228,11 @@ export const AUTH_TRANSLATIONS: Record<LanguageCode, AuthTranslations> = {
     didntReceive: 'குறியீடு வரவில்லையா?',
     resendOtp: 'OTP மீண்டும் அனுப்புக',
     verifying: 'சரிபார்க்கப்படுகிறது...',
-    otpInvalidError: 'தவறான OTP. சரியான 6 இலக்க குறியீட்டை உள்ளிடவும்.',
+    otpInvalidError: 'தவறான OTP. குறியீட்டைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.',
+    otpExpiredError: 'இந்த OTP காலாவதியானது. புதிய OTP ஐ கோரவும்.',
+    otpRateLimitError: 'அதிகப்படியான OTP கோரிக்கைகள். சிறிது நேரம் காத்திருந்து மீண்டும் முயற்சிக்கவும்.',
+    otpProviderError: 'OTP சேவை தற்காலிகமாக கிடைக்கவில்லை. பின்னர் முயற்சிக்கவும்.',
+    otpResentSuccess: 'புதிய OTP வெற்றிகரமாக அனுப்பப்பட்டது.',
     otpRequiredError: 'அனைத்து 6 இலக்கங்களையும் உள்ளிடவும்.',
     otpSuccess: 'OTP வெற்றிகரமாக சரிபார்க்கப்பட்டது!',
 
@@ -314,7 +326,11 @@ export const AUTH_TRANSLATIONS: Record<LanguageCode, AuthTranslations> = {
     didntReceive: 'कोड नहीं मिला?',
     resendOtp: 'OTP पुनः भेजें',
     verifying: 'OTP सत्यापित किया जा रहा है...',
-    otpInvalidError: 'गलत OTP. कृपया वैध 6 अंकों का कोड दर्ज करें।',
+    otpInvalidError: 'गलत OTP. कृपया कोड की जांच करें और पुनः प्रयास करें।',
+    otpExpiredError: 'यह OTP समाप्त हो गया है। कृपया नया OTP अनुरोध करें।',
+    otpRateLimitError: 'बहुत अधिक OTP अनुरोध। कृपया प्रतीक्षा करें और पुनः प्रयास करें।',
+    otpProviderError: 'OTP सेवा अस्थायी रूप से अनुपलब्ध है। कृपया बाद में पुनः प्रयास करें।',
+    otpResentSuccess: 'एक नया OTP भेज दिया गया है।',
     otpRequiredError: 'कृपया OTP के सभी 6 अंक दर्ज करें।',
     otpSuccess: 'OTP सफलतापूर्वक सत्यापित हुआ!',
 
@@ -408,7 +424,11 @@ export const AUTH_TRANSLATIONS: Record<LanguageCode, AuthTranslations> = {
     didntReceive: 'കോഡ് ലഭിച്ചില്ലേ?',
     resendOtp: 'OTP വീണ്ടും അയക്കുക',
     verifying: 'പരിശോധിക്കുന്നു...',
-    otpInvalidError: 'തെറ്റായ OTP. സാധുവായ 6 അക്ക കോഡ് നൽകുക.',
+    otpInvalidError: 'തെറ്റായ OTP. കോഡ് പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.',
+    otpExpiredError: 'ഈ OTP കാലഹരണപ്പെട്ടു. ദയവായി പുതിയ OTP അഭ്യർത്ഥിക്കുക.',
+    otpRateLimitError: 'കൂടുതൽ OTP അഭ്യർത്ഥനകൾ. ദയവായി കാത്തിരുന്ന് വീണ്ടും ശ്രമിക്കുക.',
+    otpProviderError: 'OTP സേവനം താൽക്കാലികമായി ലഭ്യമല്ല. ദയവായി പിന്നീട് ശ്രമിക്കുക.',
+    otpResentSuccess: 'ഒരു പുതിയ OTP അയച്ചിരിക്കുന്നു.',
     otpRequiredError: 'എല്ലാ 6 അക്കങ്ങളും നൽകുക.',
     otpSuccess: 'OTP വിജയകരമായി പരിശോധിച്ചു!',
 
@@ -502,7 +522,11 @@ export const AUTH_TRANSLATIONS: Record<LanguageCode, AuthTranslations> = {
     didntReceive: 'ಕೋಡ್ ಬಂದಿಲ್ಲವೇ?',
     resendOtp: 'OTP ಮರುಕಳುಹಿಸಿ',
     verifying: 'ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ...',
-    otpInvalidError: 'ತಪ್ಪಾದ OTP. ಮಾನ್ಯವಾದ 6 ಅಂಕಿಯ ಕೋಡ್ ನಮೂದಿಸಿ.',
+    otpInvalidError: 'ತಪ್ಪಾದ OTP. ಕೋಡ್ ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    otpExpiredError: 'ಈ OTP ಅವಧಿ ಮೀರಿದೆ. ದಯವಿಟ್ಟು ಹೊಸ OTP ವಿನಂತಿಸಿ.',
+    otpRateLimitError: 'ಹೆಚ್ಚಿನ OTP ವಿನಂತಿಗಳು. ದಯವಿಟ್ಟು ನಿರೀಕ್ಷಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    otpProviderError: 'OTP ಸೇವೆ ತಾತ್ಕಾಲಿಕವಾಗಿ ಲಭ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ನಂತರ ಪ್ರಯತ್ನಿಸಿ.',
+    otpResentSuccess: 'ಹೊಸ OTP ಕಳುಹಿಸಲಾಗಿದೆ.',
     otpRequiredError: 'ಎಲ್ಲಾ 6 ಅಂಕಿಗಳನ್ನು ನಮೂದಿಸಿ.',
     otpSuccess: 'OTP ಯಶಸ್ವಿಯಾಗಿ ಪರಿಶೀಲಿಸಲಾಗಿದೆ!',
 

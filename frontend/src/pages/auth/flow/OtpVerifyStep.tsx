@@ -37,9 +37,10 @@ export default function OtpVerifyStep({
     isAuthTestMode ? ['1', '2', '3', '4', '5', '6'] : ['', '', '', '', '', '']
   )
   const [currentDevOtp, setCurrentDevOtp] = useState(devOtp || (isAuthTestMode ? DUMMY_OTP : ''))
-  const [timer, setTimer] = useState(30)
+  const [timer, setTimer] = useState(60)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [infoMessage, setInfoMessage] = useState('')
   const [success, setSuccess] = useState(false)
   const [welcomeTransition, setWelcomeTransition] = useState<{
     show: boolean
@@ -48,6 +49,7 @@ export default function OtpVerifyStep({
   } | null>(null)
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+  const isResendingRef = useRef(false)
 
   // Format masked phone number (+91 98*** **210)
   const clean = phone.replace(/\D/g, '').slice(-10)
@@ -89,7 +91,7 @@ export default function OtpVerifyStep({
     }
   }, [isAuthTestMode])
 
-  // 30s Countdown timer (only active in production; disabled in demo mode to prevent artificial expiry)
+  // 60s Countdown timer (only active in production; disabled in demo mode to prevent artificial expiry)
   useEffect(() => {
     if (isAuthTestMode) return
     if (timer <= 0) return
@@ -106,6 +108,7 @@ export default function OtpVerifyStep({
 
     setLoading(true)
     setError('')
+    setInfoMessage('')
 
     try {
       const res = await onVerifyOtp(codeToVerify)
@@ -114,7 +117,7 @@ export default function OtpVerifyStep({
         if (res.isExistingUser && res.isProfileComplete) {
           const roleLabel =
             res.role === 'LOCAL_SHOP'
-              ? 'Local Shop / Repair Hub'
+               ? 'Local Shop / Repair Hub'
               : res.role === 'RECYCLER'
               ? 'Industrial Recycler'
               : 'Citizen / General User'
@@ -134,11 +137,11 @@ export default function OtpVerifyStep({
           }, 400)
         }
       } else {
-        setError(res.message || 'Verification code is invalid')
+        setError(res.message || 'Incorrect OTP. Please check the code and try again.')
         setLoading(false)
       }
     } catch (err: any) {
-      setError(err?.message || 'Verification code is invalid')
+      setError(err?.message || 'Incorrect OTP. Please check the code and try again.')
       setLoading(false)
     }
   }
@@ -213,31 +216,39 @@ export default function OtpVerifyStep({
   }
 
   const handleResend = async () => {
-    if (timer > 0 || loading) return
+    if (timer > 0 || loading || isResendingRef.current) return
 
+    isResendingRef.current = true
     setLoading(true)
     setError('')
+    setInfoMessage('')
     try {
       const res = await onResendOtp()
       if (res.success) {
-        setTimer(30)
+        setTimer(60)
         if (res.devOtp) setCurrentDevOtp(res.devOtp)
         setOtp(['', '', '', '', '', ''])
         inputRefs.current[0]?.focus()
+        setInfoMessage('A new OTP has been sent.')
       } else {
-        setError(res.message || 'Failed to resend OTP.')
+        const errMsg = res.message || 'Failed to resend OTP. Please try again.'
+        setError(errMsg)
+        if (errMsg.toLowerCase().includes('too many') || errMsg.toLowerCase().includes('wait')) {
+          setTimer(60)
+        }
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to resend OTP.')
+      const errMsg = err?.message || 'Too many OTP requests. Please wait and try again.'
+      setError(errMsg)
+      if (errMsg.toLowerCase().includes('too many') || errMsg.toLowerCase().includes('wait')) {
+        setTimer(60)
+      }
     } finally {
       setLoading(false)
+      isResendingRef.current = false
     }
   }
 
-  const formatTimer = (sec: number) => {
-    const s = sec < 10 ? `0${sec}` : `${sec}`
-    return `00:${s}`
-  }
 
   if (welcomeTransition?.show) {
     return (
@@ -611,6 +622,28 @@ export default function OtpVerifyStep({
         </div>
       )}
 
+      {/* Info message banner (e.g. A new OTP has been sent) */}
+      {infoMessage && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 16,
+            padding: '10px 14px',
+            borderRadius: '10px',
+            background: 'rgba(16, 185, 129, 0.12)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            fontSize: '0.84rem',
+            color: '#34d399',
+            fontWeight: 600,
+          }}
+        >
+          <Icon name="check" size={16} color="#34d399" />
+          <span>{infoMessage}</span>
+        </div>
+      )}
+
       {/* Timer & Resend Controls */}
       <div
         style={{
@@ -618,7 +651,7 @@ export default function OtpVerifyStep({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: 6,
+          gap: 8,
         }}
       >
         {isAuthTestMode ? (
@@ -627,12 +660,27 @@ export default function OtpVerifyStep({
             <span>Demo Mode Active • Auto-Verification</span>
           </div>
         ) : timer > 0 ? (
-          <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
-            <span>{t.resendIn} </span>
-            <strong style={{ color: '#10b981', fontWeight: 800 }}>{formatTimer(timer)}</strong>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
+              You can request a new code in <strong style={{ color: '#10b981', fontWeight: 800 }}>{timer}</strong> seconds.
+            </div>
+            <button
+              type="button"
+              disabled
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.25)',
+                fontWeight: 700,
+                fontSize: '0.84rem',
+                cursor: 'not-allowed',
+              }}
+            >
+              {t.resendOtp}
+            </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>{t.didntReceive}</span>
             <button
               type="button"
@@ -644,11 +692,11 @@ export default function OtpVerifyStep({
                 color: '#10b981',
                 fontWeight: 800,
                 fontSize: '0.84rem',
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
                 textDecoration: 'underline',
               }}
             >
-              {t.resendOtp}
+              {loading ? 'Sending...' : t.resendOtp}
             </button>
           </div>
         )}

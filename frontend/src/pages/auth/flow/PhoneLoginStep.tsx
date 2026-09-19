@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import Icon from '../../../components/Icon'
 import type { LanguageCode } from '../../../types/common.types'
 import { getAuthTranslation } from '../../../utils/translations'
@@ -25,6 +25,7 @@ export default function PhoneLoginStep({
   const [loading, setLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState('')
+  const isSubmittingRef = useRef(false)
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only permit digits, maximum 10 digits
@@ -35,6 +36,9 @@ export default function PhoneLoginStep({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Prevent repeated or concurrent calls
+    if (loading || isSubmittingRef.current) return
 
     // Validate 10-digit Indian mobile number format starting with 6-9
     if (!phone) {
@@ -47,6 +51,7 @@ export default function PhoneLoginStep({
       return
     }
 
+    isSubmittingRef.current = true
     setLoading(true)
     setError('')
 
@@ -55,15 +60,16 @@ export default function PhoneLoginStep({
       if (res.success) {
         // Brief transition delay so user sees sending state
         setTimeout(() => {
-          onOtpSent(phone, res.devOtp || '123456')
-        }, 400)
+          onOtpSent(phone, res.devOtp)
+        }, 300)
       } else {
         setError(res.message || 'Failed to send OTP. Please try again.')
       }
     } catch (err: any) {
-      setError(err.message || 'Network error while sending OTP. Please retry.')
+      setError(err?.message || 'OTP service is temporarily unavailable. Please try again later.')
     } finally {
       setLoading(false)
+      isSubmittingRef.current = false
     }
   }
 

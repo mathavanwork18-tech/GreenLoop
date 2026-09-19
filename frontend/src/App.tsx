@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { SpeedInsights } from '@vercel/speed-insights/react'
+import { Analytics } from '@vercel/analytics/react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { PwaInstallProvider } from './context/PwaInstallContext'
@@ -150,6 +151,7 @@ export default function App() {
           <InstallModal />
           <UpdateToast />
           <SpeedInsights />
+          <Analytics />
         </PwaInstallProvider>
       </AuthProvider>
     </ThemeProvider>

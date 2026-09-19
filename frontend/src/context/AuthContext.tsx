@@ -551,16 +551,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signInWithOtp({ phone: e164 })
     if (error) {
       const msg = (error.message || '').toLowerCase()
-      if (msg.includes('rate limit') || msg.includes('limit') || msg.includes('too many') || msg.includes('exceeded')) {
-        throw new Error('Too many verification attempts. Please try again later.')
+      const status = (error as any)?.status
+
+      // Rate limit / 429 / cooldown / SMS quota errors
+      if (
+        status === 429 ||
+        msg.includes('rate limit') ||
+        msg.includes('rate_limit') ||
+        msg.includes('too many') ||
+        msg.includes('limit') ||
+        msg.includes('exceeded') ||
+        msg.includes('quota') ||
+        msg.includes('for security purposes') ||
+        msg.includes('cooldown') ||
+        msg.includes('frequency')
+      ) {
+        throw new Error('Too many OTP requests. Please wait and try again.')
       }
-      if (msg.includes('provider') || msg.includes('twilio') || msg.includes('unavailable') || msg.includes('gateway')) {
-        throw new Error('SMS service is temporarily unavailable. Please try again later or sign in with password.')
+
+      // SMS provider / Twilio / account limits / service outage
+      if (
+        msg.includes('provider') ||
+        msg.includes('twilio') ||
+        msg.includes('unavailable') ||
+        msg.includes('gateway') ||
+        msg.includes('bad gateway') ||
+        msg.includes('502') ||
+        msg.includes('503') ||
+        msg.includes('504') ||
+        msg.includes('network') ||
+        msg.includes('balance') ||
+        msg.includes('credit') ||
+        msg.includes('channel')
+      ) {
+        throw new Error('OTP service is temporarily unavailable. Please try again later.')
       }
-      if (msg.includes('invalid') || msg.includes('format')) {
+
+      // Invalid phone format
+      if (msg.includes('invalid') && (msg.includes('phone') || msg.includes('format') || msg.includes('number'))) {
         throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6-9.')
       }
-      throw new Error(error.message || 'Failed to send OTP. Please try again.')
+
+      // Default safe sanitized error - NEVER expose Twilio credentials, secrets, or raw internal errors
+      throw new Error('OTP service is temporarily unavailable. Please try again later.')
     }
 
     return {
@@ -595,7 +628,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const storedOtp = sessionStorage.getItem('gl_demo_otp_' + national) || '123456'
       // Accept standard DUMMY_OTP "123456" or any stored session OTP
       if (cleanOtp !== '123456' && cleanOtp !== storedOtp) {
-        throw new Error('Verification code is invalid.')
+        throw new Error('Incorrect OTP. Please check the code and try again.')
       }
 
       // DO NOT call supabase.auth.verifyOtp()!
@@ -612,7 +645,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Existing profile found for this phone
       if (matchedProfiles && matchedProfiles.length > 0) {
-        // Pick best match: prioritize profile with custom full_name (not generic 'Green Loop Member')
         const dbProfile =
           matchedProfiles.find(p => p.full_name && p.full_name !== 'Green Loop Member') ||
           matchedProfiles[0]
@@ -623,8 +655,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           dbProfile.role
         )
 
-        // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
-        // Set dev test session with this existing profile's authentic ID and demo session metadata
         setDevTestSession({
           id: dbProfile.id,
           name: dbProfile.full_name,
@@ -665,9 +695,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
-      // Brand new phone number (no profile in public.profiles)
-      // Establish an initial demo session identity for the new phone
       const newUserId = crypto.randomUUID()
       setDevTestSession({
         id: newUserId,
@@ -695,20 +722,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: cleanOtp,
       type: 'sms',
     })
+
     if (authError || !verifyData?.user) {
       const msg = (authError?.message || '').toLowerCase()
-      if (msg.includes('expired') || msg.includes('invalid') || msg.includes('token') || msg.includes('otp')) {
-        throw new Error('Verification code is invalid or has expired. Please request a new code.')
+      const status = (authError as any)?.status
+
+      // Rate limit / too many verification attempts
+      if (
+        status === 429 ||
+        msg.includes('rate limit') ||
+        msg.includes('rate_limit') ||
+        msg.includes('too many') ||
+        msg.includes('exceeded')
+      ) {
+        throw new Error('Too many OTP requests. Please wait and try again.')
       }
-      if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('limit')) {
-        throw new Error('Too many verification attempts. Please try again later.')
+
+      // Provider or infrastructure failure
+      if (
+        msg.includes('provider') ||
+        msg.includes('twilio') ||
+        msg.includes('unavailable') ||
+        msg.includes('gateway') ||
+        msg.includes('502') ||
+        msg.includes('503') ||
+        msg.includes('504')
+      ) {
+        throw new Error('OTP service is temporarily unavailable. Please try again later.')
       }
-      throw new Error(authError?.message || 'OTP could not be verified. Please try again.')
+
+      // Expired OTP handling
+      if (
+        (msg.includes('expired') && !msg.includes('invalid')) ||
+        (authError as any)?.code === 'otp_expired' ||
+        msg.includes('has expired') ||
+        msg.includes('token is expired') ||
+        msg.includes('code has expired')
+      ) {
+        throw new Error('This OTP has expired. Please request a new OTP.')
+      }
+
+      // Wrong OTP handling
+      if (
+        msg.includes('invalid') ||
+        msg.includes('token has expired or is invalid') ||
+        msg.includes('token') ||
+        msg.includes('otp') ||
+        (authError as any)?.code === 'bad_code' ||
+        (authError as any)?.code === 'otp_invalid'
+      ) {
+        throw new Error('Incorrect OTP. Please check the code and try again.')
+      }
+
+      // Default safe sanitized error
+      throw new Error('Incorrect OTP. Please check the code and try again.')
     }
+
     authUser = verifyData.user
 
     if (!authUser?.id) {
-      throw new Error('Verification code is invalid or has expired.')
+      throw new Error('Incorrect OTP. Please check the code and try again.')
     }
 
     // 3. Locate existing profile in profiles table by ID (never by phone!)
