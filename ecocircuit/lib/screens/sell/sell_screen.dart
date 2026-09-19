@@ -207,7 +207,7 @@ class _SellScreenState extends State<SellScreen> {
                 const Text('Select Category', style: TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedCategory,
+                  value: _selectedCategory,
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
@@ -289,31 +289,31 @@ class _SellScreenState extends State<SellScreen> {
                   SwitchListTile(
                     title: const Text('Does the device power ON?'),
                     value: _powersOn,
-                    activeThumbColor: AppTheme.primary,
+                    activeColor: AppTheme.primary,
                     onChanged: (val) => setState(() => _powersOn = val),
                   ),
                   SwitchListTile(
                     title: const Text('Is the display / screen functional?'),
                     value: _displayWorking,
-                    activeThumbColor: AppTheme.primary,
+                    activeColor: AppTheme.primary,
                     onChanged: (val) => setState(() => _displayWorking = val),
                   ),
                   SwitchListTile(
                     title: const Text('Is the battery holding charge?'),
                     value: _batteryFunctional,
-                    activeThumbColor: AppTheme.primary,
+                    activeColor: AppTheme.primary,
                     onChanged: (val) => setState(() => _batteryFunctional = val),
                   ),
                   SwitchListTile(
                     title: const Text('Are internal components (RAM/Board) working?'),
                     value: _majorComponentsFunctional,
-                    activeThumbColor: AppTheme.primary,
+                    activeColor: AppTheme.primary,
                     onChanged: (val) => setState(() => _majorComponentsFunctional = val),
                   ),
                   SwitchListTile(
                     title: const Text('Is there severe physical damage / crack?'),
                     value: _hasPhysicalDamage,
-                    activeThumbColor: AppTheme.accentRed,
+                    activeColor: AppTheme.accentRed,
                     onChanged: (val) => setState(() => _hasPhysicalDamage = val),
                   ),
                   const Divider(),
@@ -426,7 +426,7 @@ class _SellScreenState extends State<SellScreen> {
                 const Text('Pickup City / Location', style: TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedLocation,
+                  value: _selectedLocation,
                   decoration: InputDecoration(
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   ),

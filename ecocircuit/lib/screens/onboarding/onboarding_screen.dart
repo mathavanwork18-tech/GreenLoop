@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
-import '../../navigation/main_nav_screen.dart';
+import '../auth/language_selection_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -37,7 +37,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _finishOnboarding() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const MainNavScreen()),
+      MaterialPageRoute(builder: (context) => const LanguageSelectionScreen()),
     );
   }
 

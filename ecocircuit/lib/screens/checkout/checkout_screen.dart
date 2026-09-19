@@ -136,23 +136,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             // 2. Delivery Options
             Text('Delivery Speed', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            RadioGroup<String>(
-              groupValue: _deliveryOption,
-              onChanged: (val) => setState(() => _deliveryOption = val ?? 'Standard'),
-              child: const Column(
-                children: [
-                  RadioListTile<String>(
-                    title: Text('Standard Delivery (2-3 Days)'),
-                    subtitle: Text('₹49 - Carbon-neutral eco delivery'),
-                    value: 'Standard',
-                  ),
-                  RadioListTile<String>(
-                    title: Text('Express Delivery (Next Day)'),
-                    subtitle: Text('₹99 - Fast local courier'),
-                    value: 'Express',
-                  ),
-                ],
-              ),
+            Column(
+              children: [
+                RadioListTile<String>(
+                  title: const Text('Standard Delivery (2-3 Days)'),
+                  subtitle: const Text('₹49 - Carbon-neutral eco delivery'),
+                  value: 'Standard',
+                  groupValue: _deliveryOption,
+                  onChanged: (val) => setState(() => _deliveryOption = val ?? 'Standard'),
+                ),
+                RadioListTile<String>(
+                  title: const Text('Express Delivery (Next Day)'),
+                  subtitle: const Text('₹99 - Fast local courier'),
+                  value: 'Express',
+                  groupValue: _deliveryOption,
+                  onChanged: (val) => setState(() => _deliveryOption = val ?? 'Standard'),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
 
@@ -166,32 +166,36 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
               ),
-              child: RadioGroup<String>(
-                groupValue: _paymentMethod,
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() => _paymentMethod = val);
-                  }
-                },
-                child: const Column(
-                  children: [
-                    RadioListTile<String>(
-                      title: Text('UPI (GPay / PhonePe / Paytm)'),
-                      value: 'UPI',
-                      activeColor: AppTheme.primary,
-                    ),
-                    RadioListTile<String>(
-                      title: Text('Debit / Credit Card'),
-                      value: 'Card',
-                      activeColor: AppTheme.primary,
-                    ),
-                    RadioListTile<String>(
-                      title: Text('Cash on Delivery (Verified)'),
-                      value: 'COD',
-                      activeColor: AppTheme.primary,
-                    ),
-                  ],
-                ),
+              child: Column(
+                children: [
+                  RadioListTile<String>(
+                    title: const Text('UPI (GPay / PhonePe / Paytm)'),
+                    value: 'UPI',
+                    groupValue: _paymentMethod,
+                    activeColor: AppTheme.primary,
+                    onChanged: (val) {
+                      if (val != null) setState(() => _paymentMethod = val);
+                    },
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Debit / Credit Card'),
+                    value: 'Card',
+                    groupValue: _paymentMethod,
+                    activeColor: AppTheme.primary,
+                    onChanged: (val) {
+                      if (val != null) setState(() => _paymentMethod = val);
+                    },
+                  ),
+                  RadioListTile<String>(
+                    title: const Text('Cash on Delivery (Verified)'),
+                    value: 'COD',
+                    groupValue: _paymentMethod,
+                    activeColor: AppTheme.primary,
+                    onChanged: (val) {
+                      if (val != null) setState(() => _paymentMethod = val);
+                    },
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 32),

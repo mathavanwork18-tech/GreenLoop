@@ -47,50 +47,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
                   ),
-                  child: RadioGroup<ThemeMode>(
-                    groupValue: currentThemeMode,
-                    onChanged: (val) {
-                      if (val != null) {
-                        appState.setThemeMode(val);
-                      }
-                    },
-                    child: const Column(
-                      children: [
-                        RadioListTile<ThemeMode>(
-                          title: Row(
-                            children: [
-                              Text('☀️ Light Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              SizedBox(width: 8),
-                              Text('Clean emerald palette', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                            ],
-                          ),
-                          value: ThemeMode.light,
-                          activeColor: AppTheme.primary,
+                  child: Column(
+                    children: [
+                      RadioListTile<ThemeMode>(
+                        title: const Row(
+                          children: [
+                            Text('☀️ Light Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            SizedBox(width: 8),
+                            Text('Clean emerald palette', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
                         ),
-                        RadioListTile<ThemeMode>(
-                          title: Row(
-                            children: [
-                              Text('🌙 Dark Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              SizedBox(width: 8),
-                              Text('Deep charcoal forest', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                            ],
-                          ),
-                          value: ThemeMode.dark,
-                          activeColor: AppTheme.primary,
+                        value: ThemeMode.light,
+                        groupValue: currentThemeMode,
+                        activeColor: AppTheme.primary,
+                        onChanged: (val) {
+                          if (val != null) appState.setThemeMode(val);
+                        },
+                      ),
+                      RadioListTile<ThemeMode>(
+                        title: const Row(
+                          children: [
+                            Text('🌙 Dark Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            SizedBox(width: 8),
+                            Text('Deep charcoal forest', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
                         ),
-                        RadioListTile<ThemeMode>(
-                          title: Row(
-                            children: [
-                              Text('⚙️ System Default', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              SizedBox(width: 8),
-                              Text('Follow OS mode', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                            ],
-                          ),
-                          value: ThemeMode.system,
-                          activeColor: AppTheme.primary,
+                        value: ThemeMode.dark,
+                        groupValue: currentThemeMode,
+                        activeColor: AppTheme.primary,
+                        onChanged: (val) {
+                          if (val != null) appState.setThemeMode(val);
+                        },
+                      ),
+                      RadioListTile<ThemeMode>(
+                        title: const Row(
+                          children: [
+                            Text('⚙️ System Default', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            SizedBox(width: 8),
+                            Text('Follow OS mode', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ],
                         ),
-                      ],
-                    ),
+                        value: ThemeMode.system,
+                        groupValue: currentThemeMode,
+                        activeColor: AppTheme.primary,
+                        onChanged: (val) {
+                          if (val != null) appState.setThemeMode(val);
+                        },
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -109,25 +113,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       SwitchListTile(
                         title: const Text('Order & Delivery Tracking Alerts'),
                         value: _notifyOrders,
-                        activeThumbColor: AppTheme.primary,
+                        activeColor: AppTheme.primary,
                         onChanged: (val) => setState(() => _notifyOrders = val),
                       ),
                       SwitchListTile(
                         title: const Text('New Chat Messages & Counter Offers'),
                         value: _notifyMessages,
-                        activeThumbColor: AppTheme.primary,
+                        activeColor: AppTheme.primary,
                         onChanged: (val) => setState(() => _notifyMessages = val),
                       ),
                       SwitchListTile(
                         title: const Text('Wishlist Price Drop Notifications'),
                         value: _notifyPriceDrops,
-                        activeThumbColor: AppTheme.primary,
+                        activeColor: AppTheme.primary,
                         onChanged: (val) => setState(() => _notifyPriceDrops = val),
                       ),
                       SwitchListTile(
                         title: const Text('Scheduled Recycling Pickup Reminders'),
                         value: _notifyRecycling,
-                        activeThumbColor: AppTheme.primary,
+                        activeColor: AppTheme.primary,
                         onChanged: (val) => setState(() => _notifyRecycling = val),
                       ),
                     ],
@@ -149,13 +153,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       SwitchListTile(
                         title: const Text('Show Verified Seller Badge on Profile'),
                         value: _publicProfile,
-                        activeThumbColor: AppTheme.primary,
+                        activeColor: AppTheme.primary,
                         onChanged: (val) => setState(() => _publicProfile = val),
                       ),
                       SwitchListTile(
                         title: const Text('Share Approximate City Radius with Buyers'),
                         value: _preciseLocation,
-                        activeThumbColor: AppTheme.primary,
+                        activeColor: AppTheme.primary,
                         onChanged: (val) => setState(() => _preciseLocation = val),
                       ),
                     ],

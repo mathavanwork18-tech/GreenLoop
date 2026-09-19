@@ -172,7 +172,7 @@ class _DonationsScreenState extends State<DonationsScreen> {
                   const Text('Select Beneficiary Program', style: TextStyle(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   DropdownButtonFormField<String>(
-                    initialValue: _targetBeneficiary,
+                    value: _targetBeneficiary,
                     decoration: const InputDecoration(border: OutlineInputBorder()),
                     items: _beneficiaries.map((b) => DropdownMenuItem(value: b, child: Text(b, style: const TextStyle(fontSize: 13)))).toList(),
                     onChanged: (val) => setState(() => _targetBeneficiary = val!),
