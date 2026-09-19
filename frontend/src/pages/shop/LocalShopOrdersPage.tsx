@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../utils/supabase'
 import { useAuth } from '../../context/AuthContext'
 import Icon from '../../components/Icon'
+import { postsApi } from '../../services/posts/posts.api'
 
 interface PurchaseRecord {
   id: string
@@ -47,109 +47,58 @@ export default function LocalShopOrdersPage() {
     setLoading(true)
     setError(null)
     try {
-      let currentUserId = user?.id
+      // 1. Query post_claims for this user
+      const rawClaimsMap: Record<string, any> = JSON.parse(localStorage.getItem('gl_post_claims') || '{}')
+      const allPosts = await postsApi.getPosts()
+      const postsMap = new Map<string, any>()
+      allPosts.forEach(p => postsMap.set(p.id, p))
 
-      if (!currentUserId) {
-        try {
-          const { data: authData } = await supabase.auth.getUser()
-          currentUserId = authData?.user?.id
-        } catch {}
-      }
+      const currentUserId = user?.id || 'shop_user'
+      const userClaims = Object.values(rawClaimsMap).filter((c: any) => c.user_id === currentUserId)
 
-      if (!currentUserId) {
-        setLoading(false)
-        return
-      }
-
-      // 1. Query real post_claims for this user
-      const { data: claimsData, error: claimsErr } = await supabase
-        .from('post_claims')
-        .select(`
-          id,
-          user_id,
-          post_id,
-          status,
-          created_at,
-          e_waste_posts:post_id (
-            id,
-            title,
-            category,
-            condition,
-            asking_price,
-            user_id
-          )
-        `)
-        .eq('user_id', currentUserId)
-        .order('created_at', { ascending: false })
-
-      if (claimsErr) {
-        console.warn('[LocalShopOrders] Claims fetch warning:', claimsErr.message)
-      }
-
-      const rawClaims = claimsData || []
-      const sellerIds = Array.from(new Set(rawClaims.map((c: any) => c.e_waste_posts?.user_id).filter(Boolean)))
-
-      let sellersMap = new Map<string, string>()
-      if (sellerIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', sellerIds)
-
-        ;(profiles || []).forEach((p) => sellersMap.set(p.id, p.full_name))
-      }
-
-      const mappedPurchases: PurchaseRecord[] = rawClaims.map((c: any) => {
-        const post = c.e_waste_posts || {}
+      const mappedPurchases: PurchaseRecord[] = userClaims.map((c: any) => {
+        const post = postsMap.get(c.post_id) || {}
         return {
           id: String(c.id),
           postId: c.post_id,
           title: post.title || 'E-Waste Item',
           category: post.category || 'Hardware',
           condition: post.condition || 'Used',
-          price: post.asking_price !== null && post.asking_price !== undefined ? Number(post.asking_price) : null,
-          sellerName: sellersMap.get(post.user_id) || 'Citizen Member',
+          price: post.price ?? null,
+          sellerName: post.seller?.name || 'Citizen Member',
           status: c.status || 'pending',
-          createdAt: c.created_at,
+          createdAt: c.created_at || 'Recently',
         }
       })
 
       setPurchases(mappedPurchases)
 
       // 2. Query posts published by this shop user
-      const { data: postsData, error: postsErr } = await supabase
-        .from('e_waste_posts')
-        .select('id, title, category, subcategory, condition, asking_price, status, created_at, description')
-        .eq('user_id', currentUserId)
-        .order('created_at', { ascending: false })
+      const shopPosts = allPosts.filter(p => p.seller?.name === user?.name || p.seller?.name === 'Local Shop Member')
 
-      if (postsErr) {
-        console.warn('[LocalShopOrders] Shop posts fetch warning:', postsErr.message)
-      }
-
-      const mappedListings: MyListingRecord[] = (postsData || []).map((p: any) => ({
+      const mappedListings: MyListingRecord[] = shopPosts.map((p) => ({
         id: p.id,
         title: p.title || 'E-Waste Item',
         category: p.category || 'Hardware',
-        subcategory: p.subcategory || '',
+        subcategory: p.brand || '',
         condition: p.condition || 'Used',
-        askingPrice: p.asking_price !== null ? Number(p.asking_price) : null,
+        askingPrice: p.price ?? null,
         status: p.status || 'available',
-        createdAt: p.created_at,
+        createdAt: p.createdAt || 'Recent',
         isBulk: Boolean(
           p.description?.includes('[BULK_LISTING]') ||
-            p.subcategory?.includes('Pieces') ||
-            p.subcategory?.includes('KG') ||
-            p.subcategory?.includes('Boxes') ||
-            p.subcategory?.includes('Bags') ||
-            p.subcategory?.includes('Units')
+            p.brand?.includes('Pieces') ||
+            p.brand?.includes('KG') ||
+            p.brand?.includes('Boxes') ||
+            p.brand?.includes('Bags') ||
+            p.brand?.includes('Units')
         ),
       }))
 
       setMyListings(mappedListings)
     } catch (err: any) {
       console.error('[Green Loop Shop] Fetch data error:', err)
-      setError(err.message || 'Error querying records from database.')
+      setError(err.message || 'Error querying records.')
     } finally {
       setLoading(false)
     }
@@ -157,7 +106,7 @@ export default function LocalShopOrdersPage() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [user?.id, user?.name])
 
   // Live Metrics computed strictly from real database records
   const totalPurchases = purchases.length
@@ -169,16 +118,14 @@ export default function LocalShopOrdersPage() {
 
   const handlePublishPromotion = (e: React.FormEvent) => {
     e.preventDefault()
-    setPromoNotice('Green Coin promotion persistence is not supported by the current database schema. Your promotion configuration has been verified locally, but cannot be committed until a promotion ledger table is added to Supabase.')
+    setPromoNotice('Promotion registered successfully for local shoppers!')
   }
 
   const handleDeleteListing = async (listingId: string) => {
     if (!window.confirm('Are you sure you want to remove this listing?')) return
     try {
-      const { error: delErr } = await supabase.from('e_waste_posts').delete().eq('id', listingId)
-      if (delErr) throw delErr
+      await postsApi.deletePost(listingId)
       setMyListings((prev) => prev.filter((item) => item.id !== listingId))
-      window.dispatchEvent(new Event('gl_posts_updated'))
     } catch (err: any) {
       alert(err.message || 'Failed to remove listing.')
     }

@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../utils/supabase'
+import { useAuth } from '../../context/AuthContext'
 import Icon from '../../components/Icon'
 import { aiApi } from '../../services/ai/ai.api'
+import { postsApi } from '../../services/posts/posts.api'
 
 export default function LocalShopPostPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   // Mode: Single item vs Bulk lot
   const [postMode, setPostMode] = useState<'item' | 'bulk'>('bulk')
@@ -196,38 +198,34 @@ export default function LocalShopPostPage() {
     setSubmitting(true)
 
     try {
-      const { data: authData, error: authErr } = await supabase.auth.getUser()
-      if (authErr || !authData?.user) {
-        throw new Error('Authentication required. Please sign in to publish a listing.')
-      }
-
       const structuredSubcategory = postMode === 'bulk' ? `${quantity} ${unit}${subcategory ? ` • ${subcategory}` : ''}` : subcategory
       const bulkTag = postMode === 'bulk' && !description.includes('[BULK_LISTING]') ? '[BULK_LISTING] ' : ''
       const fullDescription = `${bulkTag}${description.trim() || `Listing: ${title}. Condition: ${condition}. Location: ${location}.`}`
 
-      const { error: insertErr } = await supabase
-        .from('e_waste_posts')
-        .insert({
-          user_id: authData.user.id,
-          title: title.trim(),
-          category: category,
-          subcategory: structuredSubcategory,
-          condition: condition,
-          status: 'available',
-          asking_price: askingPrice ? Number(askingPrice) : null,
-          image_url: capturedImage || null,
-          description: fullDescription,
-          location: location.trim(),
-        })
-        .select('id')
-        .single()
-
-      if (insertErr) {
-        throw new Error(insertErr.message || 'Database error while publishing listing.')
-      }
-
-      // Sync across views
-      window.dispatchEvent(new Event('gl_posts_updated'))
+      await postsApi.createPost({
+        title: title.trim(),
+        category: category,
+        brand: structuredSubcategory,
+        model: '',
+        condition: condition,
+        purpose: 'Sell',
+        price: askingPrice ? Number(askingPrice) : null,
+        negotiable: false,
+        description: fullDescription,
+        location: location.trim(),
+        locationName: location.trim(),
+        latitude: 11.0168,
+        longitude: 76.9558,
+        distance: 0.8,
+        status: 'available',
+        seller: {
+          name: user?.name || 'Local Shop Member',
+          rating: 4.9,
+          verified: true,
+          avatar: null,
+        },
+        images: capturedImage ? [capturedImage] : ['https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&q=80'],
+      })
 
       setSuccess(true)
       setTimeout(() => {
@@ -235,7 +233,7 @@ export default function LocalShopPostPage() {
       }, 1500)
     } catch (err: any) {
       console.error('[Green Loop Shop] Post error:', err)
-      setError(err.message || 'Failed to publish listing. Please verify connection.')
+      setError(err.message || 'Failed to publish listing.')
     } finally {
       setSubmitting(false)
     }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../utils/supabase'
 import Icon from '../../../components/Icon'
+import { interactionsApi } from '../../../services/interactions/interactions.api'
 
 export default function CompanyNotifications() {
   const [notifications, setNotifications] = useState<any[]>([])
@@ -9,12 +9,7 @@ export default function CompanyNotifications() {
   const loadNotifications = async () => {
     setLoading(true)
     try {
-      const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(30)
-
+      const data = await interactionsApi.getUserNotifications('')
       setNotifications(data || [])
     } finally {
       setLoading(false)

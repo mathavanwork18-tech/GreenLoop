@@ -3,22 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth, type Role } from '../../../context/AuthContext'
 import type { LanguageCode } from '../../../types/common.types'
 import LanguageSelectStep from './LanguageSelectStep'
-import PhoneLoginStep from './PhoneLoginStep'
-import OtpVerifyStep from './OtpVerifyStep'
 import AccountTypeStep from './AccountTypeStep'
 import CitizenRegisterStep from './CitizenRegisterStep'
 import ShopRegisterStep from './ShopRegisterStep'
-import Icon from '../../../components/Icon'
 import { usePwaInstall } from '../../../context/PwaInstallContext'
 import InstallButton from '../../../components/InstallButton'
-import ResumePromptModal from './ResumePromptModal'
 import { normalizeRole, getRoleDashboardPath } from '../../../services/role/roleService'
-import { isAuthTestMode } from '../../../utils/supabase'
 
 export type AuthStep =
   | 'LANGUAGE'
-  | 'PHONE'
-  | 'OTP'
   | 'ROLE'
   | 'CITIZEN_REG'
   | 'SHOP_REG'
@@ -31,31 +24,22 @@ export default function AuthFlowContainer() {
     isInitializing,
     language,
     setLanguage,
-    sendOtp,
-    verifyOtp,
     completeProfile,
     saveRegistrationDraft,
-    getRegistrationDraft,
-    clearRegistrationDraft,
-    signInWithGoogle,
-    devLogin,
   } = useAuth()
 
   const { openInstallModal } = usePwaInstall()
 
-  // Avoid sending user back to Language selection if language has already been selected
+  // Start at Language selection if language is not yet selected, else open Registration directly
   const [step, setStep] = useState<AuthStep>(() => {
     const savedLang = localStorage.getItem('gl_language')
-    return savedLang ? 'PHONE' : 'LANGUAGE'
+    return savedLang ? 'ROLE' : 'LANGUAGE'
   })
   const [phone, setPhone] = useState('')
-  const [devOtp, setDevOtp] = useState('123456')
   const [role, setRole] = useState<Role>('GENERAL_USER')
   const [draftData, setDraftData] = useState<Record<string, any>>({})
-  const [showResumeModal, setShowResumeModal] = useState(false)
-  const [activeDraft, setActiveDraft] = useState<any | null>(null)
 
-  // If user is already securely authenticated, route directly to their dashboard
+  // If user is already authenticated, route directly to their dashboard
   useEffect(() => {
     if (!isInitializing && isAuthenticated && user?.id) {
       const targetRole = normalizeRole(user.role)
@@ -63,73 +47,14 @@ export default function AuthFlowContainer() {
     }
   }, [isAuthenticated, isInitializing, user, navigate])
 
-  // Check for any incomplete registration draft on initial mount
-  useEffect(() => {
-    const draft = getRegistrationDraft()
-    if (draft && draft.phone && (draft.step || draft.formData)) {
-      setActiveDraft(draft)
-      setShowResumeModal(true)
-    }
-  }, [])
-
-  // Handle Resume
-  const handleResume = () => {
-    if (!activeDraft) return
-    setPhone(activeDraft.phone)
-    if (activeDraft.role) setRole(activeDraft.role)
-    if (activeDraft.formData) setDraftData(activeDraft.formData)
-
-    // Restore step
-    if (activeDraft.step === 5) {
-      setStep(activeDraft.role === 'LOCAL_SHOP' ? 'SHOP_REG' : 'CITIZEN_REG')
-    } else if (activeDraft.step === 4) {
-      setStep('ROLE')
-    } else if (activeDraft.step === 3) {
-      setStep('OTP')
-    } else {
-      setStep('PHONE')
-    }
-    setShowResumeModal(false)
-  }
-
-  // Handle Start Over
-  const handleStartOver = () => {
-    clearRegistrationDraft()
-    setShowResumeModal(false)
-    setActiveDraft(null)
-    setDraftData({})
-  }
-
-  // Step 1: Language Continue
+  // Step 1: Language Continue -> Open Registration directly
   const handleLanguageContinue = () => {
-    setStep('PHONE')
-  }
-
-  // Step 2: OTP Sent
-  const handleOtpSent = (phoneNumber: string, code?: string) => {
-    setPhone(phoneNumber)
-    if (code) setDevOtp(code)
-    saveRegistrationDraft({ phone: phoneNumber, step: 3 })
-    setStep('OTP')
-  }
-
-  // Step 3: OTP Verified
-  const handleOtpSuccess = (isExistingUser: boolean, isProfileComplete: boolean, detectedRole?: Role) => {
-    if (isExistingUser && isProfileComplete) {
-      // Existing user with completed profile immediately enters the appropriate dashboard!
-      const targetRole = normalizeRole(detectedRole || role)
-      navigate(getRoleDashboardPath(targetRole), { replace: true })
-      return
-    }
-
-    // New or incomplete user continues to role selection
-    saveRegistrationDraft({ phone, step: 4 })
     setStep('ROLE')
   }
 
-  // Step 4: Role Selected Continue
+  // Step 2: Role Selected Continue
   const handleRoleContinue = () => {
-    saveRegistrationDraft({ phone, role, step: 5 })
+    saveRegistrationDraft({ phone, role, step: 2 })
     if (role === 'LOCAL_SHOP') {
       setStep('SHOP_REG')
     } else {
@@ -139,9 +64,10 @@ export default function AuthFlowContainer() {
 
   // Final Step: Complete Registration (Citizen or Shop)
   const handleFinalSubmit = async (formData: any) => {
+    const submittedPhone = formData.phone || phone
     const completed = await completeProfile(role, {
       ...formData,
-      phone,
+      phone: submittedPhone,
     })
 
     // Profile is completed! Navigate to appropriate dashboard based on user's role
@@ -152,10 +78,11 @@ export default function AuthFlowContainer() {
   // Save intermediate form draft
   const handleSaveFormDraft = (data: any) => {
     setDraftData((prev) => ({ ...prev, ...data }))
+    if (data.phone) setPhone(data.phone)
     saveRegistrationDraft({
-      phone,
+      phone: data.phone || phone,
       role,
-      step: 5,
+      step: 2,
       formData: data,
     })
   }
@@ -213,74 +140,6 @@ export default function AuthFlowContainer() {
         <InstallButton onFallback={openInstallModal} label="Install App" />
       </div>
 
-      {/* Isolated Development Test Mode Floating Switcher (Active ONLY when VITE_AUTH_TEST_MODE=true) */}
-      {isAuthTestMode && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 18,
-            left: 20,
-            zIndex: 40,
-            background: 'rgba(24, 24, 27, 0.95)',
-            border: '1px solid #3b82f6',
-            borderRadius: '12px',
-            padding: '6px 12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(8px)',
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', fontWeight: 800, color: '#60a5fa', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-            <Icon name="repair" size={13} color="#60a5fa" />
-            DEV TEST MODE
-          </span>
-          <button
-            type="button"
-            onClick={async () => {
-              if (devLogin) {
-                await devLogin('citizen')
-                navigate('/', { replace: true })
-              }
-            }}
-            style={{
-              background: '#2563eb',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '5px 10px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Quick Test: General User
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              if (devLogin) {
-                await devLogin('shop')
-                navigate('/shop', { replace: true })
-              }
-            }}
-            style={{
-              background: '#059669',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '5px 10px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Quick Test: Local Shop
-          </button>
-        </div>
-      )}
-
       {/* Responsive Centered Card Container */}
       <div className="auth-card-container">
         {/* Step 1: Language Selection */}
@@ -292,47 +151,18 @@ export default function AuthFlowContainer() {
           />
         )}
 
-        {/* Step 2: Phone Login */}
-        {step === 'PHONE' && (
-          <PhoneLoginStep
-            language={language}
-            initialPhone={phone}
-            onSendOtp={(p: string) => sendOtp(p)}
-            onOtpSent={handleOtpSent}
-            onGoogleSignIn={signInWithGoogle}
-            onBack={() => setStep('LANGUAGE')}
-          />
-        )}
-
-        {/* Step 3: OTP Verification */}
-        {step === 'OTP' && (
-          <OtpVerifyStep
-            language={language}
-            phone={phone}
-            devOtp={devOtp}
-            onVerifyOtp={(code: string) => verifyOtp(phone, code)}
-            onResendOtp={async () => {
-              const res = await sendOtp(phone)
-              if (res.devOtp) setDevOtp(res.devOtp)
-              return res
-            }}
-            onSuccess={handleOtpSuccess}
-            onBack={() => setStep('PHONE')}
-          />
-        )}
-
-        {/* Step 4: Account Type (Role Selection) */}
+        {/* Step 2: Account Type (Role Selection) */}
         {step === 'ROLE' && (
           <AccountTypeStep
             language={language}
             selectedRole={role}
             onSelectRole={(r: Role) => setRole(r)}
             onContinue={handleRoleContinue}
-            onBack={() => setStep('OTP')}
+            onBack={() => setStep('LANGUAGE')}
           />
         )}
 
-        {/* Step 5: Citizen Registration */}
+        {/* Step 3: Citizen Registration */}
         {step === 'CITIZEN_REG' && (
           <CitizenRegisterStep
             language={language}
@@ -344,7 +174,7 @@ export default function AuthFlowContainer() {
           />
         )}
 
-        {/* Step 6: Shop Registration */}
+        {/* Step 4: Shop Registration */}
         {step === 'SHOP_REG' && (
           <ShopRegisterStep
             language={language}
@@ -356,17 +186,7 @@ export default function AuthFlowContainer() {
           />
         )}
       </div>
-
-      {/* Resume Registration Prompt Modal */}
-      {showResumeModal && activeDraft && (
-        <ResumePromptModal
-          language={language}
-          phone={activeDraft.phone}
-          role={activeDraft.role}
-          onResume={handleResume}
-          onStartOver={handleStartOver}
-        />
-      )}
     </div>
   )
 }
+

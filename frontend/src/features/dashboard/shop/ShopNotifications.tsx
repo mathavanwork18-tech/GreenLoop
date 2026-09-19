@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../utils/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import Icon from '../../../components/Icon'
+import { interactionsApi } from '../../../services/interactions/interactions.api'
 
 export default function ShopNotifications() {
   const { user } = useAuth()
@@ -11,15 +11,8 @@ export default function ShopNotifications() {
   const loadNotifications = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(30)
-
-      if (!error && data) {
-        setNotifications(data)
-      }
+      const data = await interactionsApi.getUserNotifications(user?.id || '')
+      setNotifications(data || [])
     } catch (e) {
       console.warn('[Green Loop] Notifications fetch error:', e)
     } finally {

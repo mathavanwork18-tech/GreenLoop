@@ -1,4 +1,3 @@
-import { supabase } from '../../utils/supabase'
 
 export type AppRole = 'citizen' | 'shop' | 'company' | 'admin'
 
@@ -80,50 +79,34 @@ export function canAccessRoute(userRole: AppRole, pathname: string): boolean {
 }
 
 /**
- * Directly queries the live Supabase `public.profiles` table to resolve the user's role.
- * Ensures the database remains the single source of truth.
+ * Resolves the user's role from local session.
  */
 export async function fetchUserRoleFromDatabase(userId: string): Promise<AppRole> {
   if (!userId) return 'citizen'
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .maybeSingle()
-
-    if (error || !data?.role) {
-      return 'citizen'
+    const raw = localStorage.getItem('gl_user')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed.role) return normalizeRole(parsed.role)
     }
-    return normalizeRole(data.role)
-  } catch {
-    return 'citizen'
-  }
+  } catch {}
+  return 'citizen'
 }
 
 /**
- * Securely persists the updated role to Supabase `public.profiles`.
+ * Persists the updated role to local user storage.
  */
 export async function updateUserRoleInDatabase(userId: string, newRole: AppRole): Promise<boolean> {
   if (!userId) return false
   try {
-    let { error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', userId)
-
-    if (error && (error.code === '23514' || error.message?.includes('profiles_role_check')) && newRole === 'company') {
-      const fb = await supabase.from('profiles').update({ role: 'recycler' }).eq('id', userId)
-      error = fb.error
-    }
-
-    if (error) {
-      console.error('[Green Loop] Failed to update role in Supabase:', error.message)
-      return false
+    const raw = localStorage.getItem('gl_user')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      parsed.role = newRole
+      localStorage.setItem('gl_user', JSON.stringify(parsed))
     }
     return true
-  } catch (err: any) {
-    console.error('[Green Loop] Unexpected role update error:', err?.message)
+  } catch {
     return false
   }
 }

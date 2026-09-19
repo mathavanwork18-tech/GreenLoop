@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { homeApi } from '../services/home.api'
 import { subscribeToNewPosts } from '../../../services/posts/supabasePosts'
-import { supabase } from '../../../utils/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import { normalizeRole } from '../../../services/role/roleService'
 import { recommendationTracker } from '../../../services/ai/recommendationTracker'
@@ -40,7 +39,7 @@ export function useHomeFeed() {
     loadFeed()
 
     // Realtime — new posts appear instantly on everyone's screen
-    const channel = subscribeToNewPosts((newPost: any) => {
+    subscribeToNewPosts((newPost: any) => {
       const mappedPost: Post = {
         id: String(newPost.id || 'p_' + Date.now()),
         title: newPost.title || 'New E-Waste Listing',
@@ -81,9 +80,6 @@ export function useHomeFeed() {
     window.addEventListener('storage', handleSync)
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel)
-      }
       window.removeEventListener('gl_posts_updated', handleSync)
       window.removeEventListener('storage', handleSync)
     }

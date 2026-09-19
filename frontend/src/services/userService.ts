@@ -1,6 +1,5 @@
 import type { ProfileFormData, PasswordChangeFormData } from '../schemas/profileSchema'
 import type { User } from '../context/AuthContext'
-import { supabase } from '../utils/supabase'
 
 export interface UserSession {
   id: string
@@ -108,23 +107,6 @@ export const userService = {
 
     localStorage.setItem('gl_user', JSON.stringify(updated))
 
-    // Persist changes to Supabase public.profiles if user ID exists
-    if (updated.id) {
-      try {
-        await supabase
-          .from('profiles')
-          .update({
-            full_name: updated.name,
-            phone: updated.phone || '',
-            city: updated.city || 'Coimbatore',
-            address: updated.area || '',
-          })
-          .eq('id', updated.id)
-      } catch (e: any) {
-        console.warn('[Green Loop] Failed to sync profile updates to Supabase:', e?.message)
-      }
-    }
-
     return updated
   },
 
@@ -133,14 +115,16 @@ export const userService = {
     data: { full_name?: string; phone?: string; city?: string; address?: string }
   ): Promise<boolean> {
     if (!userId) return false
-    const { error } = await supabase
-      .from('profiles')
-      .update(data)
-      .eq('id', userId)
-
-    if (error) {
-      console.warn('[Green Loop] Failed to update profile:', error.message)
-      throw new Error(error.message)
+    const raw = localStorage.getItem('gl_user')
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        if (data.full_name) parsed.name = data.full_name
+        if (data.phone) parsed.phone = data.phone
+        if (data.city) parsed.city = data.city
+        if (data.address) parsed.area = data.address
+        localStorage.setItem('gl_user', JSON.stringify(parsed))
+      } catch {}
     }
     return true
   },

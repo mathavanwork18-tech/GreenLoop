@@ -1,11 +1,6 @@
-import { supabase } from '../../utils/supabase'
 import type { RecyclingCenter } from '../../types/recyclingCenter.types'
 import { calculateDistance } from '../../utils/distance'
 
-/**
- * Validates coordinate numbers per WGS84 standards.
- * Latitude must be within [-90, 90], Longitude within [-180, 180].
- */
 export function isValidCoordinate(lat: unknown, lng: unknown): boolean {
   if (typeof lat !== 'number' || typeof lng !== 'number') return false
   if (isNaN(lat) || isNaN(lng)) return false
@@ -14,85 +9,122 @@ export function isValidCoordinate(lat: unknown, lng: unknown): boolean {
   return true
 }
 
+const LOCAL_RECYCLING_CENTERS: RecyclingCenter[] = [
+  {
+    id: 'rc-1',
+    name: 'Dharani Recyclers',
+    address: 'Lala Mahal Road, PM Samy Colony, Rathinapuri, Gandhipuram',
+    city: 'Coimbatore',
+    latitude: 11.0253217,
+    longitude: 76.9655444,
+    contact_phone: '+91 91714 50039'
+  },
+  {
+    id: 'rc-2',
+    name: 'Techazar E-cyclers (Malumichampatti)',
+    address: 'Mother India Industrial Estate, Seerapalayam Link Rd, Malumichampatti',
+    city: 'Coimbatore',
+    latitude: 10.893136,
+    longitude: 76.9854066,
+    contact_phone: '+91 98402 35929'
+  },
+  {
+    id: 'rc-3',
+    name: 'Techazar E-cyclers (R.S. Puram)',
+    address: '18, Sir Shanmugam Rd, near IT HUB, R.S. Puram',
+    city: 'Coimbatore',
+    latitude: 11.0111113,
+    longitude: 76.9526682,
+    contact_phone: '+91 98402 35929'
+  },
+  {
+    id: 'rc-4',
+    name: 'Green Era Recyclers',
+    address: 'Sai Keerthi Industrial Estate, Bodipalayam, Seerapalayam',
+    city: 'Coimbatore',
+    latitude: 10.8852737,
+    longitude: 76.9746545,
+    contact_phone: '+91 93613 28436'
+  },
+  {
+    id: 'rc-5',
+    name: 'Pickmyscraps',
+    address: 'Kurichi Round Rd, Sundarapuram, Kurichi',
+    city: 'Coimbatore',
+    latitude: 10.9614527,
+    longitude: 76.9727046,
+    contact_phone: '+91 90429 47396'
+  },
+  {
+    id: 'rc-6',
+    name: 'Cercle X',
+    address: 'Infinite Cercle Pvt Ltd, Eachanari',
+    city: 'Coimbatore',
+    latitude: 10.9282525,
+    longitude: 76.9717147,
+    contact_phone: '+91 96404 96454'
+  },
+  {
+    id: 'rc-7',
+    name: 'Nothing is Waste',
+    address: '25, Sastha Nagar, Seeranaickenpalayam, Kuniyamuthur',
+    city: 'Coimbatore',
+    latitude: 10.9553932,
+    longitude: 76.9515631,
+    contact_phone: '+91 77084 56778'
+  },
+  {
+    id: 'rc-8',
+    name: 'Green India Recyclers',
+    address: 'Kovilpalayam Rd, Sulakkal Village, Kinathukadavu Taluk',
+    city: 'Coimbatore',
+    latitude: 10.7471536,
+    longitude: 76.9997082,
+    contact_phone: '+91 90034 91034'
+  },
+  {
+    id: 'rc-9',
+    name: 'EcoGenie',
+    address: '317, Happy Homes, Green City, Kannampalayam',
+    city: 'Coimbatore',
+    latitude: 10.9969488,
+    longitude: 77.1154819,
+    contact_phone: '+91 93447 61559'
+  },
+  {
+    id: 'rc-10',
+    name: 'SMV Scrap Dealer',
+    address: 'Saravanampatti-Kalapatti Rd, Balaji Nagar, Villankurichi',
+    city: 'Coimbatore',
+    latitude: 11.0726179,
+    longitude: 77.0126264,
+    contact_phone: '+91 98432 49492'
+  }
+]
+
 export const recyclingCentersApi = {
-  /**
-   * Fetches official recycling centers from Supabase table `public.recycling_centers`.
-   * Enforces data validation and duplicate protection by database ID.
-   */
   async getRecyclingCenters(userCoords?: [number, number] | null): Promise<RecyclingCenter[]> {
-    const { data, error } = await supabase
-      .from('recycling_centers')
-      .select('id, name, address, city, latitude, longitude, contact_phone, created_at')
-      .order('name', { ascending: true })
-
-    if (error) {
-      console.error('[Supabase Error] Failed to fetch recycling_centers:', error.message)
-      throw new Error(error.message || 'Unable to load recycling centers.')
-    }
-
-    if (!data || !Array.isArray(data)) {
-      return []
-    }
-
-    // Protection: Deduplicate by database ID and validate coordinates
-    const seenIds = new Set<string>()
-    const validCenters: RecyclingCenter[] = []
-
-    for (const raw of data) {
-      if (!raw || !raw.id) continue
-
-      const idStr = String(raw.id)
-      if (seenIds.has(idStr)) continue
-      seenIds.add(idStr)
-
-      const lat = Number(raw.latitude)
-      const lng = Number(raw.longitude)
-
-      // Skip invalid coordinates safely without crashing
-      if (!isValidCoordinate(lat, lng)) {
-        console.warn(`[Data Warning] Skipping recycling center "${raw.name}" due to invalid coordinates: (${raw.latitude}, ${raw.longitude})`)
-        continue
-      }
-
+    return LOCAL_RECYCLING_CENTERS.map(center => {
       let distanceKm: number | undefined
       if (userCoords && isValidCoordinate(userCoords[0], userCoords[1])) {
-        distanceKm = calculateDistance(userCoords[0], userCoords[1], lat, lng)
+        distanceKm = calculateDistance(userCoords[0], userCoords[1], center.latitude, center.longitude)
       }
-
-      validCenters.push({
-        id: idStr,
-        name: String(raw.name || 'Recycling Center').trim(),
-        address: String(raw.address || '').trim(),
-        city: String(raw.city || 'Coimbatore').trim(),
-        latitude: lat,
-        longitude: lng,
-        contact_phone: String(raw.contact_phone || '').trim(),
-        created_at: raw.created_at,
+      return {
+        ...center,
         distanceKm,
-      })
-    }
-
-    return validCenters
+      }
+    })
   },
 
-  /**
-   * Returns a standard navigation URL directly to the center's exact coordinates.
-   */
   getDirectionsUrl(latitude: number, longitude: number): string {
     return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`
   },
 
-  /**
-   * Returns a sanitized tel: protocol link for immediate mobile calling.
-   */
   getTelUrl(phone: string): string {
     const cleaned = phone.replace(/[^\d+]/g, '')
     return `tel:${cleaned}`
   },
 
-  /**
-   * Client-side search across center name, area, address, and city.
-   */
   filterCentersByQuery(centers: RecyclingCenter[], query: string): RecyclingCenter[] {
     const q = query.trim().toLowerCase()
     if (!q) return centers

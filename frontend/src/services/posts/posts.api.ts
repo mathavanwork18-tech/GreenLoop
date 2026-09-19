@@ -1,52 +1,50 @@
 import type { Post } from '../../types/post.types'
-import { supabase } from '../../utils/supabase'
 import {
   fetchPosts as fetchSupabasePosts,
   createPost as createSupabasePost,
   subscribeToNewPosts,
 } from './supabasePosts'
-import { interactionsApi } from '../interactions/interactions.api'
 
 export { createSupabasePost, fetchSupabasePosts, subscribeToNewPosts }
 export * from './supabasePosts'
 
-function mapSupabasePostToAppPost(sbPost: any, _currentUserId?: string, likesCount: number = 0, liked: boolean = false): Post {
+function mapRawPostToAppPost(rawPost: any, likesCount: number = 0, liked: boolean = false): Post {
   const sellerName =
-    sbPost.profiles?.full_name ||
+    rawPost.profiles?.full_name ||
     'Green Loop Citizen'
 
   const location =
-    sbPost.profiles?.city ||
-    sbPost.location ||
+    rawPost.profiles?.city ||
+    rawPost.location ||
     'Coimbatore'
 
   return {
-    id: String(sbPost.id),
-    title: sbPost.title || 'Untitled Device',
-    category: sbPost.category || 'Other Electronics',
-    brand: sbPost.subcategory || 'Electronics',
+    id: String(rawPost.id),
+    title: rawPost.title || 'Untitled Device',
+    category: rawPost.category || 'Other Electronics',
+    brand: rawPost.subcategory || 'Electronics',
     model: '',
-    condition: sbPost.condition || 'Good',
-    purpose: sbPost.asking_price ? 'Sell' : 'Recycle',
-    price: sbPost.asking_price !== null && sbPost.asking_price !== undefined ? Number(sbPost.asking_price) : null,
+    condition: rawPost.condition || 'Good',
+    purpose: rawPost.asking_price ? 'Sell' : 'Recycle',
+    price: rawPost.asking_price !== null && rawPost.asking_price !== undefined ? Number(rawPost.asking_price) : null,
     negotiable: false,
-    description: sbPost.description || '',
+    description: rawPost.description || '',
     location,
     locationName: location,
     latitude: 11.0168,
     longitude: 76.9558,
     distance: 0.8,
-    status: sbPost.status || 'available',
+    status: rawPost.status || 'available',
     seller: {
       name: sellerName,
       rating: 4.9,
       verified: true,
       avatar: null,
     },
-    images: sbPost.image_url
-      ? [sbPost.image_url]
+    images: rawPost.image_url
+      ? [rawPost.image_url]
       : ['https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&q=80'],
-    createdAt: sbPost.created_at ? new Date(sbPost.created_at).toLocaleDateString() : 'Just now',
+    createdAt: rawPost.created_at ? new Date(rawPost.created_at).toLocaleDateString() : 'Just now',
     likes: likesCount,
     comments: 0,
     liked,
@@ -56,51 +54,7 @@ function mapSupabasePostToAppPost(sbPost: any, _currentUserId?: string, likesCou
 
 export const postsApi = {
   async getPosts(): Promise<Post[]> {
-    let currentUserId: string | undefined
-    try {
-      const { data } = await supabase.auth.getUser()
-      currentUserId = data?.user?.id
-    } catch {}
-
-    try {
-      const rawPosts = await fetchSupabasePosts(0, 50)
-      if (rawPosts && rawPosts.length > 0) {
-        // Fetch like statuses and counts in parallel
-        const postIds = rawPosts.map((p: any) => p.id)
-
-        // Likes query
-        const { data: likesData } = await supabase
-          .from('post_likes')
-          .select('post_id, user_id')
-          .in('post_id', postIds)
-
-        const likesByPost = new Map<string, number>()
-        const userLikedPosts = new Set<string>()
-
-        ;(likesData || []).forEach((l: any) => {
-          likesByPost.set(l.post_id, (likesByPost.get(l.post_id) || 0) + 1)
-          if (currentUserId && l.user_id === currentUserId) {
-            userLikedPosts.add(l.post_id)
-          }
-        })
-
-        const mapped = rawPosts.map((sbPost: any) =>
-          mapSupabasePostToAppPost(
-            sbPost,
-            currentUserId,
-            likesByPost.get(sbPost.id) || 0,
-            userLikedPosts.has(sbPost.id)
-          )
-        )
-
-        localStorage.setItem('gl_posts', JSON.stringify(mapped))
-        return mapped
-      }
-    } catch (e) {
-      console.warn('[Green Loop] Supabase fetch failed, falling back to cached posts:', e)
-    }
-
-    // Cache fallback
+    // 1. Check local cache
     const stored = localStorage.getItem('gl_posts')
     if (stored) {
       try {
@@ -109,14 +63,16 @@ export const postsApi = {
       } catch {}
     }
 
-    // Honest empty state: no mock data returned
-    return []
+    // 2. Fetch raw posts and map
+    const rawPosts = await fetchSupabasePosts(0, 50)
+    const mapped = (rawPosts || []).map((p: any) => mapRawPostToAppPost(p))
+    localStorage.setItem('gl_posts', JSON.stringify(mapped))
+    return mapped
   },
 
   async createPost(
     post: Omit<Post, 'id' | 'createdAt' | 'likes' | 'comments' | 'liked' | 'saved'>
   ): Promise<Post> {
-    // 1. Create real database listing in public.e_waste_posts
     const inserted = await createSupabasePost({
       title: post.title,
       description: post.description,
@@ -145,14 +101,12 @@ export const postsApi = {
       },
     }
 
-    // Sync cached storage
     try {
       const existing = await this.getPosts()
       const updated = [newPost, ...existing.filter(p => p.id !== newPost.id)]
       localStorage.setItem('gl_posts', JSON.stringify(updated))
     } catch {}
 
-    // Trigger cross-component sync event
     window.dispatchEvent(new Event('gl_posts_updated'))
     return newPost
   },
@@ -167,18 +121,6 @@ export const postsApi = {
     if (currentUserName && targetPost.seller?.name && targetPost.seller.name !== currentUserName) {
       throw new Error('Unauthorized to edit this post (403)')
     }
-
-    // Update in Supabase e_waste_posts
-    await supabase
-      .from('e_waste_posts')
-      .update({
-        title: updates.title,
-        description: updates.description,
-        category: updates.category,
-        condition: updates.condition,
-        asking_price: updates.price,
-      })
-      .eq('id', postId)
 
     let modifiedPost: Post = targetPost
     const updated = existing.map(p => {
@@ -195,26 +137,11 @@ export const postsApi = {
   },
 
   async toggleLike(postId: string): Promise<Post[]> {
-    let currentUserId: string | undefined
-    try {
-      const { data } = await supabase.auth.getUser()
-      currentUserId = data?.user?.id
-    } catch {}
-
-    let dbResult: { liked: boolean; count: number } | null = null
-    if (currentUserId) {
-      try {
-        dbResult = await interactionsApi.toggleLike(postId, currentUserId)
-      } catch (err) {
-        console.warn('[Green Loop] DB toggleLike error:', err)
-      }
-    }
-
     const existing = await this.getPosts()
     const updated = existing.map(p => {
       if (p.id === postId) {
-        const liked = dbResult ? dbResult.liked : !p.liked
-        const likes = dbResult ? dbResult.count : (liked ? p.likes + 1 : Math.max(0, p.likes - 1))
+        const liked = !p.liked
+        const likes = liked ? p.likes + 1 : Math.max(0, p.likes - 1)
         return {
           ...p,
           liked,
@@ -246,17 +173,6 @@ export const postsApi = {
 
     if (targetPost && currentUserName && targetPost.seller?.name && targetPost.seller.name !== currentUserName) {
       throw new Error('Unauthorized to delete this post (403)')
-    }
-
-    // Delete from Supabase e_waste_posts
-    const { error } = await supabase
-      .from('e_waste_posts')
-      .delete()
-      .eq('id', postId)
-
-    if (error) {
-      console.error('[Green Loop] Delete e_waste_posts error:', error)
-      throw new Error(error.message || 'Failed to delete listing from database.')
     }
 
     const updated = existing.filter(p => p.id !== postId)

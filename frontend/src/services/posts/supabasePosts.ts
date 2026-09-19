@@ -1,5 +1,3 @@
-import { supabase } from '../../utils/supabase'
-
 export interface CreatePostParams {
   title: string
   description?: string
@@ -16,35 +14,91 @@ export interface CreatePostParams {
   [key: string]: any
 }
 
+const DEFAULT_POSTS = [
+  {
+    id: 'post-1',
+    user_id: 'u-101',
+    title: 'Samsung Galaxy S20 (Faulty Display)',
+    description: 'Motherboard 100% operational. Battery health 88%. Screen has vertical lines. Ideal for motherboard harvesting.',
+    category: 'Smartphones',
+    subcategory: 'Samsung',
+    condition: 'For Parts',
+    status: 'available',
+    asking_price: 2500,
+    image_url: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=600&auto=format&fit=crop&q=80',
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+    profiles: { full_name: 'Mathavan Raman', phone: '9876543210', city: 'Coimbatore' },
+  },
+  {
+    id: 'post-2',
+    user_id: 'u-102',
+    title: 'Dell Inspiron 15 Logic Board + i5 CPU',
+    description: 'Tested functional laptop board with Intel Core i5 10th Gen. Removed from damaged chassis unit.',
+    category: 'Laptops',
+    subcategory: 'Dell',
+    condition: 'Good',
+    status: 'available',
+    asking_price: 4200,
+    image_url: 'https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=600&auto=format&fit=crop&q=80',
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    profiles: { full_name: 'CircuitFix Repair Hub', phone: '9444284711', city: 'Chennai' },
+  },
+  {
+    id: 'post-3',
+    user_id: 'u-101',
+    title: 'Old CRT Monitor & CPU for Free Dropoff / Recycling',
+    description: 'Heavy legacy desktop parts. Free pickup or dropoff for authorized e-waste recycler.',
+    category: 'Desktop Computers',
+    subcategory: 'Legacy Hardware',
+    condition: 'Non-functional',
+    status: 'available',
+    asking_price: null,
+    image_url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80',
+    created_at: new Date(Date.now() - 172800000).toISOString(),
+    profiles: { full_name: 'Mathavan Raman', phone: '9876543210', city: 'Coimbatore' },
+  },
+]
+
+function getStoredRawPosts(): any[] {
+  try {
+    const stored = localStorage.getItem('gl_posts_raw')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch {}
+  return DEFAULT_POSTS
+}
+
+function saveStoredRawPosts(posts: any[]) {
+  try {
+    localStorage.setItem('gl_posts_raw', JSON.stringify(posts))
+  } catch {}
+}
+
 /**
- * 1. Create a post in public.e_waste_posts
- * Inserts a new e-waste listing associated with the authenticated Supabase user.
+ * 1. Create a post
  */
 export async function createPost(params: CreatePostParams) {
-  let user: { id: string; [key: string]: any } | null = null
+  let user: { id: string; name?: string; phone?: string; city?: string } = {
+    id: 'u-local',
+    name: 'Green Loop Member',
+    phone: '9876543210',
+    city: 'Coimbatore',
+  }
 
   try {
-    const { data: authData } = await supabase.auth.getUser()
-    if (authData?.user?.id) {
-      user = authData.user
+    const stored = localStorage.getItem('gl_user')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (parsed?.id) {
+        user = parsed
+      }
     }
   } catch {}
 
-  if (!user) {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('gl_user') : null
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        if (parsed?.id) user = { id: parsed.id }
-      } catch {}
-    }
-  }
-
-  if (!user) {
-    throw new Error('Please sign in to create an e-waste listing.')
-  }
-
   const newRow = {
+    id: 'post-' + Date.now(),
     user_id: user.id,
     title: params.title,
     description: params.description || '',
@@ -59,98 +113,35 @@ export async function createPost(params: CreatePostParams) {
         ? Number(params.price)
         : null,
     image_url: params.image_url || params.imageUrl || (params.images && params.images[0]) || null,
+    created_at: new Date().toISOString(),
+    profiles: {
+      full_name: user.name || 'Green Loop Member',
+      phone: user.phone || '',
+      city: user.city || 'Coimbatore',
+    },
   }
 
-  const { data, error } = await supabase
-    .from('e_waste_posts')
-    .insert(newRow)
-    .select('*')
-    .single()
+  const existing = getStoredRawPosts()
+  const updated = [newRow, ...existing]
+  saveStoredRawPosts(updated)
 
-  if (error) {
-    console.error('[Green Loop] Post failed on e_waste_posts:', error)
-    throw new Error(error.message || 'Database error: unable to save e-waste listing.')
-  }
-
-  // Attach seller profile metadata cleanly
-  try {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, phone, city')
-      .eq('id', user.id)
-      .maybeSingle()
-    if (profile && data) {
-      data.profiles = profile
-    }
-  } catch {}
-
-  return data
+  return newRow
 }
 
 /**
- * 2. Fetch all e-waste listings for the home feed (with pagination)
- * Fetches listings ordered by creation date with profiles relation.
+ * 2. Fetch all e-waste listings for the home feed
  */
 export async function fetchPosts(page = 0, pageSize = 30) {
+  const posts = getStoredRawPosts()
   const from = page * pageSize
-  const to = from + pageSize - 1
-
-  // Primary attempt: relational select joined with public.profiles
-  const resWithProfile = await supabase
-    .from('e_waste_posts')
-    .select(`
-      id, user_id, title, description, category, subcategory, condition, status, asking_price, image_url, created_at, updated_at,
-      profiles:user_id ( full_name, phone, city )
-    `)
-    .order('created_at', { ascending: false })
-    .range(from, to)
-
-  if (!resWithProfile.error && resWithProfile.data) {
-    return resWithProfile.data
-  }
-
-  // Resilient fallback if PostgREST cache has not built explicit foreign key relation
-  const directRes = await supabase
-    .from('e_waste_posts')
-    .select('id, user_id, title, description, category, subcategory, condition, status, asking_price, image_url, created_at, updated_at')
-    .order('created_at', { ascending: false })
-    .range(from, to)
-
-  const data = directRes.data || []
-  if (data.length > 0) {
-    const userIds = Array.from(new Set(data.map((p: any) => p.user_id).filter(Boolean)))
-    if (userIds.length > 0) {
-      const { data: profs } = await supabase.from('profiles').select('id, full_name, phone, city').in('id', userIds)
-      const profMap = new Map((profs || []).map((pr: any) => [pr.id, pr]))
-      data.forEach((p: any) => {
-        p.profiles = profMap.get(p.user_id) || { full_name: 'Green Loop Member' }
-      })
-    }
-  }
-
-  if (directRes.error) {
-    console.error('[Green Loop] Fetching e_waste_posts failed:', directRes.error.message)
-    return []
-  }
-
-  return data
+  return posts.slice(from, from + pageSize)
 }
 
 /**
- * 3. Realtime — new posts appear instantly on everyone's screen
- * Subscribes to Postgres INSERT events on the public:e_waste_posts table.
+ * 3. Realtime subscription stub (no external websocket needed)
  */
-export function subscribeToNewPosts(onNewPost: (newPost: any) => void) {
-  const channel = supabase
-    .channel('public:e_waste_posts')
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'e_waste_posts' },
-      (payload) => {
-        onNewPost(payload.new)
-      }
-    )
-    .subscribe()
-
-  return channel
+export function subscribeToNewPosts(_onNewPost: (newPost: any) => void) {
+  return {
+    unsubscribe: () => {},
+  }
 }

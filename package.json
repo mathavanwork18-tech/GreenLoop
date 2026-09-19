@@ -24,7 +24,6 @@
     "marketplace"
   ],
   "dependencies": {
-    "@supabase/supabase-js": "^2.116.0",
     "concurrently": "^9.2.4",
     "mongodb": "^7.6.0"
   }

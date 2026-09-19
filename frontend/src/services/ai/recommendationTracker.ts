@@ -1,4 +1,3 @@
-import { supabase } from '../../utils/supabase'
 import type {
   RecommendationEvent,
   RecommendationEventType,
@@ -261,26 +260,7 @@ class RecommendationTrackerService {
   }
 
   private async flushQueue(): Promise<void> {
-    if (this.queue.length === 0) return
-    const batch = [...this.queue]
     this.queue = []
-
-    try {
-      const records = batch.map((e) => ({
-        user_id: e.userId,
-        event_type: e.eventType,
-        post_id: e.postId && e.postId.length > 20 ? e.postId : null, // valid UUID check
-        category_id: e.categoryId || null,
-        search_query: e.searchQuery || null,
-        metadata: e.metadata || {},
-        created_at: e.createdAt || new Date().toISOString(),
-      }))
-
-      await supabase.from('recommendation_events').insert(records)
-    } catch (err: any) {
-      // Put failed back if network was temporarily down
-      console.warn('[RecTracker] Event sync deferred:', err?.message)
-    }
   }
 
   /**

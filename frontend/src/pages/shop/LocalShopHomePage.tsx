@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, isAuthTestMode, PREDEFINED_TEST_IDENTITIES, setDevTestSession } from '../../utils/supabase'
 import { useAuth } from '../../context/AuthContext'
 import Icon from '../../components/Icon'
 import MarketplaceChatModal, { type ChatListingContext } from '../../components/chat/MarketplaceChatModal'
+import { postsApi } from '../../services/posts/posts.api'
+import { interactionsApi } from '../../services/interactions/interactions.api'
 
 interface GeneralUserPost {
   id: string
@@ -45,72 +46,31 @@ export default function LocalShopHomePage() {
   const [buySuccess, setBuySuccess] = useState(false)
   const [buyError, setBuyError] = useState<string | null>(null)
 
-  // Fetch real posts from Supabase public.e_waste_posts
+  // Fetch real posts from postsApi
   const loadPosts = async () => {
     setLoading(true)
     setError(null)
     try {
-      // 1. Query real available e-waste posts
-      const { data: postsData, error: postsErr } = await supabase
-        .from('e_waste_posts')
-        .select(`
-          id,
-          user_id,
-          title,
-          description,
-          category,
-          subcategory,
-          condition,
-          status,
-          asking_price,
-          image_url,
-          created_at
-        `)
-        .order('created_at', { ascending: false })
-
-      if (postsErr) {
-        throw new Error(postsErr.message || 'Failed to load community e-waste posts.')
-      }
-
-      const rawPosts = postsData || []
-      const userIds = Array.from(new Set(rawPosts.map(p => p.user_id).filter(Boolean)))
-
-      // 2. Fetch associated seller profiles
-      let profilesMap = new Map<string, any>()
-      if (userIds.length > 0) {
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, full_name, city, address, phone')
-          .in('id', userIds)
-
-        ;(profilesData || []).forEach(pr => profilesMap.set(pr.id, pr))
-      }
-
-      // 3. Map into clean UI objects
-      const mapped: GeneralUserPost[] = rawPosts.map(p => {
-        const profile = profilesMap.get(p.user_id) || {}
-        return {
-          id: p.id,
-          userId: p.user_id,
-          title: p.title || 'Untitled E-Waste',
-          description: p.description || 'No detailed description provided.',
-          category: p.category || 'Electronics',
-          subcategory: p.subcategory || '',
-          condition: p.condition || 'Used',
-          status: p.status || 'available',
-          askingPrice: p.asking_price !== null && p.asking_price !== undefined ? Number(p.asking_price) : null,
-          imageUrl: p.image_url || null,
-          createdAt: p.created_at,
-          sellerName: profile.full_name || 'Community Citizen',
-          location: profile.city || profile.address || 'Coimbatore',
-          sellerPhone: profile.phone || '',
-        }
-      })
-
+      const allPosts = await postsApi.getPosts()
+      const mapped: GeneralUserPost[] = allPosts.map(p => ({
+        id: p.id,
+        userId: p.seller?.name || 'u_seller',
+        title: p.title,
+        description: p.description,
+        category: p.category,
+        subcategory: p.brand || '',
+        condition: p.condition,
+        status: p.status || 'available',
+        askingPrice: p.price,
+        imageUrl: p.images?.[0] || null,
+        createdAt: p.createdAt || 'Recent',
+        sellerName: p.seller?.name || 'Community Citizen',
+        location: p.location || 'Coimbatore',
+      }))
       setPosts(mapped)
     } catch (err: any) {
       console.error('[Green Loop Shop] Fetch posts error:', err)
-      setError(err.message || 'Unable to load marketplace listings from database.')
+      setError(err.message || 'Unable to load marketplace listings.')
     } finally {
       setLoading(false)
     }
@@ -120,7 +80,7 @@ export default function LocalShopHomePage() {
     loadPosts()
   }, [])
 
-  // Handle Enquiry Submission (routes through post_comments with trigger to notifications)
+  // Handle Enquiry Submission
   const handleSendEnquiry = async () => {
     if (!enquiryPost) return
     setIsEnquiring(true)
@@ -129,39 +89,8 @@ export default function LocalShopHomePage() {
     const commentText = enquiryMessage.trim() || `[Shop Enquiry] Hello, our repair shop is interested in your listing "${enquiryPost.title}". Please let us know if it is available for inspection.`
 
     try {
-      // Resolve authenticated user ID: prefer AuthContext user (already hydrated),
-      // then GoTrue session, then dev test mode fallback
-      let authUserId: string | undefined = user?.id
-
-      if (!authUserId) {
-        try {
-          const { data: authData } = await supabase.auth.getUser()
-          authUserId = authData?.user?.id
-        } catch {
-          // GoTrue call may fail in dev/offline scenarios — continue to fallback
-        }
-      }
-
-      if (!authUserId && isAuthTestMode) {
-        authUserId = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.id
-        setDevTestSession(PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP)
-      }
-
-      if (!authUserId) {
-        throw new Error('You must be signed in to send an enquiry. Please sign in with a shop account.')
-      }
-
-      const { error: insertErr } = await supabase
-        .from('post_comments')
-        .insert({
-          post_id: enquiryPost.id,
-          user_id: authUserId,
-          comment: commentText,
-        })
-
-      if (insertErr) {
-        throw new Error(insertErr.message || 'Could not record enquiry in database.')
-      }
+      const authUserId = user?.id || 'shop_user'
+      await interactionsApi.addComment(enquiryPost.id, authUserId, commentText)
 
       setEnquirySuccess(true)
       setTimeout(() => {
@@ -171,73 +100,26 @@ export default function LocalShopHomePage() {
       }, 1600)
     } catch (err: any) {
       console.error('[Green Loop Shop] Enquiry error:', err)
-      setEnquiryError(err.message || 'Enquiry failed on server. Please try again.')
+      setEnquiryError(err.message || 'Enquiry failed. Please try again.')
     } finally {
       setIsEnquiring(false)
     }
   }
 
-  // Handle Buy / Claim Submission (routes through post_claims with trigger to notifications)
+  // Handle Buy / Claim Submission
   const handleSendBuy = async () => {
     if (!buyPost) return
     setIsBuying(true)
     setBuyError(null)
 
     try {
-      // Resolve authenticated user ID: prefer AuthContext user (already hydrated),
-      // then GoTrue session, then dev test mode fallback
-      let authUserId: string | undefined = user?.id
-
-      if (!authUserId) {
-        try {
-          const { data: authData } = await supabase.auth.getUser()
-          authUserId = authData?.user?.id
-        } catch {
-          // GoTrue call may fail in dev/offline scenarios — continue to fallback
-        }
-      }
-
-      if (!authUserId && isAuthTestMode) {
-        authUserId = PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP.id
-        setDevTestSession(PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP)
-      }
-
-      if (!authUserId) {
-        throw new Error('You must be signed in to purchase a listing. Please sign in with a shop account.')
-      }
-
+      const authUserId = user?.id || 'shop_user'
       if (buyPost.userId && buyPost.userId === authUserId) {
         throw new Error('You cannot purchase your own listing.')
       }
 
-      // Concurrency duplicate prevention
-      const { data: existingClaim } = await supabase
-        .from('post_claims')
-        .select('id, status')
-        .eq('post_id', buyPost.id)
-        .eq('user_id', authUserId)
-        .maybeSingle()
+      await interactionsApi.claimPost(buyPost.id, authUserId)
 
-      if (existingClaim) {
-        throw new Error(`You have already submitted a purchase order for this listing (Status: ${existingClaim.status}).`)
-      }
-
-      // Insert purchase claim into post_claims
-      const { data: createdClaim, error: claimErr } = await supabase
-        .from('post_claims')
-        .insert({
-          post_id: buyPost.id,
-          user_id: authUserId,
-          status: 'pending',
-        })
-        .select('id, status, created_at')
-        .maybeSingle()
-
-      if (claimErr) {
-        throw new Error(claimErr.message || 'Could not create purchase request in database.')
-      }
-
-      console.log('[Green Loop Shop] Purchase order created successfully:', createdClaim?.id)
       setBuySuccess(true)
       setTimeout(() => {
         setBuyPost(null)

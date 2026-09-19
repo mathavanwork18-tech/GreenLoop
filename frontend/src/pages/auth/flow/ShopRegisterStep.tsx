@@ -3,7 +3,6 @@ import Icon from '../../../components/Icon'
 import PasswordRequirements2Ticks from '../../../components/PasswordRequirements2Ticks'
 import type { LanguageCode } from '../../../types/common.types'
 import { getAuthTranslation } from '../../../utils/translations'
-import { normalizePhone } from '../../../utils/phone'
 
 interface Props {
   language: LanguageCode
@@ -36,6 +35,7 @@ export default function ShopRegisterStep({
   const [shopName, setShopName] = useState(initialData.shopName || '')
   const [ownerName, setOwnerName] = useState(initialData.ownerName || '')
   const [category, setCategory] = useState(initialData.category || 'Electronics Repair')
+  const [phoneNumber, setPhoneNumber] = useState(initialData.phone || phone || '')
   const [email, setEmail] = useState(initialData.email || '')
   const [shopAddress, setShopAddress] = useState(initialData.shopAddress || '')
   const [area, setArea] = useState(initialData.area || 'Guindy')
@@ -64,7 +64,7 @@ export default function ShopRegisterStep({
       shopAddress: field === 'shopAddress' ? val : shopAddress,
       area: field === 'area' ? val : area,
       city: field === 'city' ? val : city,
-      phone,
+      phone: field === 'phone' ? val : phoneNumber,
     })
     if (errors[field]) {
       setErrors((prev) => {
@@ -106,6 +106,12 @@ export default function ShopRegisterStep({
       newErrors.password = 'Password must be 16 characters or fewer.'
     }
 
+    // Phone validation
+    const cleanPhone = phoneNumber.replace(/\D/g, '')
+    if (!cleanPhone || cleanPhone.length < 10) {
+      newErrors.phone = 'Please enter a valid 10-digit mobile number.'
+    }
+
     if (password !== confirmPassword) {
       newErrors.confirmPassword = "Passwords don't match."
     }
@@ -126,7 +132,7 @@ export default function ShopRegisterStep({
         shopAddress: shopAddress.trim(),
         area: area.trim(),
         city: city.trim(),
-        phone,
+        phone: cleanPhone || phoneNumber,
         role: 'LOCAL_SHOP',
       })
     } catch (err: any) {
@@ -177,40 +183,36 @@ export default function ShopRegisterStep({
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        {/* Pre-filled Verified Mobile Number (Locked) */}
+        {/* Mobile Number */}
         <div>
           <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 700, marginBottom: 6 }}>
-            {t.verifiedMobileNumber}
+            Mobile Number <span style={{ color: '#ef4444' }}>*</span>
           </label>
-          <div
+          <input
+            type="tel"
+            value={phoneNumber}
+            onChange={(e) => {
+              setPhoneNumber(e.target.value)
+              handleFieldChange('phone', e.target.value)
+            }}
+            placeholder="e.g. 98765 43210"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
+              width: '100%',
               height: 48,
               borderRadius: '12px',
-              border: '1.5px solid var(--border-color)',
-              background: 'rgba(255,255,255,0.03)',
+              border: errors.phone ? '2px solid #ef4444' : '1.5px solid var(--border-color)',
+              background: 'var(--bg-surface)',
+              color: 'var(--text-primary)',
               padding: '0 14px',
-              color: 'var(--text-secondary)',
               fontSize: '0.95rem',
-              fontWeight: 600,
+              outline: 'none',
             }}
-          >
-            <span>{normalizePhone(phone).display || ('+91 ' + phone)}</span>
-            <span
-              style={{
-                fontSize: '0.72rem',
-                padding: '3px 8px',
-                borderRadius: '6px',
-                background: 'rgba(16,185,129,0.2)',
-                color: '#34d399',
-                fontWeight: 700,
-              }}
-            >
-              {t.mobileLockedBadge}
+          />
+          {errors.phone && (
+            <span style={{ fontSize: '0.78rem', color: '#ef4444', marginTop: 4, display: 'block' }}>
+              {errors.phone}
             </span>
-          </div>
+          )}
         </div>
 
         {/* Shop Name */}

@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from 'react'
-import { supabase } from '../../../utils/supabase'
 import { adminService } from './services/adminService'
 import { useAuth } from '../../../context/AuthContext'
 import Icon from '../../../components/Icon'
@@ -18,25 +17,23 @@ export default function AdminNotifications() {
     setSending(true)
 
     try {
-      // 1. Get recipient user IDs based on target role
-      let query = supabase.from('profiles').select('id')
-      if (targetRole !== 'all') {
-        query = query.eq('role', targetRole)
-      }
-      const { data: users } = await query
+      let existing: any[] = []
+      try {
+        const raw = localStorage.getItem('gl_notifications')
+        if (raw) existing = JSON.parse(raw)
+      } catch {}
 
-      if (users && users.length > 0) {
-        const notifications = (users as Array<{ id: string }>).map((u) => ({
-          recipient_id: u.id,
-          title,
-          message,
-          type: 'announcement',
-          is_read: false,
-          created_at: new Date().toISOString(),
-        }))
-
-        await supabase.from('notifications').insert(notifications)
+      const newNotif = {
+        id: 'notif-' + Date.now(),
+        recipient_id: targetRole === 'all' ? 'all' : targetRole,
+        title,
+        message,
+        type: 'announcement',
+        is_read: false,
+        created_at: new Date().toISOString(),
       }
+
+      localStorage.setItem('gl_notifications', JSON.stringify([newNotif, ...existing]))
 
       if (currentAdmin?.id) {
         await adminService.logAdminAction(
@@ -44,7 +41,7 @@ export default function AdminNotifications() {
           currentAdmin.name || 'Admin',
           'broadcast_notification',
           `Role: ${targetRole}`,
-          { title, recipientsCount: users?.length || 0 }
+          { title }
         )
       }
 

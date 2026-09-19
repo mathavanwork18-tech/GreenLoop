@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../utils/supabase'
 import Icon from '../../../components/Icon'
 
 export default function CompanyInventory() {
@@ -9,11 +8,13 @@ export default function CompanyInventory() {
   const loadInventory = async () => {
     setLoading(true)
     try {
-      const { data } = await supabase
-        .from('pickup_requests')
-        .select('id, description, quantity, status, scheduled_date, created_at')
-        .order('created_at', { ascending: false })
-
+      const stored = localStorage.getItem('gl_pickup_requests')
+      let data: any[] = []
+      if (stored) {
+        try {
+          data = JSON.parse(stored)
+        } catch {}
+      }
       setItems(data || [])
     } finally {
       setLoading(false)

@@ -1,5 +1,3 @@
-import { supabase } from '../../utils/supabase'
-
 export interface PickupSchedulePayload {
   userId: string
   categoryId?: number
@@ -28,11 +26,21 @@ export interface DisposalLogRecord {
   notes: string
 }
 
+function getStoredPickups(): PickupRecord[] {
+  try {
+    const raw = localStorage.getItem('gl_pickup_requests')
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return []
+}
+
+function saveStoredPickups(pickups: PickupRecord[]) {
+  try {
+    localStorage.setItem('gl_pickup_requests', JSON.stringify(pickups))
+  } catch {}
+}
+
 export const pickupService = {
-  /**
-   * Schedules a doorstep pickup and persists to both public.pickup_requests
-   * and public.disposal_logs in Supabase.
-   */
   async schedulePickup(payload: PickupSchedulePayload): Promise<{
     request: PickupRecord
     disposalLog?: DisposalLogRecord
@@ -41,7 +49,6 @@ export const pickupService = {
       throw new Error('You must be logged in to schedule a pickup.')
     }
 
-    // Ensure scheduled_date is strictly in YYYY-MM-DD format for PostgreSQL DATE column compatibility
     let cleanDate = payload.scheduledDate || new Date().toISOString().split('T')[0]
     let extraSlot = ''
     if (cleanDate.includes('(')) {
@@ -55,91 +62,40 @@ export const pickupService = {
       cleanDate = new Date().toISOString().split('T')[0]
     }
 
-    const newRequest = {
+    const requestData: PickupRecord = {
+      id: 'req-' + Date.now(),
       user_id: payload.userId,
       category_id: payload.categoryId || null,
       status: 'scheduled',
       quantity: payload.quantity && payload.quantity > 0 ? payload.quantity : 1,
       description: `${payload.itemsDescription.trim() || 'E-waste devices for recycling'}${extraSlot}`,
       scheduled_date: cleanDate,
+      created_at: new Date().toISOString(),
     }
 
-    // 1. Insert into public.pickup_requests
-    const { data: requestData, error: requestErr } = await supabase
-      .from('pickup_requests')
-      .insert(newRequest)
-      .select('*')
-      .single()
+    const existing = getStoredPickups()
+    saveStoredPickups([requestData, ...existing])
 
-    if (requestErr) {
-      console.error('[Green Loop] pickup_requests insert error:', requestErr)
-      throw new Error(requestErr.message || 'Failed to schedule pickup request.')
-    }
-
-    // 2. Automatically log the disposal event in public.disposal_logs
-    let disposalLog: DisposalLogRecord | undefined
-    try {
-      const { data: logData, error: logErr } = await supabase
-        .from('disposal_logs')
-        .insert({
-          request_id: requestData.id,
-          method: 'doorstep_collection',
-          notes: `Partner: ${payload.partnerName || 'TNPCB Verified Recycler'} | Address: ${payload.pickupAddress}`,
-        })
-        .select('*')
-        .single()
-
-      if (!logErr && logData) {
-        disposalLog = logData
-      }
-    } catch (e: any) {
-      console.warn('[Green Loop] disposal_logs entry note:', e?.message)
+    const disposalLog: DisposalLogRecord = {
+      id: 'log-' + Date.now(),
+      request_id: requestData.id,
+      method: 'doorstep_collection',
+      notes: `Partner: ${payload.partnerName || 'TNPCB Verified Recycler'} | Address: ${payload.pickupAddress}`,
     }
 
     return { request: requestData, disposalLog }
   },
 
-  /**
-   * Retrieves all pickup requests for the active user.
-   */
   async getUserPickupRequests(userId: string): Promise<PickupRecord[]> {
     if (!userId) return []
-
-    const { data, error } = await supabase
-      .from('pickup_requests')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.warn('[Green Loop] Fetching user pickup requests error:', error.message)
-      return []
-    }
-
-    return data || []
+    const all = getStoredPickups()
+    return all.filter(r => r.user_id === userId)
   },
 
-  /**
-   * Completes a disposal action for a pickup request.
-   */
-  async markPickupCompleted(requestId: string, notes?: string): Promise<boolean> {
-    const { error: updateErr } = await supabase
-      .from('pickup_requests')
-      .update({ status: 'completed' })
-      .eq('id', requestId)
-
-    if (updateErr) {
-      console.error('[Green Loop] Error marking pickup completed:', updateErr.message)
-      return false
-    }
-
-    // Insert completion note into disposal_logs
-    await supabase.from('disposal_logs').insert({
-      request_id: requestId,
-      method: 'certified_recycle',
-      notes: notes || 'Recycling completed and verified.',
-    })
-
+  async markPickupCompleted(requestId: string, _notes?: string): Promise<boolean> {
+    const all = getStoredPickups()
+    const updated = all.map(r => r.id === requestId ? { ...r, status: 'completed' } : r)
+    saveStoredPickups(updated)
     return true
   }
 }

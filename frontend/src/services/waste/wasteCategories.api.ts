@@ -1,5 +1,3 @@
-import { supabase } from '../../utils/supabase'
-
 export interface WasteCategory {
   id: number
   name: string
@@ -16,24 +14,7 @@ const FALLBACK_CATEGORIES: WasteCategory[] = [
 ]
 
 export const wasteCategoriesApi = {
-  /**
-   * Fetches all official waste categories from Supabase `public.waste_categories`.
-   * Falls back to standard predefined categories if database is temporarily offline.
-   */
   async getCategories(): Promise<WasteCategory[]> {
-    try {
-      const { data, error } = await supabase
-        .from('waste_categories')
-        .select('id, name, description')
-        .order('id', { ascending: true })
-
-      if (!error && data && data.length > 0) {
-        return data as WasteCategory[]
-      }
-    } catch (e: any) {
-      console.warn('[Green Loop] Fetching waste_categories note:', e?.message)
-    }
-
     return FALLBACK_CATEGORIES
   }
 }

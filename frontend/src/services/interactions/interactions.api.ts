@@ -1,5 +1,3 @@
-import { supabase } from '../../utils/supabase'
-
 export interface PostCommentItem {
   id: string
   userId: string
@@ -19,281 +17,190 @@ export interface NotificationRecord {
   created_at: string
 }
 
-// In-flight mutex to prevent duplicate clicks per post
-const inFlightLikeMutex = new Set<string>()
+function getStoredLikes(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem('gl_post_likes')
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return {}
+}
+
+function saveStoredLikes(likes: Record<string, string[]>) {
+  try {
+    localStorage.setItem('gl_post_likes', JSON.stringify(likes))
+  } catch {}
+}
+
+function getStoredComments(): Record<string, PostCommentItem[]> {
+  try {
+    const raw = localStorage.getItem('gl_post_comments')
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return {}
+}
+
+function saveStoredComments(comments: Record<string, PostCommentItem[]>) {
+  try {
+    localStorage.setItem('gl_post_comments', JSON.stringify(comments))
+  } catch {}
+}
+
+function getStoredNotifications(): NotificationRecord[] {
+  try {
+    const raw = localStorage.getItem('gl_notifications')
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return [
+    {
+      id: 'notif-1',
+      recipient_id: 'u-101',
+      title: 'Welcome Bonus Credited!',
+      message: 'You have received 100 Green Coins for joining Green Loop.',
+      type: 'reward',
+      is_read: false,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'notif-2',
+      recipient_id: 'u-101',
+      title: 'E-Waste Drive Tomorrow',
+      message: 'Neighborhood collection drive starts tomorrow at 10:00 AM.',
+      type: 'event',
+      is_read: true,
+      created_at: new Date(Date.now() - 86400000).toISOString(),
+    },
+  ]
+}
+
+function saveStoredNotifications(notifs: NotificationRecord[]) {
+  try {
+    localStorage.setItem('gl_notifications', JSON.stringify(notifs))
+  } catch {}
+}
 
 export const interactionsApi = {
   // --- LIKES ---
 
   async isPostLiked(postId: string, userId?: string): Promise<boolean> {
-    if (!userId) {
-      try {
-        const { data } = await supabase.auth.getUser()
-        userId = data?.user?.id
-      } catch {}
-    }
     if (!userId) return false
-
-    const { data, error } = await supabase
-      .from('post_likes')
-      .select('id')
-      .match({ post_id: postId, user_id: userId })
-      .maybeSingle()
-
-    if (error) {
-      console.warn('[Green Loop] isPostLiked error:', error.message)
-      return false
-    }
-    return Boolean(data)
+    const likes = getStoredLikes()
+    const postLikes = likes[postId] || []
+    return postLikes.includes(userId)
   },
 
   async getLikesCount(postId: string): Promise<number> {
-    const { count, error } = await supabase
-      .from('post_likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('post_id', postId)
-
-    if (error) {
-      console.warn('[Green Loop] getLikesCount error:', error.message)
-      return 0
-    }
-    return count || 0
+    const likes = getStoredLikes()
+    return (likes[postId] || []).length
   },
 
   async toggleLike(postId: string, suppliedUserId?: string): Promise<{ liked: boolean; count: number }> {
-    // 1. Double-click concurrency protection
-    if (inFlightLikeMutex.has(postId)) {
-      const count = await this.getLikesCount(postId)
-      const liked = await this.isPostLiked(postId, suppliedUserId)
-      return { liked, count }
+    const userId = suppliedUserId || 'u-local'
+    const likes = getStoredLikes()
+    const postLikes = likes[postId] || []
+
+    let isNowLiked = false
+    if (postLikes.includes(userId)) {
+      likes[postId] = postLikes.filter(id => id !== userId)
+      isNowLiked = false
+    } else {
+      likes[postId] = [...postLikes, userId]
+      isNowLiked = true
     }
 
-    inFlightLikeMutex.add(postId)
-
-    try {
-      // 2. Authoritative identity verification from Supabase Auth
-      let authUserId = suppliedUserId
-      const { data: authData } = await supabase.auth.getUser()
-      if (authData?.user?.id) {
-        authUserId = authData.user.id
-      }
-
-      if (!authUserId) {
-        throw new Error('You must be signed in to like a post.')
-      }
-
-      // 3. Check existing database record
-      const { data: existingLike, error: fetchErr } = await supabase
-        .from('post_likes')
-        .select('id')
-        .match({ post_id: postId, user_id: authUserId })
-        .maybeSingle()
-
-      if (fetchErr) {
-        throw new Error(fetchErr.message || 'Database error while checking like status.')
-      }
-
-      let isNowLiked = false
-
-      if (existingLike) {
-        // Unlike: delete database record
-        const { error: deleteErr } = await supabase
-          .from('post_likes')
-          .delete()
-          .match({ post_id: postId, user_id: authUserId })
-
-        if (deleteErr) {
-          throw new Error(deleteErr.message || 'Failed to remove like from database.')
-        }
-        isNowLiked = false
-      } else {
-        // Like: insert database record
-        const { error: insertErr } = await supabase
-          .from('post_likes')
-          .insert({ post_id: postId, user_id: authUserId })
-
-        if (insertErr) {
-          // If code is 23505, unique constraint caught duplicate concurrent insert
-          if (insertErr.code === '23505') {
-            isNowLiked = true
-          } else {
-            throw new Error(insertErr.message || 'Failed to record like in database.')
-          }
-        } else {
-          isNowLiked = true
-        }
-      }
-
-      // 4. Return database count and state
-      const count = await this.getLikesCount(postId)
-      return { liked: isNowLiked, count }
-    } finally {
-      inFlightLikeMutex.delete(postId)
-    }
+    saveStoredLikes(likes)
+    return { liked: isNowLiked, count: likes[postId].length }
   },
 
   // --- COMMENTS ---
 
   async getComments(postId: string): Promise<PostCommentItem[]> {
-    const { data, error } = await supabase
-      .from('post_comments')
-      .select('id, post_id, user_id, comment, created_at')
-      .eq('post_id', postId)
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      console.warn('[Green Loop] Fetch comments error:', error.message)
-      return []
-    }
-
-    if (!data || data.length === 0) return []
-
-    // Fetch author profile names
-    const userIds = Array.from(new Set(data.map((c: any) => c.user_id).filter(Boolean)))
-    let profMap = new Map<string, string>()
-
-    if (userIds.length > 0) {
-      const { data: profs } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', userIds)
-
-      if (profs) {
-        profMap = new Map(profs.map((p: any) => [p.id, p.full_name || 'Community Member']))
-      }
-    }
-
-    return data.map((c: any) => ({
-      id: String(c.id),
-      userId: c.user_id,
-      user: profMap.get(c.user_id) || 'Community Member',
-      text: c.comment,
-      time: c.created_at ? new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now',
-    }))
+    const allComments = getStoredComments()
+    return allComments[postId] || [
+      {
+        id: 'c1',
+        userId: 'u-102',
+        user: 'CircuitFix Repair Hub',
+        text: 'Available for immediate pickup and evaluation.',
+        time: '1 hour ago',
+      },
+    ]
   },
 
   async addComment(postId: string, userId: string, comment: string): Promise<PostCommentItem> {
-    if (!userId) {
-      throw new Error('You must be logged in to comment.')
-    }
     if (!comment.trim()) {
       throw new Error('Comment cannot be empty.')
     }
 
-    const { data, error } = await supabase
-      .from('post_comments')
-      .insert({
-        post_id: postId,
-        user_id: userId,
-        comment: comment.trim(),
-      })
-      .select('id, post_id, user_id, comment, created_at')
-      .single()
+    let userName = 'Community Member'
+    try {
+      const stored = localStorage.getItem('gl_user')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        userName = parsed.name || userName
+      }
+    } catch {}
 
-    if (error) {
-      console.error('[Green Loop] Add comment error:', error)
-      throw new Error(error.message || 'Failed to post comment.')
-    }
-
-    // Lookup commenter profile name
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', userId)
-      .maybeSingle()
-
-    return {
-      id: String(data.id),
-      userId: data.user_id,
-      user: profile?.full_name || 'You',
-      text: data.comment,
+    const newComment: PostCommentItem = {
+      id: 'c_' + Date.now(),
+      userId,
+      user: userName,
+      text: comment.trim(),
       time: 'Just now',
     }
+
+    const allComments = getStoredComments()
+    allComments[postId] = [...(allComments[postId] || []), newComment]
+    saveStoredComments(allComments)
+
+    return newComment
   },
 
   // --- CLAIMS ---
 
   async getPostClaim(postId: string, userId?: string) {
     if (!userId) return null
-    const { data, error } = await supabase
-      .from('post_claims')
-      .select('*')
-      .match({ post_id: postId, user_id: userId })
-      .maybeSingle()
-
-    if (error) {
-      console.warn('[Green Loop] getPostClaim error:', error.message)
+    try {
+      const claims = JSON.parse(localStorage.getItem('gl_post_claims') || '{}')
+      return claims[`${postId}_${userId}`] || null
+    } catch {
       return null
     }
-    return data
   },
 
   async claimPost(postId: string, userId: string): Promise<{ success: boolean; claim: any }> {
-    if (!userId) {
-      throw new Error('You must be logged in to claim an e-waste listing.')
+    const claim = {
+      id: 'claim-' + Date.now(),
+      post_id: postId,
+      user_id: userId,
+      status: 'pending',
+      created_at: new Date().toISOString(),
     }
 
-    // Duplicate check
-    const existing = await this.getPostClaim(postId, userId)
-    if (existing) {
-      return { success: true, claim: existing }
-    }
+    try {
+      const claims = JSON.parse(localStorage.getItem('gl_post_claims') || '{}')
+      claims[`${postId}_${userId}`] = claim
+      localStorage.setItem('gl_post_claims', JSON.stringify(claims))
+    } catch {}
 
-    const { data, error } = await supabase
-      .from('post_claims')
-      .insert({
-        post_id: postId,
-        user_id: userId,
-        status: 'pending',
-      })
-      .select('*')
-      .single()
-
-    if (error) {
-      console.error('[Green Loop] Claim post error:', error)
-      throw new Error(error.message || 'Failed to claim listing.')
-    }
-
-    return { success: true, claim: data }
+    return { success: true, claim }
   },
 
   // --- NOTIFICATIONS ---
 
   async getUserNotifications(userId: string): Promise<NotificationRecord[]> {
-    if (!userId) return []
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('recipient_id', userId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.warn('[Green Loop] Fetch notifications error:', error.message)
-      return []
-    }
-    return data || []
+    const notifs = getStoredNotifications()
+    return notifs.filter(n => !userId || n.recipient_id === userId || n.recipient_id === 'all')
   },
 
   async markAsRead(notificationId: string): Promise<void> {
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId)
-
-    if (error) {
-      console.warn('[Green Loop] markAsRead error:', error.message)
-    }
+    const notifs = getStoredNotifications()
+    const updated = notifs.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
+    saveStoredNotifications(updated)
   },
 
   async markAllAsRead(userId: string): Promise<void> {
-    if (!userId) return
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('recipient_id', userId)
-
-    if (error) {
-      console.warn('[Green Loop] markAllAsRead error:', error.message)
-    }
+    const notifs = getStoredNotifications()
+    const updated = notifs.map(n => (!userId || n.recipient_id === userId) ? { ...n, is_read: true } : n)
+    saveStoredNotifications(updated)
   },
 }
