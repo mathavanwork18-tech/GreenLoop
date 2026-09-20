@@ -5,6 +5,8 @@ import { postsApi } from '../services/posts/posts.api'
 import { interactionsApi, type PostCommentItem } from '../services/interactions/interactions.api'
 import { chatService } from '../services/chat/chatService'
 import MarketplaceChatModal from './chat/MarketplaceChatModal'
+import { PurchaseCheckoutModal, TransactionDetailsModal } from './payment'
+import type { MarketplacePurchase } from '../types/payment.types'
 
 export interface PostItem {
   id: string
@@ -19,12 +21,16 @@ export interface PostItem {
   description: string
   location: string
   distance: number
-  seller: { name: string; rating: number; verified: boolean; avatar: string | null }
+  seller: { id?: string; name: string; role?: string; phone?: string; rating: number; verified: boolean; avatar: string | null }
   images: string[]
   likes: number
   comments: number
   recommended?: boolean
   createdAt: string
+  status?: string
+  userId?: string
+  user_id?: string
+  sellerRole?: string
   aiAnalysis?: {
     confidence: string
     recommendation: string
@@ -59,24 +65,26 @@ export default function PostDetailModal({
   ])
   const [newComment, setNewComment] = useState('')
   const [commentsList, setCommentsList] = useState<PostCommentItem[]>([])
-  const [claiming, setClaiming] = useState(false)
-  const [claimStatus, setClaimStatus] = useState<string | null>(null)
   const [openMarketplaceChat, setOpenMarketplaceChat] = useState(false)
+  const [showCheckout, setShowCheckout] = useState(false)
+  const [selectedPurchaseDetails, setSelectedPurchaseDetails] = useState<MarketplacePurchase | null>(null)
 
   useEffect(() => {
     if (post?.id && isOpen) {
       interactionsApi.getComments(post.id).then(setCommentsList)
-      if (user?.id) {
-        interactionsApi.getPostClaim(post.id, user.id).then((c: any) => {
-          if (c) setClaimStatus(c.status)
-        })
-      }
     }
-  }, [post?.id, isOpen, user?.id])
+  }, [post?.id, isOpen])
 
   if (!isOpen || !post) return null
 
-  const isOwner = (user?.name && post.seller.name.toLowerCase() === user.name.toLowerCase()) || user?.role === 'ADMIN'
+  const currentUserId = user?.id || (typeof window !== 'undefined' ? (() => {
+    try { return JSON.parse(localStorage.getItem('gl_user') || '{}')?.id } catch { return null }
+  })() : null)
+
+  const isOwner = Boolean(
+    currentUserId &&
+    (post.seller?.id === currentUserId || (post as any).userId === currentUserId || (post as any).user_id === currentUserId)
+  )
 
   const handleDeletePost = async () => {
     if (!window.confirm('Are you sure you want to delete this listing? This will remove it from Marketplace, Map, and your profile.')) {
@@ -120,22 +128,7 @@ export default function PostDetailModal({
     }
   }
 
-  const handleClaimPost = async () => {
-    if (!user?.id) {
-      alert('Please sign in to claim this listing.')
-      return
-    }
-    setClaiming(true)
-    try {
-      const res = await interactionsApi.claimPost(post.id, user.id)
-      setClaimStatus(res.claim?.status || 'pending')
-      alert('Claim submitted successfully! The seller has been notified.')
-    } catch (err: any) {
-      alert(err.message || 'Could not submit claim.')
-    } finally {
-      setClaiming(false)
-    }
-  }
+
 
   return (
     <>
@@ -528,34 +521,54 @@ export default function PostDetailModal({
                 <span>Message Seller</span>
               </button>
 
+              {/* BUY BUTTON - ALWAYS ACTIVE FOR ALL USERS (GENERAL & LOCAL SHOP) */}
               <button
+                type="button"
                 className="btn btn-primary"
-                disabled={claiming || claimStatus === 'pending' || claimStatus === 'approved'}
-                onClick={handleClaimPost}
+                disabled={post.status === 'sold' || isOwner}
+                onClick={() => {
+                  if (isOwner) {
+                    alert('You cannot buy your own item.')
+                    return
+                  }
+                  setShowCheckout(true)
+                }}
                 style={{
                   flex: 1,
-                  fontSize: '0.88rem',
+                  height: 42,
+                  fontSize: '0.9rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 6,
-                  background: claimStatus ? '#059669' : undefined,
+                  gap: 8,
+                  borderRadius: 'var(--radius-md)',
+                  background: isOwner
+                    ? 'rgba(255, 255, 255, 0.08)'
+                    : post.status === 'sold'
+                    ? 'rgba(255, 255, 255, 0.08)'
+                    : 'linear-gradient(135deg, #00FF9C 0%, #059669 100%)',
+                  color: isOwner || post.status === 'sold' ? '#8B949E' : '#0D1117',
+                  border: isOwner || post.status === 'sold' ? '1px solid rgba(255, 255, 255, 0.15)' : 'none',
+                  fontWeight: 900,
+                  cursor: isOwner || post.status === 'sold' ? 'not-allowed' : 'pointer',
+                  boxShadow: isOwner || post.status === 'sold' ? 'none' : '0 4px 14px rgba(0, 255, 156, 0.3)',
                 }}
               >
-                {claiming ? (
-                  <span>Submitting Claim...</span>
-                ) : claimStatus === 'approved' ? (
-                  <><Icon name="check" size={16} color="#fff" /><span>Claim Approved</span></>
-                ) : claimStatus === 'pending' ? (
-                  <><Icon name="check" size={16} color="#fff" /><span>Claim Pending</span></>
-                ) : post.purpose === 'Sell' ? (
-                  <><Icon name="coin" size={16} color="#fff" /><span>Claim & Make Offer</span></>
-                ) : post.purpose === 'Recycle' ? (
-                  <><Icon name="pickup" size={16} color="#fff" /><span>Claim for Recycling</span></>
-                ) : post.purpose === 'Donate' ? (
-                  <><Icon name="gift" size={16} color="#fff" /><span>Claim Donation</span></>
+                {post.status === 'sold' ? (
+                  <>
+                    <Icon name="check" size={16} color="#8B949E" />
+                    <span>Item Sold</span>
+                  </>
+                ) : isOwner ? (
+                  <>
+                    <Icon name="user" size={16} color="#8B949E" />
+                    <span>Your Listing</span>
+                  </>
                 ) : (
-                  <><Icon name="refresh" size={16} color="#fff" /><span>Claim Device</span></>
+                  <>
+                    <Icon name="shopping-bag" size={16} color="#0D1117" />
+                    <span>BUY {post.price !== null && post.price !== undefined ? `• ₹${Number(post.price).toLocaleString()}` : ''}</span>
+                  </>
                 )}
               </button>
             </>
@@ -577,6 +590,50 @@ export default function PostDetailModal({
           imageUrl: post.images?.[0] || null,
         }}
         onClose={() => setOpenMarketplaceChat(false)}
+      />
+
+      {/* Premium Marketplace Purchase & Payment Checkout Modal */}
+      <PurchaseCheckoutModal
+        isOpen={showCheckout}
+        post={{
+          id: post.id,
+          title: post.title,
+          price: post.price,
+          images: post.images,
+          condition: post.condition,
+          seller: {
+            id: (post as any).userId || (post as any).user_id || (post.seller as any)?.id,
+            name: post.seller.name,
+            role: (post as any).sellerRole || (post.seller as any)?.role || 'citizen',
+            rating: post.seller.rating,
+            verified: post.seller.verified,
+          },
+        }}
+        onClose={() => setShowCheckout(false)}
+        onOpenChat={() => {
+          setShowCheckout(false)
+          setOpenMarketplaceChat(true)
+        }}
+        onViewTransactionDetails={(p) => {
+          setShowCheckout(false)
+          setSelectedPurchaseDetails(p)
+        }}
+        onSuccess={() => {
+          setShowCheckout(false)
+          onClose()
+        }}
+      />
+
+      {/* Detailed Transaction Receipt Modal */}
+      <TransactionDetailsModal
+        isOpen={!!selectedPurchaseDetails}
+        purchase={selectedPurchaseDetails}
+        currentUserId={user?.id}
+        onClose={() => setSelectedPurchaseDetails(null)}
+        onOpenChat={() => {
+          setSelectedPurchaseDetails(null)
+          setOpenMarketplaceChat(true)
+        }}
       />
     </>
   )

@@ -3,7 +3,10 @@ import type { EcoAction } from './common.types'
 export type DeviceCondition = 'Flawless' | 'Good' | 'Fair' | 'Broken / For Parts' | 'Hazmat (Swollen Battery)'
 
 export interface PostSeller {
+  id?: string
   name: string
+  role?: string
+  phone?: string
   rating: number
   verified: boolean
   avatar: string | null

@@ -186,6 +186,9 @@ export default function LocalShopOrdersPage() {
 
   const getStatusBadge = (status: string) => {
     const s = status.toLowerCase()
+    if (s === 'sold') {
+      return <span style={{ background: 'rgba(0, 194, 255, 0.15)', color: '#00C2FF', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 800 }}>✓ Sold</span>
+    }
     if (s === 'completed' || s === 'approved') {
       return <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent)', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 800 }}>Completed</span>
     }

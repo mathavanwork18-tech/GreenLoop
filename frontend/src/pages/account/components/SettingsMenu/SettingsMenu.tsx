@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../../../context/ThemeContext'
 import { usePwaInstall } from '../../../../context/PwaInstallContext'
 import Icon from '../../../../components/Icon'
+import NotificationPermissionCard from '../../../../components/notifications/NotificationPermissionCard'
 
 interface SettingsMenuProps {
   onOpenHelp: () => void
@@ -68,6 +69,9 @@ export default function SettingsMenu({ onOpenHelp, onLogout }: SettingsMenuProps
           {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
         </span>
       </div>
+
+      {/* System & Device Notifications Status & Controls */}
+      <NotificationPermissionCard compact />
 
       {/* PWA Install Entry in Settings */}
       <div

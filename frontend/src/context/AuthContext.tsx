@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { LanguageCode } from '../types/common.types'
-import { supabase, isAuthTestMode, PREDEFINED_TEST_IDENTITIES, setDevTestSession, getDevDemoSession, clearDevTestSession } from '../utils/supabase'
+import { supabase, isAuthTestMode, DEV_DUMMY_OTP } from '../utils/supabase'
 import { normalizePhone } from '../utils/phone'
 import { normalizeRole, updateUserRoleInDatabase } from '../services/role/roleService'
 import { coinService } from '../services/coin/coinService'
@@ -27,6 +27,7 @@ export interface User {
   levelMax: number
   streak: number
   isVerified: boolean
+  isPhoneVerified?: boolean
   isProfileComplete?: boolean
   rating: number
   transactions: number
@@ -83,6 +84,26 @@ export interface RegistrationDraft {
   updatedAt: number
 }
 
+export interface RegisterData {
+  name: string
+  email: string
+  phone?: string
+  password: string
+  role: Role
+  city: string
+  area?: string
+  landmark?: string
+  shopName?: string
+  ownerName?: string
+  shopCategory?: string
+  shopAddress?: string
+  companyName?: string
+  contactPerson?: string
+  companyCategory?: string
+  companyAddress?: string
+  coordinates?: { lat: number; lng: number } | null
+}
+
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
@@ -116,20 +137,13 @@ interface AuthContextType {
   ) => Promise<User>
   devLogin?: (role: 'citizen' | 'shop') => Promise<User>
   register: (data: RegisterData) => Promise<User>
+  resetPassword: (email: string) => Promise<void>
+  updatePassword: (newPassword: string) => Promise<void>
   logout: () => Promise<void>
   updateCoins: (amount: number) => void
   redeemCoins: (amount: number, title?: string) => void
   setRole: (role: Role) => void
   setUser: React.Dispatch<React.SetStateAction<User | null>>
-}
-
-interface RegisterData {
-  name: string
-  email?: string
-  phone: string
-  password: string
-  role: Role
-  city: string
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -149,6 +163,12 @@ function mapDbProfileToUser(profile: any, authUser?: any, coinBalance?: number, 
     email.split('@')[0] ||
     'Green Loop Member'
 
+  const avatar =
+    profile?.avatar_url ||
+    authUser?.user_metadata?.avatar_url ||
+    authUser?.user_metadata?.picture ||
+    null
+
   const resolvedCoins = coinBalance !== undefined
     ? coinBalance
     : (typeof profile?.coins === 'number' ? profile.coins : 0)
@@ -156,6 +176,18 @@ function mapDbProfileToUser(profile: any, authUser?: any, coinBalance?: number, 
   const resolvedStreak = streakVal !== undefined
     ? streakVal
     : (typeof profile?.current_streak === 'number' ? profile.current_streak : 1)
+
+  // Profile is complete only if explicitly marked complete in database,
+  // or (as fallback for pre-existing records) has role, non-default name, and location/address
+  const isProfileComplete = profile?.is_profile_complete !== undefined
+    ? Boolean(profile.is_profile_complete)
+    : Boolean(
+        profile?.id &&
+        profile?.full_name &&
+        profile?.full_name !== 'Green Loop Member' &&
+        profile?.role &&
+        (profile?.address || profile?.city)
+      )
 
   return {
     id: profile?.id || authUser?.id,
@@ -166,7 +198,7 @@ function mapDbProfileToUser(profile: any, authUser?: any, coinBalance?: number, 
     city: profile?.city || 'Coimbatore',
     area: profile?.address || 'RS Puram',
     bio: 'Eco-conscious Green Loop community member',
-    avatar: null,
+    avatar,
     role,
     greenCoins: resolvedCoins,
     level: resolvedCoins >= 5000 ? 'Planet Guardian' : resolvedCoins >= 2000 ? 'Eco Master' : resolvedCoins >= 500 ? 'Eco Champion' : 'Eco Beginner',
@@ -175,12 +207,13 @@ function mapDbProfileToUser(profile: any, authUser?: any, coinBalance?: number, 
     levelMax: 499,
     streak: resolvedStreak,
     isVerified: true,
-    isProfileComplete: true,
+    isPhoneVerified: Boolean(profile?.phone_verified),
+    isProfileComplete,
     rating: 4.9,
     transactions: 0,
     joinedAt: profile?.created_at || new Date().toISOString(),
     preferences: {
-      language: 'EN',
+      language: (localStorage.getItem('gl_language') as LanguageCode) || 'EN',
       preferredCategories: ['Smartphones', 'Laptops'],
       preferredAction: 'Recycle',
       pickupPreference: 'doorstep',
@@ -202,22 +235,37 @@ function mapDbProfileToUser(profile: any, authUser?: any, coinBalance?: number, 
  */
 async function ensureProfile(
   userId: string,
-  meta?: { full_name?: string; phone?: string; role?: string; city?: string; address?: string }
+  meta?: {
+    full_name?: string
+    phone?: string
+    phone_verified?: boolean
+    role?: string
+    city?: string
+    address?: string
+    is_profile_complete?: boolean
+  }
 ) {
   if (!userId) return null
 
   const dbRole = normalizeRole(meta?.role)
 
-  const profilePayload = {
+  const profilePayload: any = {
     id: userId,
     full_name: meta?.full_name || 'Green Loop Member',
     phone: meta?.phone || '',
-    role: dbRole,
+    role: dbRole === 'admin' ? 'citizen' : dbRole,
     city: meta?.city || 'Coimbatore',
     address: meta?.address || '',
   }
 
-  // 1. Direct UPSERT into public.profiles
+  if (meta?.is_profile_complete !== undefined) {
+    profilePayload.is_profile_complete = meta.is_profile_complete
+  }
+
+  if (meta?.phone_verified !== undefined) {
+    profilePayload.phone_verified = meta.phone_verified
+  }
+
   try {
     const { data: upserted, error: upsertErr } = await supabase
       .from('profiles')
@@ -228,77 +276,20 @@ async function ensureProfile(
     if (!upsertErr && upserted) {
       return upserted
     }
-    if (upsertErr && (upsertErr.code === '23514' || upsertErr.message?.includes('profiles_role_check')) && dbRole === 'company') {
-      const fallbackPayload = { ...profilePayload, role: 'recycler' }
-      const { data: fbUpserted, error: fbErr } = await supabase
-        .from('profiles')
-        .upsert(fallbackPayload, { onConflict: 'id' })
-        .select('*')
-        .maybeSingle()
-      if (!fbErr && fbUpserted) {
-        return fbUpserted
-      }
-    }
-    if (upsertErr) {
-      console.warn('[Green Loop] Direct upsert into public.profiles notice:', upsertErr.code, upsertErr.message)
-    }
   } catch (err: any) {
-    console.warn('[Green Loop] Profile upsert error:', err?.message)
+    console.warn('[Green Loop] Profile upsert notice:', err?.message)
   }
 
-  // 2. Fallback: Check if database trigger (on_auth_user_created) created the row concurrently
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await new Promise(r => setTimeout(r, 400))
-      const { data: existing } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle()
+  // Fallback check
+  try {
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle()
 
-      if (existing) {
-        // If profile was auto-created or role/meta doesn't match selected dbRole, update with real meta
-        if (
-          existing.role !== dbRole ||
-          (meta?.full_name && (existing.full_name === 'Green Loop Member' || existing.full_name === 'Green Loop Citizen'))
-        ) {
-          let { data: updated, error: updateErr } = await supabase
-            .from('profiles')
-            .update({
-              full_name: meta?.full_name || existing.full_name,
-              phone: meta?.phone || existing.phone,
-              role: dbRole,
-              city: meta?.city || existing.city,
-              address: meta?.address || existing.address,
-            })
-            .eq('id', userId)
-            .select('*')
-            .maybeSingle()
-
-          if (updateErr && (updateErr.code === '23514' || updateErr.message?.includes('profiles_role_check')) && dbRole === 'company') {
-            const { data: fbUpdated } = await supabase
-              .from('profiles')
-              .update({
-                full_name: meta?.full_name || existing.full_name,
-                phone: meta?.phone || existing.phone,
-                role: 'recycler',
-                city: meta?.city || existing.city,
-                address: meta?.address || existing.address,
-              })
-              .eq('id', userId)
-              .select('*')
-              .maybeSingle()
-            updated = fbUpdated
-          }
-
-          return updated || { ...existing, role: dbRole }
-        }
-        return existing
-      }
-    } catch {
-      // Continue retrying
-    }
-  }
+    if (existing) return existing
+  } catch {}
 
   return profilePayload
 }
@@ -332,7 +323,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user && mounted) {
-          // Strictly query public.profiles using id = session.user.id
           let { data: profile, error: profileErr } = await supabase
             .from('profiles')
             .select('*')
@@ -346,66 +336,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               phone: meta.phone,
               role: meta.role,
               city: meta.city,
+              is_profile_complete: false,
             })
           }
 
-          const dailyReward = await coinService.processDailyLoginReward(session.user.id)
+          let dailyCoins = 0
+          let dailyStreak = 1
+          try {
+            const dailyReward = await coinService.processDailyLoginReward(session.user.id)
+            dailyCoins = dailyReward.totalCoins
+            dailyStreak = dailyReward.streak
+          } catch {}
 
           if (profile && mounted) {
-            const syncedUser = mapDbProfileToUser(profile, session.user, dailyReward.totalCoins, dailyReward.streak)
+            const syncedUser = mapDbProfileToUser(profile, session.user, dailyCoins, dailyStreak)
             setUser(syncedUser)
             localStorage.setItem('gl_user', JSON.stringify(syncedUser))
           }
         } else if (mounted) {
-          // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
-          if (isAuthTestMode) {
-            const demoSession = getDevDemoSession()
-            if (demoSession?.profile_id || demoSession?.id) {
-              const targetId = demoSession.profile_id || demoSession.id
-              const { data: dbProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', targetId)
-                .maybeSingle()
-
-              if (dbProfile && mounted) {
-                const dailyReward = await coinService.processDailyLoginReward(dbProfile.id)
-                const syncedUser = mapDbProfileToUser(
-                  dbProfile,
-                  {
-                    id: dbProfile.id,
-                    user_metadata: {
-                      profile_id: dbProfile.id,
-                      full_name: dbProfile.full_name,
-                      role: dbProfile.role,
-                      phone: dbProfile.phone || demoSession.phone,
-                      city: dbProfile.city,
-                      language: demoSession.language,
-                      isProfileComplete: demoSession.isProfileComplete,
-                      registration_status: demoSession.registration_status,
-                    },
-                  },
-                  dailyReward.totalCoins,
-                  dailyReward.streak
-                )
-                setUser(syncedUser)
-                localStorage.setItem('gl_user', JSON.stringify(syncedUser))
-                return
-              }
-            }
-          }
-
-          // No active Supabase GoTrue or Demo session
           setUser(null)
           localStorage.removeItem('gl_user')
         }
       } catch (err) {
-        console.warn('[Green Loop] Initial session sync error:', err)
+        console.warn('[Green Loop] Session sync exception:', err)
         if (mounted) {
-          if (!isAuthTestMode || !getDevDemoSession()) {
-            setUser(null)
-            localStorage.removeItem('gl_user')
-          }
+          setUser(null)
+          localStorage.removeItem('gl_user')
         }
       } finally {
         if (mounted) {
@@ -419,7 +375,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
 
-      // Do NOT wipe or redirect on INITIAL_SESSION; syncAuthSession handles it explicitly
       if (event === 'INITIAL_SESSION') return
 
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
@@ -436,17 +391,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.removeItem('gl_pending_role')
           }
           profile = await ensureProfile(session.user.id, {
-            full_name: meta.full_name || meta.name || meta.user_name || session.user.email?.split('@')[0],
+            full_name: meta.full_name || meta.name || session.user.email?.split('@')[0],
             phone: meta.phone,
             role: pendingRole || meta.role || 'citizen',
             city: meta.city || 'Coimbatore',
+            is_profile_complete: false,
           })
         }
 
-        const dailyReward = await coinService.processDailyLoginReward(session.user.id)
+        let dailyCoins = 0
+        let dailyStreak = 1
+        try {
+          const dailyReward = await coinService.processDailyLoginReward(session.user.id)
+          dailyCoins = dailyReward.totalCoins
+          dailyStreak = dailyReward.streak
+        } catch {}
 
         if (profile && mounted) {
-          const syncedUser = mapDbProfileToUser(profile, session.user, dailyReward.totalCoins, dailyReward.streak)
+          const syncedUser = mapDbProfileToUser(profile, session.user, dailyCoins, dailyStreak)
           setUser(syncedUser)
           localStorage.setItem('gl_user', JSON.stringify(syncedUser))
         }
@@ -458,7 +420,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('gl_custom_coin_history')
         localStorage.removeItem('gl_posts')
         localStorage.removeItem('gl_sessions')
-        clearDevTestSession()
         sessionStorage.clear()
       }
     })
@@ -497,7 +458,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // --- Registration Resume Draft Management ---
+  // --- Registration Draft Management ---
   const saveRegistrationDraft = (draft: Partial<RegistrationDraft>) => {
     try {
       const existing = getRegistrationDraft() || { phone: '', updatedAt: Date.now() }
@@ -529,71 +490,137 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
   }
 
-  // --- Phone + OTP Authentication Flow (Native Supabase Auth with Strict Mode Separation) ---
+  // --- Real Supabase Email + Password Authentication (Phase 2) ---
+  const login = async (identifier: string, password: string): Promise<User> => {
+    const cleanId = identifier.trim()
+    if (!cleanId) {
+      throw new Error('Please enter your email address.')
+    }
+    if (!password) {
+      throw new Error('Please enter your password.')
+    }
+
+    // Check email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(cleanId)) {
+      throw new Error('Please enter a valid email address.')
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: cleanId.toLowerCase(),
+      password,
+    })
+
+    if (authError || !authData?.user) {
+      const msg = (authError?.message || '').toLowerCase()
+      const status = (authError as any)?.status
+
+      // Unconfirmed email error
+      if (msg.includes('email not confirmed') || msg.includes('unconfirmed')) {
+        throw new Error('Please verify your email address before signing in. Check your inbox.')
+      }
+
+      // Disabled or banned user
+      if (msg.includes('disabled') || msg.includes('banned') || msg.includes('deactivated')) {
+        throw new Error('This account has been suspended or disabled. Please contact support.')
+      }
+
+      // Network / server connection error
+      if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed to fetch') || status === 502 || status === 503) {
+        throw new Error('Network connection error. Please check your internet connection.')
+      }
+
+      // Generic error message: never reveal whether account exists
+      throw new Error('Incorrect email or password.')
+    }
+
+    const authUser = authData.user
+
+    // Evict previous caches
+    recommendationTracker.clearUserSession()
+
+    // Retrieve profile from public.profiles
+    let { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .maybeSingle()
+
+    if (!profile) {
+      const meta = authUser.user_metadata || {}
+      profile = await ensureProfile(authUser.id, {
+        full_name: meta.full_name || meta.name || authUser.email?.split('@')[0],
+        phone: meta.phone || '',
+        role: meta.role || 'citizen',
+        city: meta.city || 'Coimbatore',
+      })
+    }
+
+    let dailyCoins = 0
+    let dailyStreak = 1
+    try {
+      const dailyReward = await coinService.processDailyLoginReward(authUser.id)
+      dailyCoins = dailyReward.totalCoins
+      dailyStreak = dailyReward.streak
+    } catch {}
+
+    const loggedInUser = mapDbProfileToUser(profile, authUser, dailyCoins, dailyStreak)
+    setUser(loggedInUser)
+    localStorage.setItem('gl_user', JSON.stringify(loggedInUser))
+    return loggedInUser
+  }
+
+  // --- Real Supabase Google OAuth (Phase 3) ---
+  const signInWithGoogle = async (redirectTo?: string) => {
+    const targetUrl = redirectTo || window.location.origin
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: targetUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    })
+    if (error) {
+      console.error('[Green Loop] Google OAuth error:', error)
+      throw new Error(error.message || 'Could not connect with Google. Please try again.')
+    }
+  }
+
+  // --- Phone + OTP Flow with Development Dummy OTP (Phase 4) ---
   const sendOtp = async (rawPhone: string): Promise<{ success: boolean; message: string; devOtp?: string }> => {
     const { e164, national, isValid, masked } = normalizePhone(rawPhone)
     if (!isValid) {
       throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6-9.')
     }
 
-    // 1. Development Test Mode: Pure Dummy OTP Flow for ANY phone number
+    // 1. Development Test Mode: Controlled dummy OTP 123456
     if (isAuthTestMode) {
-      const dummyOtp = '123456'
-      sessionStorage.setItem('gl_demo_otp_' + national, dummyOtp)
+      sessionStorage.setItem('gl_dev_otp_' + national, DEV_DUMMY_OTP)
       return {
         success: true,
         message: `[Dev Mode] Test OTP generated for ${masked}`,
-        devOtp: dummyOtp,
+        devOtp: DEV_DUMMY_OTP,
       }
     }
 
-    // 2. Production: Native Supabase Phone OTP Flow (Real SMS Provider)
+    // 2. Production: Native Supabase Phone OTP Flow
     const { error } = await supabase.auth.signInWithOtp({ phone: e164 })
     if (error) {
       const msg = (error.message || '').toLowerCase()
       const status = (error as any)?.status
 
-      // Rate limit / 429 / cooldown / SMS quota errors
-      if (
-        status === 429 ||
-        msg.includes('rate limit') ||
-        msg.includes('rate_limit') ||
-        msg.includes('too many') ||
-        msg.includes('limit') ||
-        msg.includes('exceeded') ||
-        msg.includes('quota') ||
-        msg.includes('for security purposes') ||
-        msg.includes('cooldown') ||
-        msg.includes('frequency')
-      ) {
-        throw new Error('Too many OTP requests. Please wait and try again.')
+      if (status === 429 || msg.includes('rate limit') || msg.includes('too many') || msg.includes('limit exceeded')) {
+        throw new Error('Too many OTP requests. Please wait a few moments before trying again.')
       }
 
-      // SMS provider / Twilio / account limits / service outage
-      if (
-        msg.includes('provider') ||
-        msg.includes('twilio') ||
-        msg.includes('unavailable') ||
-        msg.includes('gateway') ||
-        msg.includes('bad gateway') ||
-        msg.includes('502') ||
-        msg.includes('503') ||
-        msg.includes('504') ||
-        msg.includes('network') ||
-        msg.includes('balance') ||
-        msg.includes('credit') ||
-        msg.includes('channel')
-      ) {
+      if (msg.includes('provider') || msg.includes('unavailable') || status === 502 || status === 503) {
         throw new Error('OTP service is temporarily unavailable. Please try again later.')
       }
 
-      // Invalid phone format
-      if (msg.includes('invalid') && (msg.includes('phone') || msg.includes('format') || msg.includes('number'))) {
-        throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6-9.')
-      }
-
-      // Default safe sanitized error - NEVER expose Twilio credentials, secrets, or raw internal errors
-      throw new Error('OTP service is temporarily unavailable. Please try again later.')
+      throw new Error('Could not send OTP. Please verify your phone number and try again.')
     }
 
     return {
@@ -623,90 +650,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Please enter a valid 6-digit OTP.')
     }
 
-    // 1. Development Test Mode: Pure Dummy OTP Verification for ANY phone number
+    // 1. Development Test Mode
     if (isAuthTestMode) {
-      const storedOtp = sessionStorage.getItem('gl_demo_otp_' + national) || '123456'
-      // Accept standard DUMMY_OTP "123456" or any stored session OTP
-      if (cleanOtp !== '123456' && cleanOtp !== storedOtp) {
-        throw new Error('Incorrect OTP. Please check the code and try again.')
+      if (cleanOtp !== DEV_DUMMY_OTP) {
+        throw new Error('The OTP is incorrect. Please try again.')
       }
 
-      // DO NOT call supabase.auth.verifyOtp()!
-
-      // Check if this phone number already has a profile in public.profiles
-      const { data: matchedProfiles, error: profileErr } = await supabase
+      // Look up profile by phone number in public.profiles
+      const { data: matchedProfiles } = await supabase
         .from('profiles')
         .select('*')
         .or(`phone.eq.${e164},phone.eq.${national},phone.eq.91${national},phone.eq.+91 ${national}`)
 
-      if (profileErr) {
-        console.warn('[Green Loop] Dev mode profile lookup notice:', profileErr.message)
-      }
-
-      // Existing profile found for this phone
       if (matchedProfiles && matchedProfiles.length > 0) {
-        const dbProfile =
-          matchedProfiles.find(p => p.full_name && p.full_name !== 'Green Loop Member') ||
-          matchedProfiles[0]
-
+        const dbProfile = matchedProfiles[0]
         const isComplete = Boolean(
           dbProfile.full_name &&
           dbProfile.full_name !== 'Green Loop Member' &&
           dbProfile.role
         )
 
-        setDevTestSession({
-          id: dbProfile.id,
-          name: dbProfile.full_name,
-          phone: dbProfile.phone || e164,
-          e164,
-          role: dbProfile.role,
-          city: dbProfile.city,
-          language,
-          isProfileComplete: isComplete,
-          registration_status: isComplete ? 'completed' : 'pending',
-        })
-
-        const dailyReward = await coinService.processDailyLoginReward(dbProfile.id)
-        const loggedIn = mapDbProfileToUser(
-          dbProfile,
-          {
-            id: dbProfile.id,
-            user_metadata: {
-              full_name: dbProfile.full_name,
-              role: dbProfile.role,
-              phone: e164,
-              city: dbProfile.city,
-            },
-          },
-          dailyReward.totalCoins,
-          dailyReward.streak
-        )
-
-        setUser(loggedIn)
-        localStorage.setItem('gl_user', JSON.stringify(loggedIn))
+        const devUser = mapDbProfileToUser(dbProfile, { id: dbProfile.id, user_metadata: { role: dbProfile.role } })
+        setUser(devUser)
+        localStorage.setItem('gl_user', JSON.stringify(devUser))
 
         return {
           success: true,
           isExistingUser: true,
           isProfileComplete: isComplete,
-          user: loggedIn,
-          role: loggedIn.role,
+          user: devUser,
+          role: devUser.role,
         }
       }
-
-      const newUserId = crypto.randomUUID()
-      setDevTestSession({
-        id: newUserId,
-        name: 'New Member',
-        phone: e164,
-        e164,
-        role: 'citizen',
-        city: 'Coimbatore',
-        language,
-        isProfileComplete: false,
-        registration_status: 'pending',
-      })
 
       return {
         success: true,
@@ -715,8 +690,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // 2. Production: Native GoTrue SMS verification (Real provider)
-    let authUser: any = null
+    // 2. Production: Native Supabase GoTrue Phone Verification
     const { data: verifyData, error: authError } = await supabase.auth.verifyOtp({
       phone: e164,
       token: cleanOtp,
@@ -725,79 +699,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (authError || !verifyData?.user) {
       const msg = (authError?.message || '').toLowerCase()
-      const status = (authError as any)?.status
 
-      // Rate limit / too many verification attempts
-      if (
-        status === 429 ||
-        msg.includes('rate limit') ||
-        msg.includes('rate_limit') ||
-        msg.includes('too many') ||
-        msg.includes('exceeded')
-      ) {
-        throw new Error('Too many OTP requests. Please wait and try again.')
+      if (msg.includes('expired') || (authError as any)?.code === 'otp_expired') {
+        throw new Error('This OTP has expired. Request a new OTP.')
       }
 
-      // Provider or infrastructure failure
-      if (
-        msg.includes('provider') ||
-        msg.includes('twilio') ||
-        msg.includes('unavailable') ||
-        msg.includes('gateway') ||
-        msg.includes('502') ||
-        msg.includes('503') ||
-        msg.includes('504')
-      ) {
-        throw new Error('OTP service is temporarily unavailable. Please try again later.')
-      }
-
-      // Expired OTP handling
-      if (
-        (msg.includes('expired') && !msg.includes('invalid')) ||
-        (authError as any)?.code === 'otp_expired' ||
-        msg.includes('has expired') ||
-        msg.includes('token is expired') ||
-        msg.includes('code has expired')
-      ) {
-        throw new Error('This OTP has expired. Please request a new OTP.')
-      }
-
-      // Wrong OTP handling
-      if (
-        msg.includes('invalid') ||
-        msg.includes('token has expired or is invalid') ||
-        msg.includes('token') ||
-        msg.includes('otp') ||
-        (authError as any)?.code === 'bad_code' ||
-        (authError as any)?.code === 'otp_invalid'
-      ) {
-        throw new Error('Incorrect OTP. Please check the code and try again.')
-      }
-
-      // Default safe sanitized error
-      throw new Error('Incorrect OTP. Please check the code and try again.')
+      throw new Error('The OTP is incorrect. Please try again.')
     }
 
-    authUser = verifyData.user
+    const authUser = verifyData.user
 
-    if (!authUser?.id) {
-      throw new Error('Incorrect OTP. Please check the code and try again.')
-    }
-
-    // 3. Locate existing profile in profiles table by ID (never by phone!)
-    let { data: dbProfile, error: profileErr } = await supabase
+    let { data: dbProfile } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', authUser.id)
       .maybeSingle()
 
-    if (profileErr) {
-      console.warn('[Green Loop] Error retrieving profile after OTP verify:', profileErr)
-    }
+    if (dbProfile && dbProfile.full_name && dbProfile.full_name !== 'Green Loop Member') {
+      let dailyCoins = 0
+      let dailyStreak = 1
+      try {
+        const dailyReward = await coinService.processDailyLoginReward(authUser.id)
+        dailyCoins = dailyReward.totalCoins
+        dailyStreak = dailyReward.streak
+      } catch {}
 
-    if (dbProfile && dbProfile.id && dbProfile.full_name && dbProfile.full_name !== 'Green Loop Member') {
-      const dailyReward = await coinService.processDailyLoginReward(authUser.id)
-      const loggedIn = mapDbProfileToUser(dbProfile, authUser, dailyReward.totalCoins, dailyReward.streak)
+      const loggedIn = mapDbProfileToUser(dbProfile, authUser, dailyCoins, dailyStreak)
       setUser(loggedIn)
       localStorage.setItem('gl_user', JSON.stringify(loggedIn))
       return {
@@ -809,7 +736,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Verified user, continue to complete profile
     return {
       success: true,
       isExistingUser: Boolean(dbProfile?.id),
@@ -817,408 +743,121 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const devLogin = async (targetRole: 'citizen' | 'shop'): Promise<User> => {
-    if (!isAuthTestMode) {
-      throw new Error('Dev test login is only available in development test mode.')
-    }
-    const identity = targetRole === 'shop'
-      ? PREDEFINED_TEST_IDENTITIES.LOCAL_SHOP
-      : PREDEFINED_TEST_IDENTITIES.GENERAL_USER
-
-    setDevTestSession(identity)
-
-    let { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', identity.id)
-      .maybeSingle()
-
-    if (!profile) {
-      profile = await ensureProfile(identity.id, {
-        full_name: identity.name,
-        phone: identity.e164,
-        role: identity.role,
-        city: identity.city,
-      })
+  // --- Password Recovery Flow (Phase 5) ---
+  const resetPassword = async (email: string): Promise<void> => {
+    const cleanEmail = email.trim().toLowerCase()
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(cleanEmail)) {
+      throw new Error('Please enter a valid email address.')
     }
 
-    const dailyReward = await coinService.processDailyLoginReward(identity.id)
-    const loggedIn = mapDbProfileToUser(
-      profile,
-      { id: identity.id, user_metadata: { full_name: identity.name, role: identity.role } },
-      dailyReward.totalCoins,
-      dailyReward.streak
-    )
-    setUser(loggedIn)
-    localStorage.setItem('gl_user', JSON.stringify(loggedIn))
-    return loggedIn
-  }
-
-  const completeProfile = async (role: Role, profileData: any): Promise<User> => {
-    const { e164, national, isValid } = normalizePhone(profileData.phone)
-    if (!isValid) {
-      throw new Error('A valid Indian mobile number is required to complete registration.')
-    }
-
-    const dbRole = normalizeRole(role)
-    if (dbRole === 'admin') {
-      throw new Error('Administrator accounts cannot be registered via public registration.')
-    }
-    const name = profileData.name || profileData.ownerName || (dbRole === 'shop' ? profileData.shopName : 'Eco Citizen')
-    // Email is purely optional metadata and never used as primary auth credential
-    const email = profileData.email?.trim() || ''
-
-    // 1. Verify that this phone number is not already associated with another profile
-    try {
-      const { data: existingWithPhone, error: checkError } = await supabase
-        .from('profiles')
-        .select('id, phone')
-        .or(`phone.eq.${e164},phone.eq.${national},phone.eq.+91 ${national}`)
-        .maybeSingle()
-
-      if (!checkError && existingWithPhone) {
-        const { data: sessionData } = await supabase.auth.getSession()
-        const currentAuthId = sessionData?.session?.user?.id
-        if (currentAuthId && existingWithPhone.id !== currentAuthId) {
-          throw new Error('This phone number is already registered to another Green Loop account.')
-        }
-      }
-    } catch (e: any) {
-      if (e.message?.includes('already registered')) throw e
-    }
-
-    // 2. Ensure Supabase Auth user exists using PHONE as primary identity (zero email rate limit)
-    let authUserId: string | null = null
-    const { data: sessionData } = await supabase.auth.getSession()
-    if (sessionData?.session?.user) {
-      authUserId = sessionData.session.user.id
-    } else if (isAuthTestMode) {
-      authUserId = crypto.randomUUID()
-    } else {
-      const defaultPassword = profileData.password || 'GreenLoop@2026!'
-      try {
-        const { data: phoneSignUpData, error: phoneSignUpError } = await supabase.auth.signUp({
-          phone: e164,
-          password: defaultPassword,
-          options: {
-            data: {
-              full_name: name,
-              phone: e164,
-              role: dbRole,
-              city: profileData.city || 'Coimbatore',
-              email: email || undefined,
-            },
-          },
-        })
-
-        if (!phoneSignUpError && phoneSignUpData?.user) {
-          authUserId = phoneSignUpData.user.id
-        } else if (phoneSignUpError?.message?.toLowerCase().includes('already registered')) {
-          try {
-            const { data: signInData } = await supabase.auth.signInWithPassword({
-              phone: e164,
-              password: defaultPassword,
-            })
-            if (signInData?.user) {
-              authUserId = signInData.user.id
-            }
-          } catch {}
-        }
-      } catch (e: any) {
-        console.warn('[Green Loop] completeProfile phone auth notice:', e?.message)
-      }
-
-      // If phone signup didn't return an ID, check if profile exists by phone
-      if (!authUserId) {
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .or(`phone.eq.${e164},phone.eq.${national}`)
-          .maybeSingle()
-        if (existingProfile?.id) {
-          authUserId = existingProfile.id
-        }
-      }
-    }
-
-    if (!authUserId) {
-      throw new Error('Authentication required: Could not establish authenticated identity. Please verify your phone number first.')
-    }
-
-    // 3. Persist to public.profiles
-    let totalCoins = dbRole === 'citizen' ? 50 : 100
-    let streak = 1
-
-    await ensureProfile(authUserId, {
-      full_name: name,
-      phone: e164,
-      role: dbRole,
-      city: profileData.city || 'Coimbatore',
-      address: profileData.shopAddress || profileData.area || '',
+    const redirectUrl = `${window.location.origin}/reset-password`
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: redirectUrl,
     })
 
-    // Award registration bonus and process first daily login reward
-    await coinService.awardRegistrationBonus(authUserId, dbRole)
-    const daily = await coinService.processDailyLoginReward(authUserId)
-    totalCoins = daily.totalCoins
-    streak = daily.streak
-
-    const completedUser: User = {
-      id: authUserId,
-      name,
-      username: (name || 'citizen').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
-      email,
-      phone: e164,
-      city: profileData.city || 'Coimbatore',
-      area: profileData.area || 'RS Puram',
-      bio: 'Eco-conscious Green Loop community member',
-      role: dbRole,
-      greenCoins: totalCoins,
-      level: totalCoins >= 5000 ? 'Planet Guardian' : totalCoins >= 2000 ? 'Eco Master' : totalCoins >= 500 ? 'Eco Champion' : 'Eco Beginner',
-      levelIcon: totalCoins >= 5000 ? 'verified' : totalCoins >= 2000 ? 'star' : totalCoins >= 500 ? 'sparkles' : 'leaf',
-      levelMin: 0,
-      levelMax: 499,
-      streak,
-      isVerified: true,
-      isProfileComplete: true,
-      avatar: profileData.avatar || null,
-      rating: 4.9,
-      transactions: 0,
-      joinedAt: new Date().toISOString(),
-      preferences: {
-        language,
-        preferredCategories: ['Smartphones', 'Laptops'],
-        preferredAction: 'Recycle',
-        pickupPreference: 'doorstep',
-        aiRecommendations: true,
-        notifications: { email: true, sms: true, missionReminders: true, pickupUpdates: true },
-      },
-      roleProfile: dbRole === 'shop' ? {
-        shopName: profileData.shopName || '',
-        ownerName: profileData.ownerName || '',
-        category: profileData.category || 'General Electronics',
-        shopAddress: profileData.shopAddress || '',
-      } : {
-        landmark: profileData.landmark || '',
-        coordinates: profileData.coordinates || null,
-      },
-    }
-
-    // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
-    if (isAuthTestMode) {
-      setDevTestSession({
-        id: completedUser.id,
-        name: completedUser.name,
-        phone: e164,
-        e164,
-        role: completedUser.role,
-        city: completedUser.city,
-        language,
-        isProfileComplete: true,
-        registration_status: 'completed',
-      })
-    }
-
-    setUser(completedUser)
-    localStorage.setItem('gl_user', JSON.stringify(completedUser))
-
-    clearRegistrationDraft()
-    return completedUser
-  }
-
-  // --- Real Supabase Authentication: Login & Registration ---
-
-  const login = async (identifier: string, password: string): Promise<User> => {
-    const cleanId = identifier.trim()
-    const isEmail = cleanId.includes('@')
-    let authData: any = null
-    let authError: any = null
-
-    // 1. Authenticate with Supabase GoTrue Auth
-    if (isEmail) {
-      const res = await supabase.auth.signInWithPassword({
-        email: cleanId,
-        password,
-      })
-      authData = res.data
-      authError = res.error
-    } else {
-      const { e164, national } = normalizePhone(cleanId)
-      // Attempt phone login
-      const phoneRes = await supabase.auth.signInWithPassword({
-        phone: e164,
-        password,
-      })
-      if (!phoneRes.error && phoneRes.data?.user) {
-        authData = phoneRes.data
-      } else {
-        // Fallback: check if registered with email fallback pattern
-        const emailFallback = `${national}@greenloop.internal`
-        const fallbackRes = await supabase.auth.signInWithPassword({
-          email: emailFallback,
-          password,
-        })
-        if (!fallbackRes.error && fallbackRes.data?.user) {
-          authData = fallbackRes.data
-        } else {
-          authError = phoneRes.error || fallbackRes.error
-        }
+    if (error) {
+      console.warn('[Green Loop] Password reset notice:', error.message)
+      // Throw generic error if rate-limited
+      if ((error as any)?.status === 429) {
+        throw new Error('Too many recovery requests. Please wait a few moments.')
       }
     }
+  }
 
-    if (authError || !authData?.user) {
-      console.error('[Green Loop] Login error:', authError)
-      throw new Error(authError?.message || 'Invalid credentials. Please verify your mobile number/email and password.')
+  const updatePassword = async (newPassword: string): Promise<void> => {
+    if (!newPassword || newPassword.length < 8) {
+      throw new Error('Password must be at least 8 characters long.')
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    if (error) {
+      throw new Error(error.message || 'Could not update password. Please try again.')
+    }
+  }
+
+  // --- Role-Based Registration (Phase 6) ---
+  const register = async (data: RegisterData): Promise<User> => {
+    const dbRole = normalizeRole(data.role)
+    if (dbRole === 'admin') {
+      throw new Error('Administrator accounts cannot be registered publicly.')
+    }
+
+    const cleanEmail = data.email.trim().toLowerCase()
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(cleanEmail)) {
+      throw new Error('Please enter a valid email address.')
+    }
+
+    if (!data.password || data.password.length < 8) {
+      throw new Error('Password must be at least 8 characters long.')
+    }
+
+    let finalPhone = ''
+    if (data.phone && data.phone.trim()) {
+      const { e164, isValid } = normalizePhone(data.phone)
+      if (!isValid) {
+        throw new Error('Please enter a valid 10-digit Indian mobile number or leave it blank.')
+      }
+      finalPhone = e164
+    }
+
+    const displayName = data.name.trim() || data.shopName || data.companyName || 'Green Loop Member'
+
+    // Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password: data.password,
+      options: {
+        data: {
+          full_name: displayName,
+          phone: finalPhone,
+          phone_verified: false,
+          role: dbRole,
+          city: data.city.trim(),
+          shopName: data.shopName,
+          companyName: data.companyName,
+          is_profile_complete: true,
+        },
+      },
+    })
+
+    if (authError) {
+      const msg = authError.message.toLowerCase()
+      if (msg.includes('already registered') || msg.includes('unique')) {
+        throw new Error('This email is already registered. Please sign in instead.')
+      }
+      throw new Error(authError.message || 'Registration failed. Please check your details.')
+    }
+
+    if (!authData?.user) {
+      throw new Error('Registration failed on authentication server.')
     }
 
     const authUser = authData.user
 
-    // 2. Evict previous user-specific caches so User A never leaks into User B
-    recommendationTracker.clearUserSession()
-
-    // 3. Check whether the user's profile exists in public.profiles
-    const { data: existingProfile, error: profileFetchError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .maybeSingle()
-
-    let activeProfile = existingProfile
-
-    // 4. If authenticated user exists but profile is missing, create it safely from user metadata
-    if (!activeProfile && !profileFetchError) {
-      const meta = authUser.user_metadata || {}
-      activeProfile = await ensureProfile(authUser.id, {
-        full_name: meta.full_name || meta.name || authUser.email?.split('@')[0],
-        phone: meta.phone || (isEmail ? '' : cleanId),
-        role: meta.role || 'citizen',
-        city: meta.city || 'Coimbatore',
-      })
-    }
-
-    // 5. Process daily login reward (+25 once per Indian calendar day)
-    const dailyReward = await coinService.processDailyLoginReward(authUser.id)
-
-    // 6. Hydrate React user state
-    const loggedInUser = mapDbProfileToUser(activeProfile, authUser, dailyReward.totalCoins, dailyReward.streak)
-    setUser(loggedInUser)
-    localStorage.setItem('gl_user', JSON.stringify(loggedInUser))
-    return loggedInUser
-  }
-
-  const register = async (data: RegisterData): Promise<User> => {
-    // Determine database role: 'citizen', 'shop', or 'company'
-    const dbRole = normalizeRole(data.role)
-    if (dbRole === 'admin') {
-      throw new Error('Administrator accounts cannot be registered via public registration.')
-    }
-
-    const { e164, national, isValid } = normalizePhone(data.phone)
-    if (!isValid) {
-      throw new Error('Please enter a valid 10-digit Indian mobile number starting with 6-9.')
-    }
-
-    // Email is optional metadata; Phone is the primary identity
-    const email = data.email?.trim() || ''
-    const userPassword = data.password || 'GreenLoop@2026!'
-
-    // 1. Register with Supabase Auth using PHONE as primary identity (avoids email rate limits)
-    let authUser: any = null
+    // Upsert into public.profiles
+    const createdProfile = await ensureProfile(authUser.id, {
+      full_name: displayName,
+      phone: finalPhone,
+      phone_verified: false,
+      role: dbRole,
+      city: data.city.trim(),
+      address: data.shopAddress || data.companyAddress || data.area || '',
+      is_profile_complete: true,
+    })
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        phone: e164,
-        password: userPassword,
-        options: {
-          data: {
-            full_name: data.name.trim(),
-            phone: e164,
-            role: dbRole,
-            city: data.city.trim(),
-            email: email || undefined,
-          },
-        },
-      })
+      await coinService.awardRegistrationBonus(authUser.id, dbRole)
+    } catch {}
 
-      if (!authError && authData?.user) {
-        authUser = authData.user
-      } else if (authError?.message?.toLowerCase().includes('already registered')) {
-        try {
-          const { data: loginData } = await supabase.auth.signInWithPassword({
-            phone: e164,
-            password: userPassword,
-          })
-          if (loginData?.user) {
-            authUser = loginData.user
-          }
-        } catch {}
-      } else if (authError) {
-        const msg = authError.message || ''
-        if (msg.toLowerCase().includes('leaked') || msg.toLowerCase().includes('pwned') || msg.toLowerCase().includes('compromised')) {
-          throw new Error('This password is known to be compromised in data breaches. Please choose a different, secure password.')
-        }
-        console.warn('[Green Loop] Primary phone signup notice:', msg)
-      }
-    } catch (err: any) {
-      if (err.message?.includes('compromised')) throw err
-      console.warn('[Green Loop] Supabase auth registration notice:', err?.message)
-    }
-
-    // If authUser is not set from signup, check if profile exists by phone or create safely
-    let userId = authUser?.id
-    if (!userId) {
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .or(`phone.eq.${e164},phone.eq.${national}`)
-        .maybeSingle()
-      if (existingProfile?.id) {
-        userId = existingProfile.id
-      }
-    }
-
-    // 2. Automatically create corresponding row in public.profiles
-    let createdProfile: any = null
-    if (userId) {
-      createdProfile = await ensureProfile(userId, {
-        full_name: data.name.trim(),
-        phone: e164,
-        role: dbRole,
-        city: data.city.trim(),
-      })
-
-      // 3. Award registration bonus (Citizen: +50, Shop/Company: +100) exactly once!
-      await coinService.awardRegistrationBonus(userId, dbRole)
-
-      // 4. Process daily login reward (+25 once per IST calendar day)
-      const dailyReward = await coinService.processDailyLoginReward(userId)
-
-      // 5. Populate current user
-      const newUser = mapDbProfileToUser(createdProfile, authUser, dailyReward.totalCoins, dailyReward.streak)
-      setUser(newUser)
-      localStorage.setItem('gl_user', JSON.stringify(newUser))
-      return newUser
-    }
-
-    throw new Error('Registration failed on authentication server. Please check your mobile number and try again.')
-  }
-
-  const signInWithGoogle = async (redirectTo?: string) => {
-    const targetUrl = redirectTo || window.location.origin
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: targetUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'select_account',
-        },
-      },
-    })
-    if (error) {
-      console.error('[Green Loop] Google OAuth error:', error)
-      throw new Error(error.message || 'Could not initiate Google Sign-In')
-    }
+    const newUser = mapDbProfileToUser(createdProfile, authUser, dbRole === 'citizen' ? 50 : 100, 1)
+    setUser(newUser)
+    localStorage.setItem('gl_user', JSON.stringify(newUser))
+    return newUser
   }
 
   const signUpWithEmail = async (
@@ -1228,70 +867,94 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role: Role = 'citizen',
     city: string = 'Coimbatore'
   ): Promise<User> => {
+    return register({
+      name,
+      email,
+      password,
+      role,
+      city,
+    })
+  }
+
+  const completeProfile = async (role: Role, profileData: any): Promise<User> => {
     const dbRole = normalizeRole(role)
     if (dbRole === 'admin') {
-      throw new Error('Administrator accounts cannot be registered via public registration.')
+      throw new Error('Administrator accounts cannot be registered.')
     }
-    const cleanEmail = email.trim().toLowerCase()
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password,
-      options: {
-        data: {
-          full_name: name.trim(),
-          role: dbRole,
-          city: city.trim(),
-        },
-      },
-    })
 
-    if (authError) {
-      if (authError.message?.toLowerCase().includes('already registered')) {
-        return login(cleanEmail, password)
+    const currentUserId = user?.id || (await supabase.auth.getUser()).data.user?.id
+
+    if (!currentUserId) {
+      throw new Error('Authentication session required to complete profile.')
+    }
+
+    const name =
+      profileData.name ||
+      profileData.fullName ||
+      profileData.shopName ||
+      profileData.companyName ||
+      user?.name ||
+      'Green Loop Member'
+
+    let formattedPhone = ''
+    if (profileData.phone && profileData.phone.trim()) {
+      const { isValid, e164 } = normalizePhone(profileData.phone)
+      if (isValid) {
+        formattedPhone = e164
       }
-      throw new Error(authError.message || 'Email registration failed')
     }
 
-    if (!authData?.user) {
-      throw new Error('Email registration failed. Please check your credentials.')
-    }
+    const address = profileData.shopAddress || profileData.companyAddress || profileData.area || profileData.address || ''
+    const city = profileData.city?.trim() || 'Coimbatore'
 
-    const authUser = authData.user
-    const createdProfile = await ensureProfile(authUser.id, {
-      full_name: name.trim(),
+    const updatePayload: any = {
+      id: currentUserId,
+      full_name: name,
       role: dbRole,
-      city: city.trim(),
-    })
+      city,
+      address,
+      is_profile_complete: true,
+    }
+    if (formattedPhone) {
+      updatePayload.phone = formattedPhone
+    }
 
-    await coinService.awardRegistrationBonus(authUser.id, dbRole)
-    const dailyReward = await coinService.processDailyLoginReward(authUser.id)
-    const newUser = mapDbProfileToUser(createdProfile, authUser, dailyReward.totalCoins, dailyReward.streak)
-    setUser(newUser)
-    localStorage.setItem('gl_user', JSON.stringify(newUser))
-    return newUser
+    // Persist into public.profiles
+    const { data: updatedProfile, error: updateErr } = await supabase
+      .from('profiles')
+      .upsert(updatePayload, { onConflict: 'id' })
+      .select('*')
+      .maybeSingle()
+
+    if (updateErr) {
+      console.warn('[Green Loop] completeProfile warning:', updateErr.message)
+    }
+
+    // Award role-specific registration bonus
+    try {
+      await coinService.awardRegistrationBonus(currentUserId, dbRole)
+    } catch {}
+
+    const completed = mapDbProfileToUser(updatedProfile || updatePayload, { id: currentUserId, email: user?.email })
+    completed.isProfileComplete = true
+    setUser(completed)
+    localStorage.setItem('gl_user', JSON.stringify(completed))
+    clearRegistrationDraft()
+    return completed
   }
 
   const logout = async () => {
     const currentUserId = user?.id
-    clearDevTestSession()
-
-    // 1. Terminate session on Supabase Auth server
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error && !isAuthTestMode) {
-        console.error('[Green Loop] Supabase signOut error:', error)
-        throw new Error(error.message || 'Logout failed on authentication server. Please check connection.')
-      }
-    } catch (err: any) {
-      if (!isAuthTestMode) {
-        throw err
-      }
-      console.warn('[Green Loop] Test mode signOut notice:', err?.message)
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.warn('[Green Loop] SignOut error:', err)
     }
 
-    // 2. Clear user state, local caches, and recommendation trackers to prevent data leakage
     if (currentUserId) {
-      coinService.clearUserState(currentUserId)
+      try {
+        coinService.clearUserState(currentUserId)
+      } catch {}
     }
     recommendationTracker.clearUserSession()
     setUser(null)
@@ -1340,43 +1003,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const newTx = {
         id: 'c_' + Date.now(),
         type: amount >= 0 ? 'earn' : 'spent',
-        title: title,
+        title,
         amount: amount >= 0 ? `+${amount}` : `${amount}`,
         time: 'Just now',
-        status: 'Completed'
+        status: 'Completed',
       }
       localStorage.setItem('gl_custom_coin_history', JSON.stringify([newTx, ...existing]))
     } catch {}
   }
 
-  useEffect(() => {
-    (window as any).redeemCoins = (amount: number = 100, title: string = 'Eco Token Voucher') => {
-      redeemCoins(amount, title)
-      console.log(`[Green Loop] +${amount} Green Coins credited to wallet: "${title}"`)
-    }
-  }, [user])
-
   const setRole = (newRole: Role) => {
     const normalized = normalizeRole(newRole)
+    if (normalized === 'admin') {
+      console.warn('Role escalation to admin is blocked.')
+      return
+    }
     setUser(prev => {
       if (!prev) return prev
       return { ...prev, role: normalized }
     })
 
-    // State isolation: clear role-specific session storage caches
-    try {
-      sessionStorage.removeItem('greenloop_shop_cache')
-      sessionStorage.removeItem('greenloop_company_cache')
-    } catch (_) {}
-
-    // Persist role update to Supabase profiles table
     if (user?.id) {
-      updateUserRoleInDatabase(user.id, normalized).then(success => {
-        if (success) {
-          console.log(`[Green Loop] Successfully persisted role '${normalized}' in Supabase profiles`)
-        }
-      }).catch(err => {
-        console.warn('[Green Loop] Unexpected role update error:', err?.message)
+      updateUserRoleInDatabase(user.id, normalized).catch(err => {
+        console.warn('[Green Loop] Unexpected role update notice:', err?.message)
       })
     }
   }
@@ -1398,8 +1047,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         signInWithGoogle,
         signUpWithEmail,
-        devLogin,
         register,
+        resetPassword,
+        updatePassword,
         logout,
         updateCoins,
         redeemCoins,

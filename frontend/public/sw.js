@@ -130,3 +130,68 @@ self.addEventListener('fetch', (event) => {
     fetch(request).catch(() => caches.match(request))
   );
 });
+
+/* ==========================================================================
+   5. System & Web Push Notifications
+   ========================================================================== */
+
+// Handle background Web Push event
+self.addEventListener('push', (event) => {
+  let data = {
+    title: 'Green Loop',
+    body: 'New notification from Green Loop',
+    url: '/notifications',
+    tag: 'greenloop-alert',
+  };
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      data = { ...data, ...parsed };
+    } catch {
+      data.body = event.data.text() || data.body;
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    data: {
+      url: data.url || '/notifications',
+      timestamp: Date.now(),
+    },
+    vibrate: [200, 100, 200],
+    tag: data.tag || 'greenloop-notification',
+    renotify: true,
+  };
+
+  event.waitUntil(self.registration.showNotification(data.title, options));
+});
+
+// Handle notification click: focus or open the target Green Loop page
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || '/';
+  const fullTargetUrl = new URL(targetUrl, self.location.origin).href;
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If a Green Loop client tab is already open, focus it and navigate
+      for (const client of clientList) {
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          if ('navigate' in client) {
+            client.navigate(fullTargetUrl);
+          }
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(fullTargetUrl);
+      }
+    })
+  );
+});
+

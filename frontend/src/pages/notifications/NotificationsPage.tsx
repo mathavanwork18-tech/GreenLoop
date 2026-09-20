@@ -4,6 +4,7 @@ import Icon, { type IconName } from '../../components/Icon'
 import { Card, Badge, EmptyState } from '../../components/ui'
 import { useAuth } from '../../context/AuthContext'
 import { interactionsApi } from '../../services/interactions/interactions.api'
+import NotificationPermissionCard from '../../components/notifications/NotificationPermissionCard'
 
 interface NotificationItem {
   id: string
@@ -151,6 +152,9 @@ export default function NotificationsPage() {
       </div>
 
       <div className="container" style={{ paddingTop: 16 }}>
+        {/* Device & System Notification Permission Card */}
+        <NotificationPermissionCard />
+
         {/* Filter Pills */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', scrollbarWidth: 'none' }}>
           {[

@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import Icon from '../Icon'
 import { chatService } from '../../services/chat/chatService'
+import { TransactionCard, TransactionDetailsModal } from '../payment'
+import { paymentService } from '../../services/payment/paymentService'
+import type { MarketplacePurchase } from '../../types/payment.types'
+import { useAuth } from '../../context/AuthContext'
 
 export interface ChatListingContext {
   id: string
@@ -36,11 +40,14 @@ export default function MarketplaceChatModal({
   onClose,
   onViewListing,
 }: Props) {
+  const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sendCooldown, setSendCooldown] = useState(false)
   const [lastSentText, setLastSentText] = useState('')
+  const [linkedPurchase, setLinkedPurchase] = useState<MarketplacePurchase | null>(null)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Initialize and load real messages from Supabase
@@ -105,6 +112,25 @@ export default function MarketplaceChatModal({
     return () => {
       isMounted = false
       unsubscribe()
+    }
+  }, [isOpen, listing?.id])
+
+  // Load linked purchase transaction for this listing
+  useEffect(() => {
+    if (!isOpen || !listing?.id) return
+    paymentService.getActivePurchaseForPost(listing.id).then((p) => {
+      setLinkedPurchase(p)
+    })
+
+    const handleUpdate = () => {
+      paymentService.getActivePurchaseForPost(listing.id).then((p) => {
+        setLinkedPurchase(p)
+      })
+    }
+
+    window.addEventListener('gl_purchase_updated', handleUpdate)
+    return () => {
+      window.removeEventListener('gl_purchase_updated', handleUpdate)
     }
   }, [isOpen, listing?.id])
 
@@ -174,9 +200,10 @@ export default function MarketplaceChatModal({
   ]
 
   return (
-    <div
-      style={{
-        position: 'fixed',
+    <>
+      <div
+        style={{
+          position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
@@ -408,19 +435,41 @@ export default function MarketplaceChatModal({
                 backgroundColor: 'var(--bg-surface)',
                 border: '1px solid var(--border-color)',
                 borderRadius: 'var(--radius-sm)',
-                padding: '6px 10px',
-                fontSize: '0.72rem',
+                padding: '6px 12px',
+                fontSize: '0.74rem',
                 fontWeight: 700,
-                color: 'var(--text-primary)',
+                color: 'var(--text-secondary)',
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                flexShrink: 0,
               }}
             >
               View Listing
             </button>
           )}
         </div>
+
+        {/* Embedded Marketplace Transaction Card (Screen 12) */}
+        {linkedPurchase && (
+          <div
+            style={{
+              padding: '0 16px',
+              backgroundColor: 'var(--bg-surface-2)',
+              borderBottom: '1px solid var(--border-subtle)',
+            }}
+          >
+            <TransactionCard
+              purchase={linkedPurchase}
+              isSeller={Boolean(user?.id && linkedPurchase.sellerId === user.id)}
+              onViewDetails={() => setShowDetailsModal(true)}
+              onConfirmCashReceived={async () => {
+                if (user?.id) {
+                  const confirmed = await paymentService.confirmCashReceived(linkedPurchase.id, user.id)
+                  setLinkedPurchase(confirmed)
+                }
+              }}
+            />
+          </div>
+        )}
 
         {/* Message Thread Body */}
         <div
@@ -581,5 +630,21 @@ export default function MarketplaceChatModal({
         </div>
       </div>
     </div>
+
+      {/* Transaction Details Modal */}
+      <TransactionDetailsModal
+        isOpen={showDetailsModal}
+        purchase={linkedPurchase}
+        currentUserId={user?.id}
+        onClose={() => setShowDetailsModal(false)}
+        onOpenChat={() => setShowDetailsModal(false)}
+        onConfirmCashReceived={async (id) => {
+          if (user?.id) {
+            const confirmed = await paymentService.confirmCashReceived(id, user.id)
+            setLinkedPurchase(confirmed)
+          }
+        }}
+      />
+    </>
   )
 }

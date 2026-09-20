@@ -102,21 +102,23 @@ export async function fetchPosts(page = 0, pageSize = 30) {
       id, user_id, title, description, category, subcategory, condition, status, asking_price, image_url, created_at, updated_at,
       profiles:user_id ( full_name, phone, city )
     `)
+    .neq('status', 'sold')
     .order('created_at', { ascending: false })
     .range(from, to)
 
   if (!resWithProfile.error && resWithProfile.data) {
-    return resWithProfile.data
+    return resWithProfile.data.filter((p: any) => p.status !== 'sold')
   }
 
   // Resilient fallback if PostgREST cache has not built explicit foreign key relation
   const directRes = await supabase
     .from('e_waste_posts')
     .select('id, user_id, title, description, category, subcategory, condition, status, asking_price, image_url, created_at, updated_at')
+    .neq('status', 'sold')
     .order('created_at', { ascending: false })
     .range(from, to)
 
-  const data = directRes.data || []
+  const data = (directRes.data || []).filter((p: any) => p.status !== 'sold')
   if (data.length > 0) {
     const userIds = Array.from(new Set(data.map((p: any) => p.user_id).filter(Boolean)))
     if (userIds.length > 0) {

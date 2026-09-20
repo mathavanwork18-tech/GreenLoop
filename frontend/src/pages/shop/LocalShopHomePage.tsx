@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase, isAuthTestMode, getDevDemoSession } from '../../utils/supabase'
 import { useAuth } from '../../context/AuthContext'
-import { normalizeRole } from '../../services/role/roleService'
 import Icon from '../../components/Icon'
 import MarketplaceChatModal, { type ChatListingContext } from '../../components/chat/MarketplaceChatModal'
+import PurchaseCheckoutModal from '../../components/payment/PurchaseCheckoutModal'
+import TransactionDetailsModal from '../../components/payment/TransactionDetailsModal'
+import type { MarketplacePurchase } from '../../types/payment.types'
 
 interface GeneralUserPost {
   id: string
@@ -21,10 +22,10 @@ interface GeneralUserPost {
   sellerName: string
   location: string
   sellerPhone?: string
+  sellerRole?: string
 }
 
 export default function LocalShopHomePage() {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const [posts, setPosts] = useState<GeneralUserPost[]>([])
   const [loading, setLoading] = useState(true)
@@ -41,17 +42,15 @@ export default function LocalShopHomePage() {
   const [enquirySuccess, setEnquirySuccess] = useState(false)
   const [enquiryError, setEnquiryError] = useState<string | null>(null)
 
-  const [buyPost, setBuyPost] = useState<GeneralUserPost | null>(null)
-  const [isBuying, setIsBuying] = useState(false)
-  const [buySuccess, setBuySuccess] = useState(false)
-  const [buyError, setBuyError] = useState<string | null>(null)
+  const [checkoutPost, setCheckoutPost] = useState<any | null>(null)
+  const [selectedPurchaseDetails, setSelectedPurchaseDetails] = useState<MarketplacePurchase | null>(null)
 
   // Fetch real posts from Supabase public.e_waste_posts
   const loadPosts = async () => {
     setLoading(true)
     setError(null)
     try {
-      // 1. Query real available e-waste posts
+      // 1. Query real available e-waste posts (exclude sold items)
       const { data: postsData, error: postsErr } = await supabase
         .from('e_waste_posts')
         .select(`
@@ -67,6 +66,7 @@ export default function LocalShopHomePage() {
           image_url,
           created_at
         `)
+        .neq('status', 'sold')
         .order('created_at', { ascending: false })
 
       if (postsErr) {
@@ -76,12 +76,12 @@ export default function LocalShopHomePage() {
       const rawPosts = postsData || []
       const userIds = Array.from(new Set(rawPosts.map(p => p.user_id).filter(Boolean)))
 
-      // 2. Fetch associated seller profiles
+      // 2. Fetch associated seller profiles (including role)
       let profilesMap = new Map<string, any>()
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('id, full_name, city, address, phone')
+          .select('id, full_name, city, address, phone, role')
           .in('id', userIds)
 
         ;(profilesData || []).forEach(pr => profilesMap.set(pr.id, pr))
@@ -105,6 +105,7 @@ export default function LocalShopHomePage() {
           sellerName: profile.full_name || 'Community Citizen',
           location: profile.city || profile.address || 'Coimbatore',
           sellerPhone: profile.phone || '',
+          sellerRole: profile.role || 'citizen',
         }
       })
 
@@ -173,112 +174,7 @@ export default function LocalShopHomePage() {
     }
   }
 
-  // Handle Buy / Claim Submission (routes through post_claims with trigger to notifications)
-  const handleSendBuy = async () => {
-    if (!buyPost) return
-    setIsBuying(true)
-    setBuyError(null)
 
-    try {
-      // DEMO AUTH ONLY — Temporary dummy authentication for testing. Replace with real Supabase Phone OTP before production.
-      // Resolve current application user: prefer AuthContext user, then demo session fallback, then GoTrue session
-      const demoSession = isAuthTestMode ? getDevDemoSession() : null
-      const currentBuyer = user || (demoSession ? {
-        id: demoSession.profile_id || demoSession.id,
-        role: demoSession.role,
-        phone: demoSession.phone,
-        isProfileComplete: demoSession.isProfileComplete ?? (demoSession.registration_status === 'completed'),
-      } : null)
-
-      let buyerId: string | undefined = currentBuyer?.id
-
-      if (!buyerId) {
-        try {
-          const { data: authData } = await supabase.auth.getUser()
-          buyerId = authData?.user?.id
-        } catch {}
-      }
-
-      // CHECK 1: A current application user exists
-      if (!buyerId) {
-        throw new Error('You must be signed in to purchase a listing. Please sign in with a shop account.')
-      }
-
-      // CHECK 2: The user is registered
-      const isRegistered = currentBuyer?.isProfileComplete ?? true
-      if (!isRegistered) {
-        throw new Error('Please complete your shop profile registration before purchasing.')
-      }
-
-      // CHECK 3: The user has an allowed role (Local Shop / Recycler)
-      const buyerRole = normalizeRole(currentBuyer?.role)
-      const allowedRoles = ['shop', 'local_shop', 'company', 'recycler']
-      if (!allowedRoles.includes(buyerRole)) {
-        throw new Error('Only registered local shops or recyclers can purchase e-waste listings.')
-      }
-
-      // CHECK 4: The listing exists in Supabase
-      const { data: freshPost, error: postErr } = await supabase
-        .from('e_waste_posts')
-        .select('id, user_id, status, title')
-        .eq('id', buyPost.id)
-        .maybeSingle()
-
-      if (postErr || !freshPost) {
-        throw new Error('This listing could not be found or has been removed.')
-      }
-
-      // CHECK 5: The listing is available
-      if (freshPost.status && freshPost.status !== 'available') {
-        throw new Error(`This listing is no longer available for purchase (Status: ${freshPost.status}).`)
-      }
-
-      // CHECK 6: The buyer is not the seller
-      if (freshPost.user_id && freshPost.user_id === buyerId) {
-        throw new Error('You cannot purchase your own listing.')
-      }
-
-      // CHECK 7: Duplicate active purchase requests are prevented
-      const { data: existingClaim } = await supabase
-        .from('post_claims')
-        .select('id, status')
-        .eq('post_id', freshPost.id)
-        .eq('user_id', buyerId)
-        .maybeSingle()
-
-      if (existingClaim) {
-        throw new Error(`You have already submitted a purchase order for this listing (Status: ${existingClaim.status}).`)
-      }
-
-      // CHECK 8: The transaction is actually saved to Supabase
-      const { data: createdClaim, error: claimErr } = await supabase
-        .from('post_claims')
-        .insert({
-          post_id: freshPost.id,
-          user_id: buyerId,
-          status: 'pending',
-        })
-        .select('id, post_id, user_id, status, created_at')
-        .maybeSingle()
-
-      if (claimErr || !createdClaim) {
-        throw new Error(claimErr?.message || 'Could not create purchase request in database.')
-      }
-
-      console.log('[Green Loop Shop] Purchase order created successfully:', createdClaim?.id)
-      setBuySuccess(true)
-      setTimeout(() => {
-        setBuyPost(null)
-        setBuySuccess(false)
-        loadPosts()
-      }, 1600)
-    } catch (err: any) {
-      console.error('[Green Loop Shop] Buy error:', err)
-      setBuyError(err.message || 'Purchase request failed. Please try again.')
-    } finally {
-      setIsBuying(false)
-    }
-  }
 
   // Filter categories
   const categories = [
@@ -588,9 +484,28 @@ export default function LocalShopHomePage() {
 
                       <button
                         onClick={() => {
-                          setBuyPost(post)
-                          setBuyError(null)
-                          setBuySuccess(false)
+                          const currentBuyerId = user?.id || (isAuthTestMode ? getDevDemoSession()?.id : null)
+                          if (currentBuyerId && post.userId === currentBuyerId) {
+                            alert('You cannot buy your own item.')
+                            return
+                          }
+                          setCheckoutPost({
+                            id: post.id,
+                            title: post.title,
+                            description: post.description,
+                            category: post.category,
+                            condition: post.condition,
+                            status: post.status,
+                            price: post.askingPrice,
+                            imageUrl: post.imageUrl,
+                            seller: {
+                              id: post.userId,
+                              name: post.sellerName,
+                              city: post.location,
+                              phone: post.sellerPhone,
+                              role: post.sellerRole || 'citizen',
+                            },
+                          })
                         }}
                         className="btn btn-primary"
                         style={{
@@ -689,96 +604,35 @@ export default function LocalShopHomePage() {
         </div>
       )}
 
-      {/* BUY / PURCHASE CLAIM MODAL */}
-      {buyPost && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 440, padding: 22, boxShadow: 'var(--shadow-xl)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'rgba(37, 99, 235, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="shopping-bag" size={18} color="#2563eb" />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                    Initiate Purchase Claim
-                  </h3>
-                  <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)' }}>
-                    {buyPost.title}
-                  </div>
-                </div>
-              </div>
-              <button onClick={() => setBuyPost(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                <Icon name="close" size={18} color="var(--text-secondary)" />
-              </button>
-            </div>
+      {/* NEW DEMO PURCHASE CHECKOUT MODAL (ALL ROLES SUPPORTED: GENERAL <-> LOCAL SHOP) */}
+      {checkoutPost && (
+        <PurchaseCheckoutModal
+          isOpen={Boolean(checkoutPost)}
+          post={{
+            id: checkoutPost.id,
+            title: checkoutPost.title,
+            price: checkoutPost.price,
+            images: checkoutPost.imageUrl ? [checkoutPost.imageUrl] : [],
+            condition: checkoutPost.condition,
+            seller: {
+              id: checkoutPost.seller.id,
+              name: checkoutPost.seller.name,
+              role: checkoutPost.seller.role,
+            },
+          }}
+          onClose={() => setCheckoutPost(null)}
+          onSuccess={(_result: any) => {
+            loadPosts()
+          }}
+        />
+      )}
 
-            {buySuccess ? (
-              <div style={{ padding: '24px 10px', textAlign: 'center' }}>
-                <Icon name="check-circle" size={36} color="var(--accent)" />
-                <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginTop: 8 }}>Purchase Claim Submitted!</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-                  Recorded in database. You can track this purchase anytime in the <strong>Orders</strong> tab.
-                </div>
-              </div>
-            ) : (
-              <>
-                <div style={{ background: 'var(--bg-surface-2)', padding: 12, borderRadius: 'var(--radius-md)', marginBottom: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
-                    <span>Price</span>
-                    <span style={{ color: '#2563eb' }}>{buyPost.askingPrice !== null ? `₹${buyPost.askingPrice.toLocaleString()}` : 'Free Collection'}</span>
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                    Seller: {buyPost.sellerName} • {buyPost.location}
-                  </div>
-                </div>
-
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
-                  Submitting a purchase claim sends a formal acquisition request to the citizen. Once accepted, you can coordinate pickup or shop drop-off.
-                </p>
-
-                {buyError && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: '0.78rem', color: '#ef4444', marginBottom: 6, fontWeight: 600 }}>
-                      {buyError}
-                    </div>
-                    {buyError.includes('signed in') && (
-                      <button
-                        type="button"
-                        onClick={() => navigate('/auth')}
-                        style={{
-                          background: 'rgba(37, 99, 235, 0.15)',
-                          border: '1px solid #2563eb',
-                          borderRadius: '8px',
-                          color: '#60a5fa',
-                          fontSize: '0.76rem',
-                          fontWeight: 700,
-                          padding: '6px 12px',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Sign In with Shop Account →
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button onClick={() => setBuyPost(null)} className="btn btn-secondary btn-full" style={{ height: 40, fontSize: '0.84rem' }}>
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSendBuy}
-                    disabled={isBuying}
-                    className="btn btn-primary btn-full"
-                    style={{ height: 40, fontSize: '0.84rem', fontWeight: 800, background: '#2563eb', border: 'none', color: '#fff' }}
-                  >
-                    {isBuying ? 'Confirming...' : 'Confirm Purchase'}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+      {selectedPurchaseDetails && (
+        <TransactionDetailsModal
+          isOpen={Boolean(selectedPurchaseDetails)}
+          purchase={selectedPurchaseDetails}
+          onClose={() => setSelectedPurchaseDetails(null)}
+        />
       )}
 
       {/* Live Marketplace 1-on-1 Chat Modal */}

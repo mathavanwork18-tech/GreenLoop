@@ -38,7 +38,10 @@ function mapSupabasePostToAppPost(sbPost: any, _currentUserId?: string, likesCou
     distance: 0.8,
     status: sbPost.status || 'available',
     seller: {
+      id: sbPost.user_id,
       name: sellerName,
+      role: sbPost.profiles?.role || 'citizen',
+      phone: sbPost.profiles?.phone || '',
       rating: 4.9,
       verified: true,
       avatar: null,

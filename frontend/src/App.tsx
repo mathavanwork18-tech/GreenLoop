@@ -7,12 +7,19 @@ import { PwaInstallProvider } from './context/PwaInstallContext'
 import InstallModal from './components/install/InstallModal'
 import UpdateToast from './components/install/UpdateToast'
 import { normalizeRole } from './services/role/roleService'
+import { useDeviceNotifications } from './hooks/useDeviceNotifications'
+
+// Authentication Components
+import { LoginPage } from './pages/auth/Login'
+import PhoneLoginPage from './pages/auth/PhoneLoginPage'
+import LanguageSelectionPage from './pages/auth/LanguageSelectionPage'
+import RegisterPage from './pages/auth/Register/RegisterPage'
+import CompleteProfilePage from './pages/auth/CompleteProfilePage'
+import ForgotPasswordPage from './pages/auth/ForgotPassword/ForgotPasswordPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 
 // General User Components (100% Preserved Existing Dashboard)
 import AppShell from './components/AppShell'
-import { LoginPage } from './pages/auth/Login'
-import { RegisterPage } from './pages/auth/Register'
-import { ForgotPasswordPage } from './pages/auth/ForgotPassword'
 import { HomePage } from './pages/home'
 import { MapPage } from './pages/map'
 import { PostPage } from './pages/post'
@@ -40,6 +47,7 @@ import {
 
 function AppRoutes() {
   const { isAuthenticated, isInitializing, user } = useAuth()
+  useDeviceNotifications()
 
   // Initializing session gate: prevent premature redirect to login/register during cold start
   if (isInitializing) {
@@ -51,8 +59,8 @@ function AppRoutes() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'var(--bg-base)',
-          color: 'var(--text-primary)',
+          background: 'var(--bg-base, #061e14)',
+          color: 'var(--text-primary, #ffffff)',
         }}
       >
         <div
@@ -60,16 +68,16 @@ function AppRoutes() {
             width: 44,
             height: 44,
             borderRadius: '50%',
-            border: '3px solid var(--border-color)',
-            borderTopColor: 'var(--accent)',
+            border: '3px solid var(--border-color, rgba(16, 185, 129, 0.2))',
+            borderTopColor: 'var(--accent, #10b981)',
             animation: 'spin 0.8s linear infinite',
             marginBottom: 14,
           }}
         />
-        <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+        <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-primary, #ffffff)' }}>
           Loading Green Loop...
         </div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #a7f3d0)', marginTop: 4 }}>
           Determining secure authentication state...
         </div>
       </div>
@@ -78,12 +86,31 @@ function AppRoutes() {
 
   // Unauthenticated Flow
   if (!isAuthenticated) {
+    const hasLanguagePreference = Boolean(localStorage.getItem('gl_language'))
+
     return (
       <Routes>
+        <Route path="/language" element={<LanguageSelectionPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/login/phone" element={<PhoneLoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        {/* If new user without saved language, direct to language selection first; otherwise to login */}
+        <Route
+          path="*"
+          element={<Navigate to={hasLanguagePreference ? '/login' : '/language'} replace />}
+        />
+      </Routes>
+    )
+  }
+
+  // If user is authenticated but their profile is incomplete, strictly gate to profile completion
+  if (user && user.isProfileComplete === false) {
+    return (
+      <Routes>
+        <Route path="/complete-profile" element={<CompleteProfilePage />} />
+        <Route path="*" element={<Navigate to="/complete-profile" replace />} />
       </Routes>
     )
   }
@@ -116,7 +143,7 @@ function AppRoutes() {
     )
   }
 
-  // 3. GENERAL USER DASHBOARD (100% PRESERVED EXISTING DASHBOARD)
+  // 2. GENERAL USER DASHBOARD (100% PRESERVED EXISTING DASHBOARD)
   return (
     <AppShell>
       <Routes>
@@ -135,7 +162,7 @@ function AppRoutes() {
         <Route path="/missions" element={<MissionsPage />} />
         <Route path="/impact" element={<ImpactPage />} />
         <Route path="/support" element={<SupportPage />} />
-        {/* Strict Role Guard: Any other route (e.g. /shop/*, /company/*, /admin/*) redirects to / */}
+        {/* Strict Role Guard: Any other route redirects to / */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>
