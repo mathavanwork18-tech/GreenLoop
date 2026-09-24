@@ -186,7 +186,29 @@ export default function PostPage() {
       setStep(2)
     } catch (err: any) {
       console.error('AI Analysis failed:', err)
-      setScanError(err?.message || "Couldn't analyze the image right now. Please try again or enter details manually.")
+      const rawMsg = err?.message || ''
+
+      let friendlyMsg = "Couldn't analyze the image right now. Please try again or enter details manually."
+
+      if (rawMsg.includes('Invalid GEMINI_API_KEY')) {
+        friendlyMsg = 'AI service error: GEMINI_API_KEY in backend/.env is invalid. Please verify your key at aistudio.google.com/app/apikey'
+      } else if (rawMsg.includes('GEMINI_API_KEY is not configured')) {
+        friendlyMsg = 'AI service is not configured: GEMINI_API_KEY is missing from backend/.env'
+      } else if (rawMsg.includes('timed out') || rawMsg.includes('AbortError') || rawMsg.includes('timeout')) {
+        friendlyMsg = 'AI analysis timed out — the server took too long to respond. Please check your connection and try again.'
+      } else if (rawMsg.includes('rate limit') || rawMsg.includes('429')) {
+        friendlyMsg = 'AI quota limit reached. Please wait a moment and try again.'
+      } else if (rawMsg.includes('404') || rawMsg.includes('not found') || rawMsg.includes('no longer available')) {
+        friendlyMsg = 'AI model is temporarily unavailable. Please try again in a few seconds.'
+      } else if (rawMsg.includes('503') || rawMsg.includes('unavailable')) {
+        friendlyMsg = 'AI service is temporarily overloaded. Please try again in a moment.'
+      } else if (rawMsg.includes('405') || rawMsg.includes('Method Not Allowed')) {
+        friendlyMsg = 'AI service endpoint error (405). The backend server may not be running on port 5000 — please start it with: cd backend && npm run dev'
+      } else if (rawMsg.length > 0 && rawMsg.length < 200) {
+        friendlyMsg = rawMsg
+      }
+
+      setScanError(friendlyMsg)
     } finally {
       setIsScanning(false)
     }

@@ -5,11 +5,12 @@ try {
   dns.setDefaultResultOrder('ipv4first')
 } catch {}
 
+// Verified active Gemini model IDs for multimodal analysis & chat
 const DEFAULT_MODELS = [
-  'gemini-3.5-flash-lite',
-  'gemini-3.6-flash',
-  'gemini-flash-latest',
-  'gemini-3.7-flash'
+  'gemini-3-flash-preview',  // Fast and highly available vision model
+  'gemini-flash-lite-latest', // High availability lite model
+  'gemini-3.6-flash',        // Google's flagship flash model
+  'gemini-flash-latest',     // General fallback
 ]
 
 const SUPPORTED_MIME_TYPES = new Set([
@@ -156,7 +157,16 @@ export class GeminiService {
   static async analyzeProduct({ image, description = '', language = 'en' }) {
     const apiKey = process.env.GEMINI_API_KEY?.trim()
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not configured in the server environment. Please set GEMINI_API_KEY in backend/.env.')
+      throw new Error('GEMINI_API_KEY is not configured. Please set it in backend/.env with a key from https://aistudio.google.com/app/apikey')
+    }
+
+    // Validate key format (supports both new AQ. and legacy AIza formats)
+    if (!apiKey.startsWith('AIza') && !apiKey.startsWith('AQ.')) {
+      if (apiKey.length < 20) {
+        throw new Error(
+          'Invalid GEMINI_API_KEY format. Please check your key at https://aistudio.google.com/app/apikey and update backend/.env'
+        )
+      }
     }
 
     const { mimeType, data: base64Data } = parseImageData(image)
@@ -227,7 +237,7 @@ Return ONLY a valid JSON object matching this schema:
 
     for (const model of DEFAULT_MODELS) {
       const abortController = new AbortController()
-      const timeoutId = setTimeout(() => abortController.abort(), 18000)
+      const timeoutId = setTimeout(() => abortController.abort(), 25000)
 
       try {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`

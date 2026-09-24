@@ -50,14 +50,29 @@ export default function SplashScreen({ onFinished }: SplashScreenProps) {
         ctx.drawImage(video, CROP_X, CROP_Y, CROP_W, CROP_H, 0, 0, CROP_W, CROP_H)
         const id = ctx.getImageData(0, 0, CROP_W, CROP_H)
         const d = id.data
-        // Real-time chroma-key to make white & near-white backgrounds transparent
+        // ── Robust chroma-key: luminance + low-saturation detection ──────────
+        // Catches white ovals, bright glows, near-white reflections & grey halos
         for (let i = 0; i < d.length; i += 4) {
-          const b = Math.min(d[i], d[i + 1], d[i + 2])
-          if (b >= 215) {
-            d[i + 3] = 0 // completely transparent
-          } else if (b >= 170) {
-            // Anti-aliased smooth feathered edge
-            d[i + 3] = Math.round(((215 - b) / 45) * 255)
+          const r = d[i], g = d[i + 1], b = d[i + 2]
+          // Perceptual luminance (0–255)
+          const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+          // Colour saturation: how far from grey (0 = pure grey/white, 255 = vivid)
+          const cMax = Math.max(r, g, b)
+          const cMin = Math.min(r, g, b)
+          const sat = cMax === 0 ? 0 : ((cMax - cMin) / cMax) * 255
+          // Zone 1 — fully transparent: very bright AND low saturation (white/grey oval)
+          if (lum >= 200 && sat < 55) {
+            d[i + 3] = 0
+          // Zone 2 — also transparent: pure bright white catch (safety net)
+          } else if (cMin >= 210) {
+            d[i + 3] = 0
+          // Zone 3 — feathered anti-alias edge: moderate brightness, low saturation
+          } else if (lum >= 155 && sat < 70) {
+            const t = (lum - 155) / 45  // 0..1 as lum goes 155→200
+            const edgeSat = Math.max(0, 1 - sat / 70)  // more transparent when less saturated
+            d[i + 3] = Math.round((1 - t * edgeSat) * d[i + 3])
+          // Zone 4 — very bright vivid green logo pixels: keep fully opaque
+          // (no action needed — d[i+3] stays as-is)
           }
         }
         ctx.putImageData(id, 0, 0)
@@ -125,10 +140,6 @@ export default function SplashScreen({ onFinished }: SplashScreenProps) {
         @keyframes glRippleOut {
           0%   { transform: scale(0.3); opacity: 0.7; }
           100% { transform: scale(3.8); opacity: 0; }
-        }
-        @keyframes glShimmerPass {
-          0%   { left: -100%; }
-          100% { left: 140%; }
         }
         @keyframes glDotBounce {
           0%, 100% { transform: translateY(0); opacity: 0.4; }
@@ -261,20 +272,6 @@ export default function SplashScreen({ onFinished }: SplashScreenProps) {
               justifyContent: 'center',
             }}
           >
-            {/* Shimmer light sweep */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                width: '35%',
-                zIndex: 4,
-                pointerEvents: 'none',
-                background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.22) 50%, transparent 100%)',
-                animation: 'glShimmerPass 2.8s ease-in-out 1s infinite',
-                borderRadius: '50%',
-              }}
-            />
 
             {/* Hidden source video */}
             <video

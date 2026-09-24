@@ -27,10 +27,10 @@ router.get('/status', (req, res) => {
       safetyTriage: 'Lithium battery swelling, hazardous chemicals, zero landfill'
     },
     modelStrategy: [
-      'gemini-3.5-flash-lite',
-      'gemini-3.6-flash',
-      'gemini-flash-latest',
-      'gemini-3.7-flash'
+      'gemini-2.0-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-pro'
     ],
     embeddingModel: 'models/gemini-embedding-001'
   })
