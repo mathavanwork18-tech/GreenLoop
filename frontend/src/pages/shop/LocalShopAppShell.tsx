@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import Icon, { type IconName } from '../../components/Icon'
+import ProfileCompletionBanner from '../../components/profile/ProfileCompletionBanner'
 
 const SHOP_NAV_ITEMS: { path: string; icon: IconName; label: string; isPost?: boolean }[] = [
   { path: '/',       icon: 'home',   label: 'Home' },
@@ -294,6 +295,7 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
           boxSizing: 'border-box',
         }}
       >
+        <ProfileCompletionBanner />
         {children}
       </main>
 

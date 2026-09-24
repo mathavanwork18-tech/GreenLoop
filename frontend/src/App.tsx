@@ -11,7 +11,6 @@ import { useDeviceNotifications } from './hooks/useDeviceNotifications'
 
 // Authentication Components
 import { LoginPage } from './pages/auth/Login'
-import PhoneLoginPage from './pages/auth/PhoneLoginPage'
 import LanguageSelectionPage from './pages/auth/LanguageSelectionPage'
 import RegisterPage from './pages/auth/Register/RegisterPage'
 import CompleteProfilePage from './pages/auth/CompleteProfilePage'
@@ -92,7 +91,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/language" element={<LanguageSelectionPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/login/phone" element={<PhoneLoginPage />} />
+        <Route path="/login/phone" element={<Navigate to="/login" replace />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -101,16 +100,6 @@ function AppRoutes() {
           path="*"
           element={<Navigate to={hasLanguagePreference ? '/login' : '/language'} replace />}
         />
-      </Routes>
-    )
-  }
-
-  // If user is authenticated but their profile is incomplete, strictly gate to profile completion
-  if (user && user.isProfileComplete === false) {
-    return (
-      <Routes>
-        <Route path="/complete-profile" element={<CompleteProfilePage />} />
-        <Route path="*" element={<Navigate to="/complete-profile" replace />} />
       </Routes>
     )
   }
@@ -135,6 +124,7 @@ function AppRoutes() {
           <Route path="/account" element={<LocalShopAccountPage />} />
           <Route path="/shop/account" element={<LocalShopAccountPage />} />
           <Route path="/account/edit" element={<EditProfilePage />} />
+          <Route path="/complete-profile" element={<CompleteProfilePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           {/* Strict Role Guard: Any other route redirects to / */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -153,6 +143,7 @@ function AppRoutes() {
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/account/edit" element={<EditProfilePage />} />
+        <Route path="/complete-profile" element={<CompleteProfilePage />} />
         <Route path="/marketplace" element={<MarketplacePage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/pickup" element={<PickupPage />} />

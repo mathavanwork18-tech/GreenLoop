@@ -98,6 +98,80 @@ export default function AccountPage() {
         {/* 3. Tab Contents */}
         {activeTab === 'profile' && (
           <div>
+            {!user?.isProfileComplete && (
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(16, 185, 129, 0.15) 100%)',
+                  border: '1.5px solid rgba(16, 185, 129, 0.35)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '16px 18px',
+                  marginBottom: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 14,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 200 }}>
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+                    }}
+                  >
+                    <Icon name="sparkles" size={20} color="#ffffff" />
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                        Complete Your Profile
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          fontWeight: 800,
+                          color: '#34d399',
+                          background: 'rgba(16, 185, 129, 0.2)',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                        }}
+                      >
+                        Action Needed
+                      </span>
+                    </div>
+                    <p style={{ margin: '3px 0 0', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
+                      Set your account password and location to enable email sign-in and unlock full features.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/account/edit')}
+                  className="btn btn-primary btn-sm"
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '8px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontWeight: 800,
+                  }}
+                >
+                  <span>Set Password</span>
+                  <Icon name="arrow-right" size={14} color="#ffffff" />
+                </button>
+              </div>
+            )}
+
             <RoleSwitcher
               currentRole={currentRole as Role}
               onSelectRole={r => setRole(r)}

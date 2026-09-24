@@ -369,21 +369,54 @@ export default function RegisterPage() {
         {error && (
           <div
             style={{
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.4)',
-              borderRadius: '12px',
-              padding: '12px 14px',
+              background: error.toLowerCase().includes('rate limit')
+                ? 'rgba(245, 158, 11, 0.12)'
+                : 'rgba(239, 68, 68, 0.12)',
+              border: `1px solid ${
+                error.toLowerCase().includes('rate limit')
+                  ? 'rgba(245, 158, 11, 0.4)'
+                  : 'rgba(239, 68, 68, 0.4)'
+              }`,
+              borderRadius: '14px',
+              padding: '14px 16px',
               marginBottom: 18,
               fontSize: '0.82rem',
-              color: '#f87171',
+              color: error.toLowerCase().includes('rate limit') ? '#fbbf24' : '#f87171',
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: 'column',
               gap: 8,
-              fontWeight: 600,
+              fontWeight: 500,
             }}
           >
-            <Icon name="alert" size={16} color="#f87171" />
-            <span>{error}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+              <Icon name="alert" size={16} color={error.toLowerCase().includes('rate limit') ? '#fbbf24' : '#f87171'} />
+              <span>{error.toLowerCase().includes('rate limit') ? 'Email Rate Limit Reached' : 'Registration Notice'}</span>
+            </div>
+            <div style={{ lineHeight: 1.45 }}>{error}</div>
+            {error.toLowerCase().includes('rate limit') && (
+              <button
+                type="button"
+                onClick={handleGoogleSignUp}
+                disabled={isGoogleLoading}
+                style={{
+                  marginTop: 6,
+                  padding: '8px 12px',
+                  borderRadius: '10px',
+                  background: '#fbbf24',
+                  color: '#061e14',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                <span>Continue with Google Instead (Instant)</span>
+              </button>
+            )}
           </div>
         )}
 

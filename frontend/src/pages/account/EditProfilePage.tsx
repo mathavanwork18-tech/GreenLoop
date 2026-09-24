@@ -8,7 +8,7 @@ import Icon from '../../components/Icon'
 
 export default function EditProfilePage() {
   const navigate = useNavigate()
-  const { user, setUser } = useAuth()
+  const { user, setUser, updatePassword } = useAuth()
 
   // Active sub-section tab for desktop view
   const [activeTab, setActiveTab] = useState<'personal' | 'preferences' | 'privacy' | 'security' | 'role'>('personal')
@@ -70,9 +70,10 @@ export default function EditProfilePage() {
 
   // Password Change modal & states
   const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [passwordError, setPasswordError] = useState<string | null>(null)
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null)
   const [passwordLoading, setPasswordLoading] = useState(false)
@@ -309,17 +310,13 @@ export default function EditProfilePage() {
     }
   }
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleChangePassword = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     setPasswordError(null)
     setPasswordSuccess(null)
 
-    if (!currentPassword) {
-      setPasswordError('Please enter your current password.')
-      return
-    }
-    if (newPassword.length < 8) {
-      setPasswordError('New password must be at least 8 characters.')
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters long.')
       return
     }
     if (newPassword !== confirmPassword) {
@@ -329,21 +326,18 @@ export default function EditProfilePage() {
 
     setPasswordLoading(true)
     try {
-      await userService.changePassword({
-        currentPassword,
-        newPassword,
-        confirmPassword
-      })
-      setPasswordSuccess('Password updated securely!')
-      setCurrentPassword('')
+      await updatePassword(newPassword)
+      setPasswordSuccess('Password saved securely! You can now use this password to sign in.')
       setNewPassword('')
       setConfirmPassword('')
+      if (user && !user.isProfileComplete) {
+        setUser({ ...user, isProfileComplete: true })
+      }
       setTimeout(() => {
         setShowPasswordModal(false)
-        setPasswordSuccess(null)
-      }, 2000)
+      }, 3000)
     } catch (err: any) {
-      setPasswordError(err.message || 'Failed to change password.')
+      setPasswordError(err?.message || 'Failed to update password. Please try again.')
     } finally {
       setPasswordLoading(false)
     }
@@ -727,6 +721,202 @@ export default function EditProfilePage() {
                 placeholder="Share your sustainability goals or devices you specialize in..."
                 style={{ width: '100%', resize: 'vertical' }}
               />
+            </div>
+
+            {/* ===== ACCOUNT PASSWORD & SECURITY CARD ===== */}
+            <div
+              style={{
+                marginTop: 20,
+                padding: '18px 20px',
+                borderRadius: 'var(--radius-lg)',
+                background: 'linear-gradient(135deg, var(--bg-surface-2), rgba(16, 185, 129, 0.05))',
+                border: '1.5px solid var(--border-color)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '8px',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--accent)',
+                    }}
+                  >
+                    <Icon name="certificate" size={18} color="var(--accent)" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                      Account Password
+                    </h3>
+                    <p style={{ fontSize: '0.74rem', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>
+                      Set or update your password to sign in via email & password in addition to Google
+                    </p>
+                  </div>
+                </div>
+
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    padding: '3px 10px',
+                    borderRadius: '20px',
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    color: 'var(--accent)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                  }}
+                >
+                  Password Security
+                </span>
+              </div>
+
+              {passwordSuccess && (
+                <div
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    marginBottom: 14,
+                    fontSize: '0.8rem',
+                    color: '#34d399',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontWeight: 600,
+                  }}
+                >
+                  <Icon name="check" size={15} color="#34d399" />
+                  <span>{passwordSuccess}</span>
+                </div>
+              )}
+
+              {passwordError && (
+                <div
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    marginBottom: 14,
+                    fontSize: '0.8rem',
+                    color: '#f87171',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontWeight: 600,
+                  }}
+                >
+                  <Icon name="alert" size={15} color="#f87171" />
+                  <span>{passwordError}</span>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+                {/* New Password */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                    New Password
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      className="input"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Min. 8 characters"
+                      style={{ width: '100%', paddingRight: 40 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: 10,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        padding: 4,
+                      }}
+                      tabIndex={-1}
+                    >
+                      <Icon name={showNewPassword ? 'eye-off' : 'eye'} size={15} color="var(--text-tertiary)" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                    Confirm Password
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      className="input"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      style={{ width: '100%', paddingRight: 40 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: 10,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        padding: 4,
+                      }}
+                      tabIndex={-1}
+                    >
+                      <Icon name={showConfirmPassword ? 'eye-off' : 'eye'} size={15} color="var(--text-tertiary)" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => handleChangePassword()}
+                  disabled={passwordLoading || !newPassword}
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    fontSize: '0.8rem',
+                    padding: '8px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: passwordLoading || !newPassword ? 'not-allowed' : 'pointer',
+                    opacity: passwordLoading || !newPassword ? 0.6 : 1,
+                  }}
+                >
+                  {passwordLoading ? (
+                    <>
+                      <span className="animate-spin" style={{ width: 14, height: 14, border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block' }} />
+                      <span>Saving Password...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="check" size={14} color="var(--accent)" />
+                      <span>Set / Update Password</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1564,7 +1754,7 @@ export default function EditProfilePage() {
             animation: 'scale-in 0.2s ease'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>Change Password</span>
+              <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>Set or Update Password</span>
               <button onClick={() => setShowPasswordModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <Icon name="close" size={16} color="var(--text-secondary)" />
               </button>
@@ -1573,44 +1763,50 @@ export default function EditProfilePage() {
             <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                  Current Password
-                </label>
-                <input
-                  type="password"
-                  className="input"
-                  value={currentPassword}
-                  onChange={e => setCurrentPassword(e.target.value)}
-                  placeholder="••••••••"
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
                   New Password (Min. 8 characters)
                 </label>
-                <input
-                  type="password"
-                  className="input"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  style={{ width: '100%' }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    className="input"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Min. 8 characters"
+                    style={{ width: '100%', paddingRight: 36 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                    tabIndex={-1}
+                  >
+                    <Icon name={showNewPassword ? 'eye-off' : 'eye'} size={15} color="var(--text-tertiary)" />
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
                   Confirm New Password
                 </label>
-                <input
-                  type="password"
-                  className="input"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  style={{ width: '100%' }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    className="input"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    style={{ width: '100%', paddingRight: 36 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                    tabIndex={-1}
+                  >
+                    <Icon name={showConfirmPassword ? 'eye-off' : 'eye'} size={15} color="var(--text-tertiary)" />
+                  </button>
+                </div>
               </div>
 
               {passwordError && (

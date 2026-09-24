@@ -830,6 +830,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (msg.includes('already registered') || msg.includes('unique')) {
         throw new Error('This email is already registered. Please sign in instead.')
       }
+      if (
+        (authError as any)?.status === 429 ||
+        msg.includes('rate limit') ||
+        msg.includes('over_email_send_rate_limit') ||
+        msg.includes('too many')
+      ) {
+        throw new Error(
+          'Email rate limit exceeded: Supabase free tier limits confirmation emails to 3 per hour. To fix permanently: Disable "Confirm email" in Supabase Dashboard (Authentication > Providers > Email), or sign in with Google below.'
+        )
+      }
       throw new Error(authError.message || 'Registration failed. Please check your details.')
     }
 

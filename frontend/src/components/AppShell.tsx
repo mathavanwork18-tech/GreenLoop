@@ -7,6 +7,7 @@ import { usePwaInstall } from '../context/PwaInstallContext'
 import GreenAiDrawer from './GreenAiDrawer'
 import Icon, { type IconName } from './Icon'
 import InstallButton from './InstallButton'
+import ProfileCompletionBanner from './profile/ProfileCompletionBanner'
 
 const PRIMARY_NAV_ITEMS: { path: string; icon: IconName; label: string; isPost?: boolean }[] = [
   { path: '/',         icon: 'home',     label: 'Home'     },
@@ -380,6 +381,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             boxSizing: 'border-box',
           }}
         >
+          <ProfileCompletionBanner />
           {children}
         </main>
 

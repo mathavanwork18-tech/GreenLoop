@@ -405,30 +405,6 @@ export default function DedicatedLoginPage() {
 
         {/* Alternative Auth Methods */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* Phone Login Option */}
-          <Link
-            to="/login/phone"
-            style={{
-              width: '100%',
-              height: 46,
-              borderRadius: '12px',
-              border: '1px solid var(--border-color, rgba(16, 185, 129, 0.3))',
-              background: 'rgba(255, 255, 255, 0.04)',
-              color: 'var(--text-primary, #ffffff)',
-              fontSize: '0.88rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-              textDecoration: 'none',
-              transition: 'all 0.18s ease',
-            }}
-          >
-            <Icon name="phone" size={16} color="var(--accent, #10b981)" />
-            <span>Sign in with Phone & OTP</span>
-          </Link>
-
           {/* Real Google OAuth Button */}
           <button
             type="button"
