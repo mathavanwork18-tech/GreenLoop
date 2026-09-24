@@ -1,4 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useCallback } from 'react'
+import SplashScreen from './components/SplashScreen'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import { Analytics } from '@vercel/analytics/react'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -161,10 +163,21 @@ function AppRoutes() {
 }
 
 export default function App() {
+  // Show splash only once per browser session
+  const [splashDone, setSplashDone] = useState(() => {
+    return sessionStorage.getItem('gl_splash_shown') === 'true'
+  })
+
+  const handleSplashFinished = useCallback(() => {
+    sessionStorage.setItem('gl_splash_shown', 'true')
+    setSplashDone(true)
+  }, [])
+
   return (
     <ThemeProvider>
       <AuthProvider>
         <PwaInstallProvider>
+          {!splashDone && <SplashScreen onFinished={handleSplashFinished} />}
           <AppRoutes />
           <InstallModal />
           <UpdateToast />
