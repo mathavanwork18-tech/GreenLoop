@@ -134,8 +134,7 @@ export default function SplashScreen({ onFinished }: SplashScreenProps) {
               width: 'min(58vmin, 270px)',
               height: 'min(58vmin, 270px)',
               overflow: 'hidden',
-              mixBlendMode: 'screen',
-              borderRadius: '24px',
+              position: 'relative',
             }}
           >
             <video
@@ -148,6 +147,11 @@ export default function SplashScreen({ onFinished }: SplashScreenProps) {
                 height: '100%',
                 objectFit: 'contain',
                 display: 'block',
+                /* invert(1): white bg → black, colors → complement
+                   hue-rotate(180deg): complements → originals, black stays black
+                   mix-blend-mode: screen: black = transparent on dark bg */
+                filter: 'invert(1) hue-rotate(180deg)',
+                mixBlendMode: 'screen',
               }}
             />
           </div>
