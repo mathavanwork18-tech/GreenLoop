@@ -11,6 +11,7 @@ import ProfileCompletionBanner from './profile/ProfileCompletionBanner'
 import LanguageSwitcherModal from './LanguageSwitcherModal'
 import { useTranslation } from '../i18n/useTranslation'
 import { getLanguageName } from '../i18n/languages'
+import greenLoopLogo from '../assets/branding/green-loop-logo.png'
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -54,21 +55,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div
+              <img
+                src={greenLoopLogo}
+                alt="Green Loop"
                 style={{
                   width: 38,
-                  height: 38,
-                  borderRadius: 'var(--radius-md)',
-                  background: 'linear-gradient(135deg, var(--accent), var(--color-primary-600))',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: 'var(--shadow-accent)',
+                  height: 'auto',
+                  maxHeight: 38,
+                  objectFit: 'contain',
+                  background: 'transparent',
                   flexShrink: 0,
+                  filter: 'drop-shadow(0 2px 8px rgba(16, 185, 129, 0.35))',
                 }}
-              >
-                <Icon name="recycle" size={22} color="#ffffff" />
-              </div>
+              />
               <div>
                 <div
                   style={{

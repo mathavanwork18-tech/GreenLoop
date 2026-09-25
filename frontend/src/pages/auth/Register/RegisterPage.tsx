@@ -4,6 +4,7 @@ import { useAuth, type Role } from '../../../context/AuthContext'
 import Icon from '../../../components/Icon'
 import { getRoleDashboardPath, normalizeRole } from '../../../services/role/roleService'
 import { normalizePhone } from '../../../utils/phone'
+import greenLoopLogo from '../../../assets/branding/green-loop-logo.png'
 
 type Step = 'ROLE' | 'FORM'
 type RegistrationRole = 'GENERAL_USER' | 'LOCAL_SHOP' | 'RECYCLER'
@@ -340,20 +341,13 @@ export default function RegisterPage() {
 
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, var(--accent, #10b981), #047857)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 12px',
-              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-            }}
-          >
-            <Icon name="user" size={24} color="#ffffff" />
+          {/* Official Green Loop Brand Logo (Transparent) */}
+          <div className="login-logo-wrapper">
+            <img
+              src={greenLoopLogo}
+              alt="Green Loop"
+              className="login-logo-img"
+            />
           </div>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ffffff', margin: '0 0 6px' }}>
             {step === 'ROLE' ? 'Choose Account Type' : `Create ${ROLE_OPTIONS.find((r) => r.id === selectedRole)?.title} Account`}

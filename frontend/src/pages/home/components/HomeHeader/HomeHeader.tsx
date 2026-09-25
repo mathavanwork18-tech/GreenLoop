@@ -28,15 +28,14 @@ export default function HomeHeader({ onNotificationClick }: HomeHeaderProps) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <img
             src="/logo.png"
-            alt="Green Loop Logo"
+            alt="Green Loop"
             style={{
               width: 38,
-              height: 38,
-              borderRadius: '50%',
+              height: 'auto',
+              maxHeight: 38,
               objectFit: 'contain',
-              backgroundColor: '#ffffff',
-              padding: 2,
-              boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+              background: 'transparent',
+              filter: 'drop-shadow(0 2px 8px rgba(16,185,129,0.35))',
               cursor: 'pointer'
             }}
             onClick={() => navigate('/')}
