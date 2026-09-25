@@ -67,9 +67,9 @@ export default function ShopInventory() {
               style={{
                 padding: '6px 14px',
                 borderRadius: 'var(--radius-full)',
-                border: isSelected ? '1px solid #2563eb' : '1px solid var(--border-color)',
-                background: isSelected ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-surface)',
-                color: isSelected ? '#2563eb' : 'var(--text-secondary)',
+                border: isSelected ? '1px solid #F97316' : '1px solid var(--border-color)',
+                background: isSelected ? 'rgba(249, 115, 22, 0.12)' : 'var(--bg-surface)',
+                color: isSelected ? '#FB923C' : 'var(--text-secondary)',
                 fontWeight: isSelected ? 800 : 600,
                 fontSize: '0.78rem',
                 cursor: 'pointer',
@@ -82,7 +82,7 @@ export default function ShopInventory() {
               <span>{st === 'all' ? 'All Items' : st}</span>
               <span
                 style={{
-                  background: isSelected ? '#2563eb' : 'var(--bg-surface-2)',
+                  background: isSelected ? '#F97316' : 'var(--bg-surface-2)',
                   color: isSelected ? '#ffffff' : 'var(--text-tertiary)',
                   padding: '1px 6px',
                   borderRadius: 10,
@@ -111,8 +111,8 @@ export default function ShopInventory() {
       ) : filteredItems.length === 0 ? (
         /* Empty state */
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ padding: 12, borderRadius: '50%', background: 'rgba(37, 99, 235, 0.1)', display: 'inline-flex', marginBottom: 12 }}>
-            <Icon name="package" size={24} color="#2563eb" />
+          <div style={{ padding: 12, borderRadius: '50%', background: 'rgba(249, 115, 22, 0.10)', display: 'inline-flex', marginBottom: 12 }}>
+            <Icon name="package" size={24} color="#FB923C" />
           </div>
           <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', marginBottom: 4 }}>
             0 items in inventory
@@ -145,16 +145,16 @@ export default function ShopInventory() {
                     borderRadius: 'var(--radius-sm)',
                     background:
                       item.status === 'Ready for Resale'
-                        ? 'rgba(16, 185, 129, 0.15)'
+                        ? 'rgba(34, 197, 94, 0.15)'
                         : item.status === 'Sorting'
                         ? 'rgba(245, 158, 11, 0.15)'
-                        : 'rgba(37, 99, 235, 0.15)',
+                        : 'rgba(249, 115, 22, 0.15)',
                     color:
                       item.status === 'Ready for Resale'
-                        ? '#10b981'
+                        ? '#22C55E'
                         : item.status === 'Sorting'
                         ? '#f59e0b'
-                        : '#2563eb',
+                        : '#FB923C',
                   }}
                 >
                   {item.status}
@@ -163,7 +163,7 @@ export default function ShopInventory() {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                 <span>Condition: <strong>{item.condition}</strong></span>
-                <span>Est. Value: <strong style={{ color: '#2563eb' }}>₹{item.estimatedValue.toLocaleString()}</strong></span>
+                <span>Est. Value: <strong style={{ color: '#FB923C' }}>₹{item.estimatedValue.toLocaleString()}</strong></span>
               </div>
 
               <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid var(--border-subtle)', fontSize: '0.72rem', color: 'var(--text-tertiary)', display: 'flex', justifyContent: 'space-between' }}>

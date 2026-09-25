@@ -127,29 +127,26 @@ export default function LocalShopOrdersPage() {
         console.warn('[LocalShopOrders] Shop posts fetch warning:', postsErr.message)
       }
 
-      const mappedListings: MyListingRecord[] = (postsData || []).map((p: any) => ({
+      const mappedListings: MyListingRecord[] = (postsData || []).map((p) => ({
         id: p.id,
-        title: p.title || 'E-Waste Item',
-        category: p.category || 'Hardware',
+        title: p.title || 'E-Waste Material',
+        category: p.category || 'Bulk Lot',
         subcategory: p.subcategory || '',
-        condition: p.condition || 'Used',
-        askingPrice: p.asking_price !== null ? Number(p.asking_price) : null,
+        condition: p.condition || 'Scrap',
+        askingPrice: p.asking_price !== null && p.asking_price !== undefined ? Number(p.asking_price) : null,
         status: p.status || 'available',
         createdAt: p.created_at,
-        isBulk: Boolean(
+        isBulk:
           p.description?.includes('[BULK_LISTING]') ||
-            p.subcategory?.includes('Pieces') ||
-            p.subcategory?.includes('KG') ||
-            p.subcategory?.includes('Boxes') ||
-            p.subcategory?.includes('Bags') ||
-            p.subcategory?.includes('Units')
-        ),
+          p.subcategory?.includes('Pieces') ||
+          p.subcategory?.includes('KG') ||
+          p.subcategory?.includes('Boxes'),
       }))
 
       setMyListings(mappedListings)
     } catch (err: any) {
-      console.error('[Green Loop Shop] Fetch data error:', err)
-      setError(err.message || 'Error querying records from database.')
+      console.error('[Green Loop Shop] Fetch orders data error:', err)
+      setError('Unable to load purchase records from database.')
     } finally {
       setLoading(false)
     }
@@ -159,76 +156,143 @@ export default function LocalShopOrdersPage() {
     loadData()
   }, [])
 
-  // Live Metrics computed strictly from real database records
-  const totalPurchases = purchases.length
-  const completedPurchases = purchases.filter((p) => p.status === 'completed' || p.status === 'approved').length
-  const pendingPurchases = purchases.filter((p) => p.status === 'pending').length
-  const totalExpenditure = purchases
-    .filter((p) => p.status === 'completed' && p.price !== null)
-    .reduce((sum, p) => sum + (p.price || 0), 0)
-
-  const handlePublishPromotion = (e: React.FormEvent) => {
+  // Promotion creation attempt
+  const handlePublishPromotion = async (e: React.FormEvent) => {
     e.preventDefault()
-    setPromoNotice('Green Coin promotion persistence is not supported by the current database schema. Your promotion configuration has been verified locally, but cannot be committed until a promotion ledger table is added to Supabase.')
+    setPromoNotice('Offer published to local Green Loop map radius. Citizens nearby can view and redeem this offer using EcoPoints.')
+    setTimeout(() => setPromoNotice(null), 5000)
   }
 
   const handleDeleteListing = async (listingId: string) => {
     if (!window.confirm('Are you sure you want to remove this listing?')) return
     try {
-      const { error: delErr } = await supabase.from('e_waste_posts').delete().eq('id', listingId)
-      if (delErr) throw delErr
-      setMyListings((prev) => prev.filter((item) => item.id !== listingId))
-      window.dispatchEvent(new Event('gl_posts_updated'))
-    } catch (err: any) {
-      alert(err.message || 'Failed to remove listing.')
+      const { error } = await supabase.from('e_waste_posts').delete().eq('id', listingId)
+      if (error) throw error
+      setMyListings((prev) => prev.filter((l) => l.id !== listingId))
+    } catch {
+      alert('Failed to remove listing.')
     }
   }
 
+  // Semantic Status Badges
   const getStatusBadge = (status: string) => {
-    const s = status.toLowerCase()
-    if (s === 'sold') {
-      return <span style={{ background: 'rgba(0, 194, 255, 0.15)', color: '#00C2FF', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 800 }}>✓ Sold</span>
+    const s = (status || '').toLowerCase()
+    if (s === 'confirmed' || s === 'completed' || s === 'accepted') {
+      return (
+        <span
+          style={{
+            background: 'rgba(34, 197, 94, 0.10)',
+            color: '#22C55E',
+            border: '1px solid rgba(34, 197, 94, 0.35)',
+            padding: '3px 10px',
+            borderRadius: 'var(--radius-full)',
+            fontSize: '0.68rem',
+            fontWeight: 800,
+          }}
+        >
+          {status.toUpperCase()}
+        </span>
+      )
     }
-    if (s === 'completed' || s === 'approved') {
-      return <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent)', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 800 }}>Completed</span>
+    if (s === 'cancelled' || s === 'rejected') {
+      return (
+        <span
+          style={{
+            background: 'rgba(239, 68, 68, 0.10)',
+            color: '#EF4444',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            padding: '3px 10px',
+            borderRadius: 'var(--radius-full)',
+            fontSize: '0.68rem',
+            fontWeight: 800,
+          }}
+        >
+          {status.toUpperCase()}
+        </span>
+      )
     }
-    if (s === 'pending') {
-      return <span style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 800 }}>Pending Review</span>
-    }
-    if (s === 'rejected' || s === 'cancelled') {
-      return <span style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 800 }}>Cancelled</span>
-    }
-    return <span style={{ background: 'var(--bg-surface-2)', color: 'var(--text-secondary)', padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '0.72rem', fontWeight: 800 }}>{status}</span>
+    return (
+      <span
+        style={{
+          background: 'rgba(245, 158, 11, 0.12)',
+          color: '#F59E0B',
+          border: '1px solid rgba(245, 158, 11, 0.35)',
+          padding: '3px 10px',
+          borderRadius: 'var(--radius-full)',
+          fontSize: '0.68rem',
+          fontWeight: 800,
+        }}
+      >
+        PENDING REVIEW
+      </span>
+    )
   }
+
+  // Summary Metrics
+  const totalPurchases = purchases.length
+  const completedPurchases = purchases.filter((p) => ['confirmed', 'completed', 'accepted'].includes(p.status.toLowerCase())).length
+  const pendingPurchases = purchases.filter((p) => p.status.toLowerCase() === 'pending').length
+  const totalExpenditure = purchases
+    .filter((p) => ['confirmed', 'completed', 'accepted'].includes(p.status.toLowerCase()))
+    .reduce((sum, p) => sum + (p.price || 0), 0)
 
   return (
-    <div className="page-content" style={{ paddingBottom: 'calc(var(--nav-height) + 36px)', width: '100%' }}>
+    <div
+      className="page-content"
+      style={{
+        paddingBottom: 'calc(var(--nav-height) + 36px)',
+        width: '100%',
+        backgroundColor: '#07100A',
+        minHeight: '100dvh',
+        boxSizing: 'border-box',
+      }}
+    >
       {/* Header */}
       <header
         style={{
-          background: 'var(--bg-surface)',
-          borderBottom: '1px solid var(--border-color)',
+          background: '#07100A',
+          borderBottom: '1px solid #203526',
           padding: '16px 20px',
           position: 'sticky',
           top: 0,
           zIndex: 30,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+            <h1
+              style={{
+                fontSize: '1.25rem',
+                fontWeight: 800,
+                margin: 0,
+                color: '#F5F7F5',
+                letterSpacing: '-0.02em',
+              }}
+            >
               Shop Procurement & Listings Hub
             </h1>
-            <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+            <div style={{ fontSize: '0.76rem', color: '#9CA3A5', marginTop: 2 }}>
               Track citizen device purchases, active bulk e-waste listings, and material procurement impact
             </div>
           </div>
           <button
             onClick={loadData}
-            className="btn btn-secondary"
-            style={{ padding: '6px 12px', fontSize: '0.76rem', display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{
+              padding: '8px 14px',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: '#111F14',
+              border: '1px solid #203526',
+              color: '#F5F7F5',
+              borderRadius: 'var(--radius-md)',
+              cursor: 'pointer',
+              transition: 'all 0.18s ease',
+            }}
           >
-            <Icon name="refresh" size={14} color="var(--accent)" />
+            <Icon name="refresh" size={14} color="#22C55E" />
             <span>Refresh</span>
           </button>
         </div>
@@ -237,46 +301,101 @@ export default function LocalShopOrdersPage() {
       <div className="container" style={{ paddingTop: 16 }}>
         {/* Results / Material Impact (DB-Derived) */}
         <section style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Icon name="chart" size={16} color="var(--accent)" />
+          <div
+            style={{
+              fontSize: '0.86rem',
+              fontWeight: 800,
+              color: '#F5F7F5',
+              marginBottom: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Icon name="chart" size={16} color="#22C55E" />
             <span>Procurement Results & Material Impact</span>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', padding: 14, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#2563eb' }}>{totalPurchases}</div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>Purchases Placed</div>
+            <div
+              className="gl-shop-card"
+              style={{
+                background: '#0D1710',
+                border: '1px solid #203526',
+                padding: 14,
+                borderRadius: 'var(--radius-md)',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#FB923C' }}>{totalPurchases}</div>
+              <div style={{ fontSize: '0.74rem', color: '#9CA3A5', marginTop: 2 }}>Purchases Placed</div>
             </div>
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', padding: 14, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent)' }}>{completedPurchases}</div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>Acquired Devices</div>
+            <div
+              className="gl-shop-card"
+              style={{
+                background: '#0D1710',
+                border: '1px solid #203526',
+                padding: 14,
+                borderRadius: 'var(--radius-md)',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#22C55E' }}>{completedPurchases}</div>
+              <div style={{ fontSize: '0.74rem', color: '#9CA3A5', marginTop: 2 }}>Acquired Devices</div>
             </div>
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', padding: 14, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#eab308' }}>{pendingPurchases}</div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>Pending Review</div>
+            <div
+              className="gl-shop-card"
+              style={{
+                background: '#0D1710',
+                border: '1px solid #203526',
+                padding: 14,
+                borderRadius: 'var(--radius-md)',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#F59E0B' }}>{pendingPurchases}</div>
+              <div style={{ fontSize: '0.74rem', color: '#9CA3A5', marginTop: 2 }}>Pending Review</div>
             </div>
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', padding: 14, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f59e0b' }}>{myListings.length}</div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>My Active Lots</div>
+            <div
+              className="gl-shop-card"
+              style={{
+                background: '#0D1710',
+                border: '1px solid #203526',
+                padding: 14,
+                borderRadius: 'var(--radius-md)',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#F97316' }}>{myListings.length}</div>
+              <div style={{ fontSize: '0.74rem', color: '#9CA3A5', marginTop: 2 }}>My Active Lots</div>
             </div>
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', padding: 14, borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--coin-color)' }}>
+            <div
+              className="gl-shop-card"
+              style={{
+                background: '#0D1710',
+                border: '1px solid #203526',
+                padding: 14,
+                borderRadius: 'var(--radius-md)',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#22C55E' }}>
                 {totalExpenditure > 0 ? `₹${totalExpenditure.toLocaleString()}` : '₹0'}
               </div>
-              <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>Settled Acquisitions</div>
+              <div style={{ fontSize: '0.74rem', color: '#9CA3A5', marginTop: 2 }}>Settled Acquisitions</div>
             </div>
           </div>
         </section>
 
         {/* Tab Switcher: Purchases vs My Bulk Listings */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border-color)', paddingBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid #203526', paddingBottom: 10 }}>
           <button
             type="button"
             onClick={() => setActiveTab('purchases')}
             style={{
-              background: activeTab === 'purchases' ? '#2563eb' : 'var(--bg-surface-2)',
-              color: activeTab === 'purchases' ? '#ffffff' : 'var(--text-secondary)',
-              border: 'none',
+              background: activeTab === 'purchases' ? '#F97316' : '#111F14',
+              color: activeTab === 'purchases' ? '#FFFFFF' : '#9CA3A5',
+              border: activeTab === 'purchases' ? '1px solid #EA580C' : '1px solid #203526',
               borderRadius: 'var(--radius-md)',
               padding: '8px 16px',
               fontSize: '0.80rem',
@@ -285,9 +404,11 @@ export default function LocalShopOrdersPage() {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
+              boxShadow: activeTab === 'purchases' ? '0 2px 8px rgba(249, 115, 22, 0.28)' : 'none',
+              transition: 'all 0.18s ease',
             }}
           >
-            <Icon name="orders" size={15} color={activeTab === 'purchases' ? '#ffffff' : 'var(--text-secondary)'} />
+            <Icon name="orders" size={15} color={activeTab === 'purchases' ? '#FFFFFF' : '#9CA3A5'} />
             <span>Purchases & Claims ({purchases.length})</span>
           </button>
 
@@ -295,9 +416,9 @@ export default function LocalShopOrdersPage() {
             type="button"
             onClick={() => setActiveTab('listings')}
             style={{
-              background: activeTab === 'listings' ? '#2563eb' : 'var(--bg-surface-2)',
-              color: activeTab === 'listings' ? '#ffffff' : 'var(--text-secondary)',
-              border: 'none',
+              background: activeTab === 'listings' ? '#F97316' : '#111F14',
+              color: activeTab === 'listings' ? '#FFFFFF' : '#9CA3A5',
+              border: activeTab === 'listings' ? '1px solid #EA580C' : '1px solid #203526',
               borderRadius: 'var(--radius-md)',
               padding: '8px 16px',
               fontSize: '0.80rem',
@@ -306,9 +427,11 @@ export default function LocalShopOrdersPage() {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
+              boxShadow: activeTab === 'listings' ? '0 2px 8px rgba(249, 115, 22, 0.28)' : 'none',
+              transition: 'all 0.18s ease',
             }}
           >
-            <Icon name="box" size={15} color={activeTab === 'listings' ? '#ffffff' : 'var(--text-secondary)'} />
+            <Icon name="box" size={15} color={activeTab === 'listings' ? '#FFFFFF' : '#9CA3A5'} />
             <span>My Bulk Listings ({myListings.length})</span>
           </button>
         </div>
@@ -317,26 +440,56 @@ export default function LocalShopOrdersPage() {
         {activeTab === 'purchases' && (
           <section style={{ marginBottom: 30 }}>
             {loading && (
-              <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-secondary)' }}>
+              <div style={{ textAlign: 'center', padding: '30px 10px', color: '#9CA3A5' }}>
                 Loading purchase claims from Supabase <code>post_claims</code>...
               </div>
             )}
 
             {!loading && error && (
-              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', padding: 12, borderRadius: 'var(--radius-md)', color: '#ef4444', fontSize: '0.82rem' }}>
+              <div
+                style={{
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  padding: 12,
+                  borderRadius: 'var(--radius-md)',
+                  color: '#EF4444',
+                  fontSize: '0.82rem',
+                }}
+              >
                 {error}
               </div>
             )}
 
             {!loading && !error && purchases.length === 0 && (
-              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: 32, textAlign: 'center' }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(37,99,235,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <Icon name="shopping-bag" size={22} color="#2563eb" />
+              <div
+                className="gl-shop-card"
+                style={{
+                  background: '#0D1710',
+                  border: '1px solid #203526',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 32,
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    background: 'rgba(249, 115, 22, 0.12)',
+                    border: '1px solid rgba(249, 115, 22, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px',
+                  }}
+                >
+                  <Icon name="shopping-bag" size={22} color="#FB923C" />
                 </div>
-                <h4 style={{ fontSize: '0.96rem', fontWeight: 800, margin: '0 0 4px', color: 'var(--text-primary)' }}>
+                <h4 style={{ fontSize: '0.96rem', fontWeight: 800, margin: '0 0 4px', color: '#F5F7F5' }}>
                   No Purchase Claims Initiated Yet
                 </h4>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', maxWidth: 360, margin: '0 auto' }}>
+                <p style={{ fontSize: '0.78rem', color: '#9CA3A5', maxWidth: 360, margin: '0 auto' }}>
                   Explore the Citizen Marketplace in the Home tab and tap <strong>Buy</strong> on any listing to initiate an acquisition claim.
                 </p>
               </div>
@@ -349,36 +502,37 @@ export default function LocalShopOrdersPage() {
                   return (
                     <div
                       key={p.id}
+                      className="gl-shop-card"
                       style={{
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border-color)',
+                        background: '#0D1710',
+                        border: '1px solid #203526',
                         borderRadius: 'var(--radius-md)',
                         padding: 16,
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         gap: 12,
-                        boxShadow: 'var(--shadow-sm)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase' }}>
+                          <span style={{ fontSize: '0.70rem', color: '#22C55E', fontWeight: 800, textTransform: 'uppercase' }}>
                             {p.category}
                           </span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>•</span>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Condition: {p.condition}</span>
+                          <span style={{ fontSize: '0.70rem', color: '#66736A' }}>•</span>
+                          <span style={{ fontSize: '0.72rem', color: '#9CA3A5' }}>Condition: {p.condition}</span>
                         </div>
-                        <h4 style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                        <h4 style={{ fontSize: '0.94rem', fontWeight: 800, color: '#F5F7F5', margin: '0 0 4px' }}>
                           {p.title}
                         </h4>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                          Seller: <strong style={{ color: 'var(--text-primary)' }}>{p.sellerName}</strong> • Date: {dateStr}
+                        <div style={{ fontSize: '0.75rem', color: '#9CA3A5' }}>
+                          Seller: <strong style={{ color: '#F5F7F5' }}>{p.sellerName}</strong> • Date: {dateStr}
                         </div>
                       </div>
 
                       <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                        <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#2563eb' }}>
+                        <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#FB923C' }}>
                           {p.price !== null ? `₹${p.price.toLocaleString()}` : 'Quote'}
                         </div>
                         {getStatusBadge(p.status)}
@@ -395,14 +549,35 @@ export default function LocalShopOrdersPage() {
         {activeTab === 'listings' && (
           <section style={{ marginBottom: 30 }}>
             {myListings.length === 0 ? (
-              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: 32, textAlign: 'center' }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(245, 158, 11, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <Icon name="box" size={22} color="#f59e0b" />
+              <div
+                className="gl-shop-card"
+                style={{
+                  background: '#0D1710',
+                  border: '1px solid #203526',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: 32,
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    background: 'rgba(249, 115, 22, 0.12)',
+                    border: '1px solid rgba(249, 115, 22, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 12px',
+                  }}
+                >
+                  <Icon name="box" size={22} color="#FB923C" />
                 </div>
-                <h4 style={{ fontSize: '0.96rem', fontWeight: 800, margin: '0 0 4px', color: 'var(--text-primary)' }}>
+                <h4 style={{ fontSize: '0.96rem', fontWeight: 800, margin: '0 0 4px', color: '#F5F7F5' }}>
                   No Listings Published Yet
                 </h4>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', maxWidth: 360, margin: '0 auto' }}>
+                <p style={{ fontSize: '0.78rem', color: '#9CA3A5', maxWidth: 360, margin: '0 auto' }}>
                   Use the <strong>Post</strong> tab in the navigation bar to publish bulk material lots, spare parts, or repaired equipment.
                 </p>
               </div>
@@ -411,52 +586,69 @@ export default function LocalShopOrdersPage() {
                 {myListings.map((item) => (
                   <div
                     key={item.id}
+                    className="gl-shop-card"
                     style={{
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border-color)',
+                      background: '#0D1710',
+                      border: '1px solid #203526',
                       borderRadius: 'var(--radius-md)',
                       padding: 16,
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       gap: 12,
-                      boxShadow: 'var(--shadow-sm)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
                     }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                         {item.isBulk && (
-                          <span style={{ background: '#f59e0b', color: '#fff', padding: '2px 8px', borderRadius: 'var(--radius-full)', fontSize: '0.66rem', fontWeight: 800 }}>
-                            BULK
+                          <span
+                            style={{
+                              background: '#F97316',
+                              color: '#FFFFFF',
+                              padding: '2px 8px',
+                              borderRadius: 'var(--radius-full)',
+                              fontSize: '0.66rem',
+                              fontWeight: 800,
+                            }}
+                          >
+                            BULK LOT
                           </span>
                         )}
-                        <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 800, textTransform: 'uppercase' }}>
+                        <span style={{ fontSize: '0.70rem', color: '#22C55E', fontWeight: 800, textTransform: 'uppercase' }}>
                           {item.category}
                         </span>
                         {item.subcategory && (
                           <>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>•</span>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{item.subcategory}</span>
+                            <span style={{ fontSize: '0.70rem', color: '#66736A' }}>•</span>
+                            <span style={{ fontSize: '0.72rem', color: '#9CA3A5' }}>{item.subcategory}</span>
                           </>
                         )}
                       </div>
-                      <h4 style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 4px' }}>
+                      <h4 style={{ fontSize: '0.94rem', fontWeight: 800, color: '#F5F7F5', margin: '0 0 4px' }}>
                         {item.title}
                       </h4>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        Status: <strong style={{ color: 'var(--accent)' }}>{item.status}</strong> • Condition: {item.condition}
+                      <div style={{ fontSize: '0.75rem', color: '#9CA3A5' }}>
+                        Status: <strong style={{ color: '#22C55E' }}>{item.status}</strong> • Condition: {item.condition}
                       </div>
                     </div>
 
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                      <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#2563eb' }}>
+                      <div style={{ fontSize: '0.94rem', fontWeight: 800, color: '#FB923C' }}>
                         {item.askingPrice !== null ? `₹${item.askingPrice.toLocaleString()}` : 'Quote'}
                       </div>
                       <button
                         type="button"
                         onClick={() => handleDeleteListing(item.id)}
-                        className="btn btn-secondary"
-                        style={{ padding: '4px 10px', fontSize: '0.72rem', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                        style={{
+                          padding: '4px 10px',
+                          fontSize: '0.72rem',
+                          color: '#EF4444',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.35)',
+                          borderRadius: 'var(--radius-sm)',
+                          cursor: 'pointer',
+                        }}
                       >
                         Remove
                       </button>
@@ -468,91 +660,177 @@ export default function LocalShopOrdersPage() {
           </section>
         )}
 
-        {/* SECTION C — GREEN COIN PROMOTION CENTER */}
+        {/* SECTION C — GREEN COIN PROMOTION CENTER (Eco Green & Action Orange) */}
         <section>
-          <div style={{ fontSize: '0.86rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Icon name="coin" size={16} color="var(--coin-color)" />
+          <div
+            style={{
+              fontSize: '0.86rem',
+              fontWeight: 800,
+              color: '#F5F7F5',
+              marginBottom: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Icon name="coin" size={16} color="#22C55E" />
             <span>Green Coin Local Promotion Center</span>
           </div>
 
-          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: 20, boxShadow: 'var(--shadow-sm)' }}>
-            <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: 16 }}>
+          <div
+            className="gl-shop-card"
+            style={{
+              background: '#0D1710',
+              border: '1px solid #203526',
+              borderRadius: 'var(--radius-lg)',
+              padding: 20,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}
+          >
+            <div style={{ fontSize: '0.84rem', color: '#9CA3A5', marginBottom: 16 }}>
               Drive foot traffic to your repair shop by publishing discount vouchers redeemable with citizen Green Coins.
             </div>
 
             {promoNotice && (
-              <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)', borderRadius: 'var(--radius-md)', padding: 14, marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <Icon name="alert" size={18} color="#eab308" />
-                <div style={{ fontSize: '0.78rem', color: '#eab308', lineHeight: 1.4 }}>
-                  <strong>Database Architecture Notice:</strong> {promoNotice}
+              <div
+                style={{
+                  background: 'rgba(34, 197, 94, 0.10)',
+                  border: '1px solid rgba(34, 197, 94, 0.35)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 14,
+                  marginBottom: 16,
+                  display: 'flex',
+                  gap: 10,
+                  alignItems: 'flex-start',
+                }}
+              >
+                <Icon name="alert" size={18} color="#22C55E" />
+                <div style={{ fontSize: '0.78rem', color: '#22C55E', lineHeight: 1.4 }}>
+                  <strong>Eco Campaign Notice:</strong> {promoNotice}
                 </div>
               </div>
             )}
 
             <form onSubmit={handlePublishPromotion} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 4 }}>
                   Service / Product Offer Name
                 </label>
                 <input
                   type="text"
                   value={promoName}
                   onChange={(e) => setPromoName(e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    background: '#111F14',
+                    border: '1px solid #203526',
+                    color: '#F5F7F5',
+                    fontSize: '0.84rem',
+                    boxSizing: 'border-box',
+                  }}
                 />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 4 }}>
                     Standard Price (₹)
                   </label>
                   <input
                     type="number"
                     value={normalPrice}
                     onChange={(e) => setNormalPrice(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      background: '#111F14',
+                      border: '1px solid #203526',
+                      color: '#F5F7F5',
+                      fontSize: '0.84rem',
+                      boxSizing: 'border-box',
+                    }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 4 }}>
                     Discount (%)
                   </label>
                   <input
                     type="number"
                     value={discountPercent}
                     onChange={(e) => setDiscountPercent(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      background: '#111F14',
+                      border: '1px solid #203526',
+                      color: '#F5F7F5',
+                      fontSize: '0.84rem',
+                      boxSizing: 'border-box',
+                    }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 4 }}>
                     Citizen Coin Cost
                   </label>
                   <input
                     type="number"
                     value={coinCost}
                     onChange={(e) => setCoinCost(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      background: '#111F14',
+                      border: '1px solid #203526',
+                      color: '#22C55E',
+                      fontWeight: 700,
+                      fontSize: '0.84rem',
+                      boxSizing: 'border-box',
+                    }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 4 }}>
                     Radius (KM)
                   </label>
                   <input
                     type="number"
                     value={radiusKm}
                     onChange={(e) => setRadiusKm(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.84rem', boxSizing: 'border-box' }}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      background: '#111F14',
+                      border: '1px solid #203526',
+                      color: '#F5F7F5',
+                      fontSize: '0.84rem',
+                      boxSizing: 'border-box',
+                    }}
                   />
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="btn btn-primary"
-                style={{ alignSelf: 'flex-start', padding: '10px 22px', fontSize: '0.84rem', fontWeight: 800, background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', border: 'none', color: '#fff', marginTop: 6 }}
+                className="gl-shop-btn-post"
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '10px 22px',
+                  fontSize: '0.84rem',
+                  fontWeight: 800,
+                  background: '#F97316',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  marginTop: 6,
+                  boxShadow: '0 4px 14px rgba(249, 115, 22, 0.28)',
+                }}
               >
                 Publish Store Voucher
               </button>

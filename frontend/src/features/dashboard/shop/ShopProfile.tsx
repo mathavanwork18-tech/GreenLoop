@@ -72,7 +72,7 @@ export default function ShopProfile() {
       {/* Role Switcher Section */}
       <div className="card" style={{ padding: 20, marginBottom: 20 }}>
         <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Icon name="refresh" size={16} color="#2563eb" />
+          <Icon name="refresh" size={16} color="#22C55E" />
           <span>Switch Application Role / Dashboard</span>
         </div>
         <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', margin: '0 0 14px' }}>
@@ -89,9 +89,9 @@ export default function ShopProfile() {
                 style={{
                   padding: '12px 14px',
                   borderRadius: 'var(--radius-md)',
-                  border: isCurrent ? '2px solid #2563eb' : '1px solid var(--border-color)',
-                  background: isCurrent ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-surface-2)',
-                  color: isCurrent ? '#2563eb' : 'var(--text-primary)',
+                  border: isCurrent ? '2px solid #22C55E' : '1px solid var(--border-color)',
+                  background: isCurrent ? 'rgba(34, 197, 94, 0.10)' : 'var(--bg-surface-2)',
+                  color: isCurrent ? '#22C55E' : 'var(--text-primary)',
                   fontWeight: 800,
                   fontSize: '0.82rem',
                   cursor: 'pointer',
@@ -104,7 +104,7 @@ export default function ShopProfile() {
                 }}
               >
                 <span>{r.label}</span>
-                <span style={{ fontSize: '0.68rem', color: isCurrent ? '#2563eb' : 'var(--text-tertiary)', fontWeight: 600 }}>
+                <span style={{ fontSize: '0.68rem', color: isCurrent ? '#22C55E' : 'var(--text-tertiary)', fontWeight: 600 }}>
                   {r.badge}
                 </span>
               </button>
@@ -192,7 +192,7 @@ export default function ShopProfile() {
                 type="submit"
                 disabled={saving}
                 className="btn btn-primary"
-                style={{ padding: '8px 18px', fontSize: '0.82rem', background: '#2563eb', border: 'none' }}
+                style={{ padding: '8px 18px', fontSize: '0.82rem', background: '#F97316', border: 'none' }}
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>

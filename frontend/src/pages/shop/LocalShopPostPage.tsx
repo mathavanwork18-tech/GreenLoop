@@ -242,14 +242,23 @@ export default function LocalShopPostPage() {
   }
 
   return (
-    <div className="page-content" style={{ paddingBottom: 'calc(var(--nav-height) + 36px)', width: '100%' }}>
+    <div
+      className="page-content"
+      style={{
+        paddingBottom: 'calc(var(--nav-height) + 36px)',
+        width: '100%',
+        backgroundColor: '#07100A',
+        minHeight: '100dvh',
+        boxSizing: 'border-box',
+      }}
+    >
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
       {/* Header */}
       <header
         style={{
-          background: 'var(--bg-surface)',
-          borderBottom: '1px solid var(--border-color)',
+          background: '#07100A',
+          borderBottom: '1px solid #203526',
           padding: '16px 20px',
           position: 'sticky',
           top: 0,
@@ -258,33 +267,61 @@ export default function LocalShopPostPage() {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-md)', background: 'rgba(37, 99, 235, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name={postMode === 'bulk' ? 'box' : 'sparkles'} size={20} color="#2563eb" />
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(249, 115, 22, 0.12)',
+                border: '1px solid rgba(249, 115, 22, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name={postMode === 'bulk' ? 'box' : 'sparkles'} size={20} color="#FB923C" />
             </div>
             <div>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+              <h1
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 800,
+                  margin: 0,
+                  color: '#F5F7F5',
+                  letterSpacing: '-0.02em',
+                }}
+              >
                 {postMode === 'bulk' ? 'Post Bulk E-Waste Lot' : 'Post Single E-Waste Item'}
               </h1>
-              <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+              <div style={{ fontSize: '0.76rem', color: '#9CA3A5', marginTop: 2 }}>
                 Publish scrap lots, harvested components, or refurbished devices to verified partners
               </div>
             </div>
           </div>
 
           {/* Mode Switcher */}
-          <div style={{ display: 'flex', background: 'var(--bg-surface-2)', padding: 3, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+          <div
+            style={{
+              display: 'flex',
+              background: '#111F14',
+              padding: 3,
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid #203526',
+            }}
+          >
             <button
               type="button"
               onClick={() => setPostMode('item')}
               style={{
-                background: postMode === 'item' ? '#2563eb' : 'transparent',
-                color: postMode === 'item' ? '#ffffff' : 'var(--text-secondary)',
+                background: postMode === 'item' ? '#F97316' : 'transparent',
+                color: postMode === 'item' ? '#FFFFFF' : '#9CA3A5',
                 border: 'none',
                 borderRadius: 'var(--radius-sm)',
                 padding: '6px 14px',
                 fontSize: '0.76rem',
                 fontWeight: 700,
                 cursor: 'pointer',
+                transition: 'all 0.18s ease',
               }}
             >
               Post Item
@@ -293,14 +330,15 @@ export default function LocalShopPostPage() {
               type="button"
               onClick={() => setPostMode('bulk')}
               style={{
-                background: postMode === 'bulk' ? '#2563eb' : 'transparent',
-                color: postMode === 'bulk' ? '#ffffff' : 'var(--text-secondary)',
+                background: postMode === 'bulk' ? '#F97316' : 'transparent',
+                color: postMode === 'bulk' ? '#FFFFFF' : '#9CA3A5',
                 border: 'none',
                 borderRadius: 'var(--radius-sm)',
                 padding: '6px 14px',
                 fontSize: '0.76rem',
                 fontWeight: 700,
                 cursor: 'pointer',
+                transition: 'all 0.18s ease',
               }}
             >
               Post Bulk E-Waste
@@ -312,9 +350,28 @@ export default function LocalShopPostPage() {
       <div className="container" style={{ paddingTop: 20 }}>
         {/* Bulk Presets (when in Bulk Mode) */}
         {postMode === 'bulk' && (
-          <div style={{ background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: 16, marginBottom: 20 }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Icon name="sparkles" size={15} color="var(--accent)" />
+          <div
+            className="gl-shop-card"
+            style={{
+              background: '#0D1710',
+              border: '1px solid #203526',
+              borderRadius: 'var(--radius-lg)',
+              padding: 16,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                color: '#F5F7F5',
+                marginBottom: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Icon name="sparkles" size={15} color="#22C55E" />
               <span>Quick Bulk Material Templates:</span>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -324,15 +381,23 @@ export default function LocalShopPostPage() {
                   type="button"
                   onClick={() => applyPreset(p)}
                   style={{
-                    background: 'var(--bg-surface)',
-                    border: '1px solid var(--border-subtle)',
+                    background: '#111F14',
+                    border: '1px solid #203526',
                     borderRadius: 'var(--radius-md)',
                     padding: '6px 12px',
                     fontSize: '0.74rem',
                     fontWeight: 700,
-                    color: 'var(--text-secondary)',
+                    color: '#9CA3A5',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#FB923C'
+                    e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.4)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#9CA3A5'
+                    e.currentTarget.style.borderColor = '#203526'
                   }}
                 >
                   {p.title} ({p.quantity} {p.unit})
@@ -344,12 +409,21 @@ export default function LocalShopPostPage() {
 
         {/* Success Banner */}
         {success && (
-          <div style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 'var(--radius-md)', padding: 20, textAlign: 'center', marginBottom: 20 }}>
-            <Icon name="check-circle" size={36} color="var(--accent)" />
-            <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginTop: 8, fontSize: '1rem' }}>
+          <div
+            style={{
+              background: 'rgba(34, 197, 94, 0.10)',
+              border: '1px solid rgba(34, 197, 94, 0.35)',
+              borderRadius: 'var(--radius-md)',
+              padding: 20,
+              textAlign: 'center',
+              marginBottom: 20,
+            }}
+          >
+            <Icon name="check-circle" size={36} color="#22C55E" />
+            <div style={{ fontWeight: 800, color: '#F5F7F5', marginTop: 8, fontSize: '1rem' }}>
               Listing Published Successfully!
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+            <div style={{ fontSize: '0.8rem', color: '#9CA3A5', marginTop: 4 }}>
               Recorded in <code>public.e_waste_posts</code>. Redirecting to Shop Marketplace...
             </div>
           </div>
@@ -357,20 +431,101 @@ export default function LocalShopPostPage() {
 
         {/* Error Banner */}
         {error && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: 'var(--radius-md)', padding: 14, marginBottom: 20, color: '#ef4444', fontSize: '0.84rem', fontWeight: 600 }}>
+          <div
+            style={{
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: 'var(--radius-md)',
+              padding: 14,
+              marginBottom: 20,
+              color: '#EF4444',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+            }}
+          >
             {error}
           </div>
         )}
 
+        {/* Camera Permission Alert Banner */}
+        {cameraError && (
+          <div
+            style={{
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              borderRadius: 'var(--radius-md)',
+              padding: 14,
+              marginBottom: 20,
+              color: '#EF4444',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <span>{cameraError}</span>
+            <button
+              type="button"
+              onClick={() => setCameraError(null)}
+              style={{
+                color: '#EF4444',
+                fontSize: '0.76rem',
+                fontWeight: 800,
+                textDecoration: 'underline',
+                cursor: 'pointer',
+                background: 'transparent',
+                border: 'none',
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* CAMERA CAPTURE & AI SECTION */}
-        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: 18, marginBottom: 20, boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Icon name="camera" size={16} color="var(--accent)" />
+        <div
+          className="gl-shop-card"
+          style={{
+            background: '#0D1710',
+            border: '1px solid #203526',
+            borderRadius: 'var(--radius-lg)',
+            padding: 18,
+            marginBottom: 20,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '0.88rem',
+              fontWeight: 800,
+              color: '#F5F7F5',
+              marginBottom: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Icon name="camera" size={16} color="#22C55E" />
             <span>Camera Capture & Multimodal Gemini AI Recognition</span>
           </div>
 
           {/* Live Viewfinder or Captured Preview */}
-          <div style={{ background: 'var(--bg-surface-2)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', marginBottom: 14 }}>
+          <div
+            style={{
+              background: '#111F14',
+              border: '1px dashed #203526',
+              borderRadius: 'var(--radius-md)',
+              minHeight: 220,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              position: 'relative',
+              marginBottom: 14,
+            }}
+          >
             {isCameraActive ? (
               <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <video ref={videoRef} autoPlay playsInline style={{ width: '100%', maxHeight: 320, objectFit: 'cover' }} />
@@ -378,17 +533,35 @@ export default function LocalShopPostPage() {
                   <button
                     type="button"
                     onClick={capturePhoto}
-                    className="btn btn-primary"
-                    style={{ background: '#10b981', border: 'none', color: '#fff', fontSize: '0.82rem', fontWeight: 800 }}
+                    style={{
+                      background: '#22C55E',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      fontSize: '0.82rem',
+                      fontWeight: 800,
+                      padding: '8px 16px',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
                   >
-                    <Icon name="camera" size={15} color="#fff" />
+                    <Icon name="camera" size={15} color="#FFFFFF" />
                     <span>Take Snapshot</span>
                   </button>
                   <button
                     type="button"
                     onClick={stopCamera}
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.82rem' }}
+                    style={{
+                      background: '#111F14',
+                      border: '1px solid #203526',
+                      color: '#F5F7F5',
+                      fontSize: '0.82rem',
+                      padding: '8px 16px',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                    }}
                   >
                     Cancel Camera
                   </button>
@@ -396,7 +569,11 @@ export default function LocalShopPostPage() {
               </div>
             ) : capturedImage ? (
               <div style={{ width: '100%', textAlign: 'center', position: 'relative', padding: 10 }}>
-                <img src={capturedImage} alt="Lot capture" style={{ maxHeight: 260, maxWidth: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }} />
+                <img
+                  src={capturedImage}
+                  alt="Lot capture"
+                  style={{ maxHeight: 260, maxWidth: '100%', objectFit: 'contain', borderRadius: 'var(--radius-md)' }}
+                />
                 <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 10 }}>
                   <button
                     type="button"
@@ -404,48 +581,88 @@ export default function LocalShopPostPage() {
                       setCapturedImage(null)
                       startCamera()
                     }}
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.78rem' }}
+                    style={{
+                      fontSize: '0.78rem',
+                      padding: '8px 14px',
+                      background: '#111F14',
+                      border: '1px solid #203526',
+                      color: '#F5F7F5',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
                   >
-                    <Icon name="refresh" size={14} color="var(--text-secondary)" />
+                    <Icon name="refresh" size={14} color="#9CA3A5" />
                     <span>Retake Photo</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleRunAiAnalysis}
                     disabled={isAnalyzing}
-                    className="btn btn-primary"
-                    style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', color: '#fff', fontSize: '0.78rem', fontWeight: 800 }}
+                    className="gl-shop-btn-eco"
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
                   >
-                    <Icon name="sparkles" size={14} color="#fff" />
+                    <Icon name="sparkles" size={14} color="#FFFFFF" />
                     <span>{isAnalyzing ? 'Analyzing with Gemini AI...' : 'Analyze with Gemini AI'}</span>
                   </button>
                 </div>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: 30 }}>
-                <Icon name="camera" size={36} color="var(--text-tertiary)" />
-                <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginTop: 8, fontSize: '0.92rem' }}>
+                <Icon name="camera" size={36} color="#66736A" />
+                <div style={{ fontWeight: 700, color: '#F5F7F5', marginTop: 8, fontSize: '0.92rem' }}>
                   No photo attached
                 </div>
-                <div style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', marginTop: 4, marginBottom: 14 }}>
+                <div style={{ fontSize: '0.76rem', color: '#9CA3A5', marginTop: 4, marginBottom: 14 }}>
                   Use your device camera or upload an image file to let Gemini AI estimate bulk recyclability
                 </div>
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
                   <button
                     type="button"
                     onClick={startCamera}
-                    className="btn btn-primary"
-                    style={{ background: '#2563eb', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 700 }}
+                    style={{
+                      background: '#F97316',
+                      border: 'none',
+                      color: '#FFFFFF',
+                      fontSize: '0.80rem',
+                      fontWeight: 700,
+                      padding: '8px 16px',
+                      borderRadius: 'var(--radius-md)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      boxShadow: '0 2px 8px rgba(249, 115, 22, 0.28)',
+                    }}
                   >
-                    <Icon name="camera" size={15} color="#fff" />
+                    <Icon name="camera" size={15} color="#FFFFFF" />
                     <span>Open Camera</span>
                   </button>
                   <label
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{
+                      fontSize: '0.80rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#111F14',
+                      border: '1px solid #203526',
+                      color: '#F5F7F5',
+                      padding: '8px 16px',
+                      borderRadius: 'var(--radius-md)',
+                    }}
                   >
-                    <Icon name="image" size={15} color="var(--text-secondary)" />
+                    <Icon name="image" size={15} color="#9CA3A5" />
                     <span>Upload Image</span>
                     <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
                   </label>
@@ -454,65 +671,168 @@ export default function LocalShopPostPage() {
             )}
           </div>
 
-          {cameraError && (
-            <div style={{ fontSize: '0.76rem', color: '#ef4444', marginBottom: 8 }}>
-              {cameraError}
-            </div>
-          )}
-
+          {/* AI Analysis Result Callout */}
           {aiAnalysisResult && (
-            <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: '0.78rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="sparkles" size={15} color="var(--accent)" />
-              <span>{aiAnalysisResult}</span>
+            <div
+              style={{
+                background: 'rgba(34, 197, 94, 0.10)',
+                border: '1px solid rgba(34, 197, 94, 0.35)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 14px',
+                fontSize: '0.80rem',
+                color: '#22C55E',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 8,
+              }}
+            >
+              <Icon name="sparkles" size={16} color="#22C55E" />
+              <div>
+                <strong style={{ color: '#F5F7F5' }}>Gemini AI Domain Diagnosis:</strong> {aiAnalysisResult}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Listing Form */}
-        <form onSubmit={handleSubmit} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: 22, boxShadow: 'var(--shadow-sm)' }}>
+        {/* LISTING DETAILS FORM */}
+        <form
+          onSubmit={handleSubmit}
+          className="gl-shop-card"
+          style={{
+            background: '#0D1710',
+            border: '1px solid #203526',
+            borderRadius: 'var(--radius-lg)',
+            padding: 20,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#F5F7F5', marginBottom: 16 }}>
+            {postMode === 'bulk' ? 'Bulk Lot Parameters' : 'Item Details'}
+          </div>
+
           {/* Title */}
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-              {postMode === 'bulk' ? 'Bulk Material Title *' : 'Item Title *'}
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 6 }}>
+              Listing Title *
             </label>
             <input
               type="text"
-              placeholder={postMode === 'bulk' ? 'e.g. Broken Mobile Phones Lot, Laptops Scrap' : 'e.g. iPhone 11 Pro 64GB (Screen Cracked)'}
+              placeholder={postMode === 'bulk' ? 'e.g. Broken Mobile Phones Lot (25 Pieces)' : 'e.g. Samsung Galaxy S20 Plus (For Display / Parts)'}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              required
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-md)',
+                background: '#111F14',
+                border: '1px solid #203526',
+                color: '#F5F7F5',
+                fontSize: '0.88rem',
+                boxSizing: 'border-box',
+              }}
             />
           </div>
 
-          {/* Quantity & Unit Row (Bulk Mode Only) */}
+          {/* Category & Condition */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 6 }}>
+                Primary Category
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: '#111F14',
+                  border: '1px solid #203526',
+                  color: '#F5F7F5',
+                  fontSize: '0.88rem',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <option value="Mobile Phones">Mobile Phones</option>
+                <option value="Laptops">Laptops / Desktops</option>
+                <option value="Electronic Parts">PCBs & Components</option>
+                <option value="Accessories">Cables & Chargers</option>
+                <option value="Batteries">Battery Packs / Cells</option>
+                <option value="Home Appliances">Small Home Appliances</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 6 }}>
+                Condition & Usability
+              </label>
+              <select
+                value={condition}
+                onChange={(e) => setCondition(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: '#111F14',
+                  border: '1px solid #203526',
+                  color: '#F5F7F5',
+                  fontSize: '0.88rem',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <option value="Broken / For Parts">Broken / For Parts</option>
+                <option value="Scrap Components">Scrap Components</option>
+                <option value="Scrap Only">Scrap Only (Smelting)</option>
+                <option value="Hazmat / Recycler Only">Hazmat / Recycler Only</option>
+                <option value="Used / Fair">Used / Working</option>
+                <option value="Refurbished">Refurbished / Tested</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Bulk Quantity & Unit (if in bulk mode) */}
           {postMode === 'bulk' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-                  Quantity *
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 6 }}>
+                  Estimated Quantity *
                 </label>
                 <input
                   type="number"
-                  min={1}
-                  placeholder="25"
+                  min="1"
                   value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
-                  required
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    background: '#111F14',
+                    border: '1px solid #203526',
+                    color: '#F5F7F5',
+                    fontSize: '0.88rem',
+                    boxSizing: 'border-box',
+                  }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-                  Unit *
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 6 }}>
+                  Quantity Unit
                 </label>
                 <select
                   value={unit}
                   onChange={(e) => setUnit(e.target.value as any)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    background: '#111F14',
+                    border: '1px solid #203526',
+                    color: '#F5F7F5',
+                    fontSize: '0.88rem',
+                    boxSizing: 'border-box',
+                  }}
                 >
                   <option value="Pieces">Pieces</option>
-                  <option value="KG">KG</option>
+                  <option value="KG">Kilograms (KG)</option>
                   <option value="Boxes">Boxes</option>
                   <option value="Bags">Bags</option>
                   <option value="Units">Units</option>
@@ -521,59 +841,31 @@ export default function LocalShopPostPage() {
             </div>
           )}
 
-          {/* Category & Condition */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-                Category *
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
-              >
-                <option value="Mobile Phones">Mobile Phones</option>
-                <option value="Laptops">Laptops & PCs</option>
-                <option value="Electronic Parts">Mixed Electronic Parts</option>
-                <option value="Batteries">Batteries & Power Packs</option>
-                <option value="Accessories">Cables & Chargers</option>
-                <option value="Appliances">Other Appliances</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-                Condition *
-              </label>
-              <select
-                value={condition}
-                onChange={(e) => setCondition(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
-              >
-                <option value="Broken / For Parts">Broken / For Parts</option>
-                <option value="Harvested Components">Harvested Components</option>
-                <option value="Mixed Working/Faulty">Mixed Working / Faulty</option>
-                <option value="Scrap Only">Scrap Only (Smelting)</option>
-                <option value="Used">Used / Functional</option>
-              </select>
-            </div>
-          </div>
-
           {/* Asking Price & Location */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-                Asking Price (₹) <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(Leave blank for quote)</span>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 6 }}>
+                Asking Price (₹) <span style={{ color: '#9CA3A5', fontWeight: 400 }}>(Leave blank for quote)</span>
               </label>
               <input
                 type="number"
                 placeholder="e.g. 4500"
                 value={askingPrice}
                 onChange={(e) => setAskingPrice(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: '#111F14',
+                  border: '1px solid #203526',
+                  color: '#F5F7F5',
+                  fontSize: '0.88rem',
+                  boxSizing: 'border-box',
+                }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 6 }}>
                 Pickup Location / Shop Area
               </label>
               <input
@@ -581,14 +873,23 @@ export default function LocalShopPostPage() {
                 placeholder="e.g. Gandhipuram, Coimbatore"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  background: '#111F14',
+                  border: '1px solid #203526',
+                  color: '#F5F7F5',
+                  fontSize: '0.88rem',
+                  boxSizing: 'border-box',
+                }}
               />
             </div>
           </div>
 
           {/* Description */}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#F5F7F5', marginBottom: 6 }}>
               Description & Lot Specifications
             </label>
             <textarea
@@ -596,32 +897,48 @@ export default function LocalShopPostPage() {
               placeholder={postMode === 'bulk' ? 'e.g. Bulk lot of 25 devices. Includes circuit boards, broken glass, and plastic casing.' : 'e.g. Battery health 84%, back panel clean.'}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: 'var(--radius-md)', background: 'var(--bg-surface-2)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '0.88rem', resize: 'vertical', boxSizing: 'border-box' }}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-md)',
+                background: '#111F14',
+                border: '1px solid #203526',
+                color: '#F5F7F5',
+                fontSize: '0.88rem',
+                resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
             />
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons: Cancel + Primary Orange CTA */}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="btn btn-secondary"
-              style={{ padding: '10px 20px', fontSize: '0.88rem', fontWeight: 700 }}
+              style={{
+                padding: '10px 20px',
+                fontSize: '0.88rem',
+                fontWeight: 700,
+                background: '#111F14',
+                border: '1px solid #203526',
+                color: '#9CA3A5',
+                borderRadius: 'var(--radius-md)',
+                cursor: 'pointer',
+              }}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="btn btn-primary"
+              className="gl-shop-btn-post"
               style={{
                 padding: '10px 24px',
                 fontSize: '0.88rem',
                 fontWeight: 800,
-                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                border: 'none',
-                color: '#ffffff',
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                background: '#F97316',
+                boxShadow: '0 4px 14px rgba(249, 115, 22, 0.28)',
               }}
             >
               {submitting ? 'Publishing...' : postMode === 'bulk' ? 'Publish Bulk Listing' : 'Publish Item'}

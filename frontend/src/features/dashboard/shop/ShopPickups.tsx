@@ -82,9 +82,9 @@ export default function ShopPickups() {
               style={{
                 padding: '6px 14px',
                 borderRadius: 'var(--radius-full)',
-                border: isSel ? '1px solid #2563eb' : '1px solid var(--border-color)',
-                background: isSel ? 'rgba(37, 99, 235, 0.12)' : 'var(--bg-surface)',
-                color: isSel ? '#2563eb' : 'var(--text-secondary)',
+                border: isSel ? '1px solid #F97316' : '1px solid var(--border-color)',
+                background: isSel ? 'rgba(249, 115, 22, 0.12)' : 'var(--bg-surface)',
+                color: isSel ? '#FB923C' : 'var(--text-secondary)',
                 fontWeight: isSel ? 800 : 600,
                 fontSize: '0.78rem',
                 cursor: 'pointer',
@@ -97,7 +97,7 @@ export default function ShopPickups() {
               <span>{t}</span>
               <span
                 style={{
-                  background: isSel ? '#2563eb' : 'var(--bg-surface-2)',
+                  background: isSel ? '#F97316' : 'var(--bg-surface-2)',
                   color: isSel ? '#ffffff' : 'var(--text-tertiary)',
                   padding: '1px 6px',
                   borderRadius: 10,
@@ -123,8 +123,8 @@ export default function ShopPickups() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ padding: 12, borderRadius: '50%', background: 'rgba(37, 99, 235, 0.1)', display: 'inline-flex', marginBottom: 12 }}>
-            <Icon name="pickup" size={24} color="#2563eb" />
+          <div style={{ padding: 12, borderRadius: '50%', background: 'rgba(249, 115, 22, 0.10)', display: 'inline-flex', marginBottom: 12 }}>
+            <Icon name="pickup" size={24} color="#FB923C" />
           </div>
           <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', marginBottom: 4 }}>
             No pickup requests found
@@ -168,21 +168,21 @@ export default function ShopPickups() {
                           req.status === 'pending'
                             ? 'rgba(245, 158, 11, 0.15)'
                             : req.status === 'accepted'
-                            ? 'rgba(37, 99, 235, 0.15)'
+                            ? 'rgba(249, 115, 22, 0.15)'
                             : req.status === 'collected'
-                            ? 'rgba(139, 92, 246, 0.15)'
+                            ? 'rgba(34, 197, 94, 0.15)'
                             : req.status === 'completed'
-                            ? 'rgba(16, 185, 129, 0.15)'
+                            ? 'rgba(34, 197, 94, 0.15)'
                             : 'rgba(107, 114, 128, 0.15)',
                         color:
                           req.status === 'pending'
                             ? '#f59e0b'
                             : req.status === 'accepted'
-                            ? '#2563eb'
+                            ? '#FB923C'
                             : req.status === 'collected'
-                            ? '#8b5cf6'
+                            ? '#22C55E'
                             : req.status === 'completed'
-                            ? '#10b981'
+                            ? '#22C55E'
                             : '#6b7280',
                       }}
                     >
@@ -209,7 +209,7 @@ export default function ShopPickups() {
                         onClick={() => handleStatus(req.id, 'accepted')}
                         disabled={isProcessing}
                         className="btn btn-primary"
-                        style={{ padding: '8px 16px', fontSize: '0.78rem', background: '#2563eb', border: 'none' }}
+                        style={{ padding: '8px 16px', fontSize: '0.78rem', background: '#F97316', border: 'none' }}
                       >
                         {isProcessing ? 'Updating...' : 'Accept'}
                       </button>
@@ -229,7 +229,7 @@ export default function ShopPickups() {
                       onClick={() => handleStatus(req.id, 'collected')}
                       disabled={isProcessing}
                       className="btn btn-primary"
-                      style={{ padding: '8px 16px', fontSize: '0.78rem', background: '#8b5cf6', border: 'none' }}
+                      style={{ padding: '8px 16px', fontSize: '0.78rem', background: '#22C55E', border: 'none' }}
                     >
                       {isProcessing ? 'Updating...' : 'Mark Collected'}
                     </button>

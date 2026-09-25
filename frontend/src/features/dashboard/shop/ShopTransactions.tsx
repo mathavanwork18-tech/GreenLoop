@@ -58,8 +58,8 @@ export default function ShopTransactions() {
         </div>
       ) : transactions.length === 0 ? (
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ padding: 12, borderRadius: '50%', background: 'rgba(37, 99, 235, 0.1)', display: 'inline-flex', marginBottom: 12 }}>
-            <Icon name="coin" size={24} color="#2563eb" />
+          <div style={{ padding: 12, borderRadius: '50%', background: 'rgba(249, 115, 22, 0.10)', display: 'inline-flex', marginBottom: 12 }}>
+            <Icon name="coin" size={24} color="#FB923C" />
           </div>
           <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', marginBottom: 4 }}>
             0 Transactions
@@ -88,7 +88,7 @@ export default function ShopTransactions() {
                     <td style={{ padding: '12px 16px', fontWeight: 800, color: 'var(--text-primary)' }}>{tx.itemTitle}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{tx.customerName}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>₹{tx.estimatedValue.toLocaleString()}</td>
-                    <td style={{ padding: '12px 16px', fontWeight: 700, color: '#2563eb' }}>₹{tx.offeredValue.toLocaleString()}</td>
+                    <td style={{ padding: '12px 16px', fontWeight: 700, color: '#FB923C' }}>₹{tx.offeredValue.toLocaleString()}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <span
                         style={{
@@ -98,13 +98,13 @@ export default function ShopTransactions() {
                           borderRadius: 'var(--radius-sm)',
                           background:
                             tx.status === 'Completed'
-                              ? 'rgba(16, 185, 129, 0.15)'
+                              ? 'rgba(34, 197, 94, 0.15)'
                               : tx.status === 'Pending'
                               ? 'rgba(245, 158, 11, 0.15)'
                               : 'rgba(239, 68, 68, 0.15)',
                           color:
                             tx.status === 'Completed'
-                              ? '#10b981'
+                              ? '#22C55E'
                               : tx.status === 'Pending'
                               ? '#f59e0b'
                               : '#ef4444',

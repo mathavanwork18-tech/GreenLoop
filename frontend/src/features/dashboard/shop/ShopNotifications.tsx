@@ -59,8 +59,8 @@ export default function ShopNotifications() {
         </div>
       ) : notifications.length === 0 ? (
         <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-          <div style={{ padding: 12, borderRadius: '50%', background: 'rgba(37, 99, 235, 0.1)', display: 'inline-flex', marginBottom: 12 }}>
-            <Icon name="bell" size={24} color="#2563eb" />
+          <div style={{ padding: 12, borderRadius: '50%', background: 'rgba(249, 115, 22, 0.10)', display: 'inline-flex', marginBottom: 12 }}>
+            <Icon name="bell" size={24} color="#FB923C" />
           </div>
           <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)', marginBottom: 4 }}>
             No new notifications
@@ -80,7 +80,7 @@ export default function ShopNotifications() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 14,
-                borderLeft: n.is_read ? '1px solid var(--border-color)' : '4px solid #2563eb',
+                borderLeft: n.is_read ? '1px solid var(--border-color)' : '4px solid #F97316',
               }}
             >
               <div
@@ -88,15 +88,15 @@ export default function ShopNotifications() {
                   width: 36,
                   height: 36,
                   borderRadius: '50%',
-                  background: 'rgba(37, 99, 235, 0.12)',
-                  color: '#2563eb',
+                  background: n.is_read ? 'var(--bg-surface-2)' : 'rgba(249, 115, 22, 0.10)',
+                  color: n.is_read ? '#9CA3A5' : '#FB923C',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <Icon name="bell" size={18} color="#2563eb" />
+                <Icon name="bell" size={18} color={n.is_read ? '#9CA3A5' : '#FB923C'} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-primary)', marginBottom: 2 }}>

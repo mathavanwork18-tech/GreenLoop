@@ -165,20 +165,20 @@ export default function ShopDashboard() {
         <div
           className="card"
           onClick={() => navigate('/shop/inventory')}
-          style={{ padding: 18, cursor: 'pointer', borderLeft: '4px solid #2563eb' }}
+          style={{ padding: 18, cursor: 'pointer', borderLeft: '4px solid #F97316' }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)' }}>
               Inventory Items
             </span>
-            <div style={{ padding: 6, borderRadius: 'var(--radius-md)', background: 'rgba(37, 99, 235, 0.1)' }}>
-              <Icon name="package" size={18} color="#2563eb" />
+            <div style={{ padding: 6, borderRadius: 'var(--radius-md)', background: 'rgba(249, 115, 22, 0.1)' }}>
+              <Icon name="package" size={18} color="#FB923C" />
             </div>
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-primary)' }}>
             {loading ? '...' : stats.inventoryItems}
           </div>
-          <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 700, marginTop: 4 }}>
+          <div style={{ fontSize: '0.72rem', color: '#FB923C', fontWeight: 700, marginTop: 4 }}>
             Categorized & ready in stock
           </div>
         </div>
@@ -290,17 +290,17 @@ export default function ShopDashboard() {
                           req.status === 'pending'
                             ? 'rgba(245, 158, 11, 0.15)'
                             : req.status === 'accepted'
-                            ? 'rgba(37, 99, 235, 0.15)'
+                            ? 'rgba(249, 115, 22, 0.15)'
                             : req.status === 'completed'
-                            ? 'rgba(16, 185, 129, 0.15)'
+                            ? 'rgba(34, 197, 94, 0.15)'
                             : 'rgba(107, 114, 128, 0.15)',
                         color:
                           req.status === 'pending'
                             ? '#f59e0b'
                             : req.status === 'accepted'
-                            ? '#2563eb'
+                            ? '#FB923C'
                             : req.status === 'completed'
-                            ? '#10b981'
+                            ? '#22C55E'
                             : '#6b7280',
                       }}
                     >
@@ -318,7 +318,7 @@ export default function ShopDashboard() {
                         onClick={() => handleStatusUpdate(req.id, 'accepted')}
                         disabled={actionLoading === req.id}
                         className="btn btn-primary"
-                        style={{ padding: '6px 14px', fontSize: '0.76rem', background: '#2563eb', border: 'none' }}
+                        style={{ padding: '6px 14px', fontSize: '0.76rem', background: '#F97316', border: 'none' }}
                       >
                         {actionLoading === req.id ? 'Updating...' : 'Accept'}
                       </button>
@@ -385,15 +385,15 @@ export default function ShopDashboard() {
                       width: 32,
                       height: 32,
                       borderRadius: '50%',
-                      background: 'rgba(37, 99, 235, 0.1)',
-                      color: '#2563eb',
+                      background: 'rgba(34, 197, 94, 0.10)',
+                      color: '#22C55E',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
                     }}
                   >
-                    <Icon name="check" size={16} color="#2563eb" />
+                    <Icon name="check" size={16} color="#22C55E" />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)' }}>

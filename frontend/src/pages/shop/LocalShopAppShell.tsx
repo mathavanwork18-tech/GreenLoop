@@ -18,38 +18,68 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
   const navigate = useNavigate()
   const { user, setRole } = useAuth()
   const { theme, toggleTheme } = useTheme()
-  const isMapPage = location.pathname === '/map'
+  const isMapPage = location.pathname === '/map' || location.pathname === '/shop/map'
 
   return (
-    <div style={{ display: 'flex', width: '100%', minHeight: '100dvh', position: 'relative' }}>
+    <div
+      className="gl-shop-wrapper"
+      style={{
+        display: 'flex',
+        width: '100%',
+        minHeight: '100dvh',
+        position: 'relative',
+        backgroundColor: '#07100A',
+        color: '#F5F7F5',
+      }}
+    >
       {/* Desktop Sticky Sidebar */}
-      <aside className="desktop-sidebar hide-mobile" aria-label="Local Shop Desktop Navigation">
+      <aside
+        className="desktop-sidebar gl-shop-sidebar hide-mobile"
+        aria-label="Local Shop Desktop Navigation"
+        style={{
+          width: 240,
+          minWidth: 240,
+          maxWidth: 240,
+          height: '100dvh',
+          position: 'sticky',
+          top: 0,
+          backgroundColor: '#0D1710',
+          borderRight: '1px solid #203526',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '16px 0',
+          zIndex: 50,
+          flexShrink: 0,
+          boxSizing: 'border-box',
+        }}
+      >
         {/* Logo & Hub Header */}
         <div
           className="sidebar-logo"
           onClick={() => navigate('/')}
           style={{
             cursor: 'pointer',
-            padding: '18px 20px',
-            borderBottom: '1px solid var(--border-subtle)',
+            padding: '4px 18px 16px',
+            borderBottom: '1px solid #203526',
             marginBottom: 8,
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 38,
-                height: 38,
+                width: 40,
+                height: 40,
                 borderRadius: 'var(--radius-md)',
-                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                background: 'rgba(249, 115, 22, 0.12)',
+                border: '1px solid rgba(249, 115, 22, 0.35)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                boxShadow: '0 4px 12px rgba(249, 115, 22, 0.15)',
                 flexShrink: 0,
               }}
             >
-              <Icon name="shop" size={20} color="#ffffff" />
+              <Icon name="shop" size={20} color="#FB923C" />
             </div>
             <div>
               <div
@@ -57,7 +87,7 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
                   fontWeight: 800,
                   fontSize: '1.05rem',
                   letterSpacing: '-0.02em',
-                  color: 'var(--text-primary)',
+                  color: '#F5F7F5',
                   lineHeight: 1.2,
                 }}
               >
@@ -65,10 +95,10 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
               </div>
               <div
                 style={{
-                  fontSize: '0.7rem',
-                  color: '#38bdf8',
+                  fontSize: '0.70rem',
+                  color: '#FB923C',
                   fontWeight: 800,
-                  letterSpacing: '0.04em',
+                  letterSpacing: '0.06em',
                   textTransform: 'uppercase',
                 }}
               >
@@ -78,24 +108,30 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
           </div>
         </div>
 
-        {/* Primary Action Button: Post Bulk Material */}
-        <div style={{ padding: '8px 14px 14px' }}>
+        {/* Primary Action Button: Post Bulk Material (E-Waste Orange) */}
+        <div style={{ padding: '8px 14px 12px' }}>
           <button
             onClick={() => navigate('/post')}
-            className="btn btn-primary btn-full"
+            className="gl-shop-btn-post"
             style={{
-              gap: 8,
-              padding: '12px 16px',
+              width: '100%',
+              padding: '11px 16px',
               fontSize: '0.88rem',
               fontWeight: 700,
               borderRadius: 'var(--radius-md)',
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+              background: '#F97316',
+              boxShadow: '0 4px 14px rgba(249, 115, 22, 0.28)',
               border: 'none',
-              color: '#ffffff',
+              color: '#FFFFFF',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              transition: 'all 0.18s ease',
             }}
           >
-            <Icon name="plus" size={18} color="#ffffff" />
+            <Icon name="plus" size={18} color="#FFFFFF" />
             <span>Post Bulk Material</span>
           </button>
         </div>
@@ -105,7 +141,7 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 3,
+            gap: 4,
             padding: '0 10px',
             flex: 1,
             overflowY: 'auto',
@@ -115,41 +151,44 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
             style={{
               fontSize: '0.68rem',
               fontWeight: 800,
-              color: 'var(--text-tertiary)',
+              color: '#66736A',
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
-              padding: '8px 12px 4px',
+              padding: '6px 12px 2px',
             }}
           >
             Shop Management
           </div>
 
-          {SHOP_NAV_ITEMS.filter(i => !i.isPost).map((item) => {
-            const isActive = location.pathname === item.path
+          {SHOP_NAV_ITEMS.filter((i) => !i.isPost).map((item) => {
+            const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path))
             return (
               <div
                 key={item.path}
                 onClick={() => navigate(item.path)}
+                className={`gl-shop-nav-item ${isActive ? 'active' : ''}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
                   padding: '10px 14px',
                   borderRadius: 'var(--radius-md)',
-                  background: isActive ? 'rgba(37, 99, 235, 0.12)' : 'transparent',
-                  color: isActive ? '#38bdf8' : 'var(--text-secondary)',
+                  background: isActive ? 'rgba(249, 115, 22, 0.10)' : 'transparent',
+                  color: isActive ? '#F5F7F5' : '#9CA3A5',
                   fontWeight: isActive ? 800 : 600,
                   fontSize: '0.88rem',
                   cursor: 'pointer',
-                  transition: 'all var(--transition-fast)',
-                  border: isActive ? '1px solid rgba(56, 189, 248, 0.25)' : '1px solid transparent',
+                  transition: 'all 0.18s ease',
+                  border: isActive ? '1px solid rgba(249, 115, 22, 0.35)' : '1px solid transparent',
                 }}
               >
-                <Icon
-                  name={item.icon}
-                  size={19}
-                  color={isActive ? '#38bdf8' : 'var(--text-tertiary)'}
-                />
+                <div className="gl-shop-icon" style={{ display: 'flex', alignItems: 'center' }}>
+                  <Icon
+                    name={item.icon}
+                    size={19}
+                    color={isActive ? '#FB923C' : '#66736A'}
+                  />
+                </div>
                 <span>{item.label}</span>
               </div>
             )
@@ -160,37 +199,38 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
         <div
           style={{
             marginTop: 'auto',
-            padding: '14px 16px',
-            borderTop: '1px solid var(--border-subtle)',
+            padding: '12px 14px',
+            borderTop: '1px solid #203526',
             display: 'flex',
             flexDirection: 'column',
             gap: 8,
           }}
         >
-          {/* Quick Switch to General User Button */}
+          {/* Quick Switch to General User Button (Eco Green) */}
           <button
             onClick={() => setRole('GENERAL_USER')}
+            className="gl-shop-btn-citizen-switch"
             style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '8px 12px',
               borderRadius: 'var(--radius-md)',
-              background: 'var(--bg-surface-2)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--accent)',
+              background: 'rgba(34, 197, 94, 0.08)',
+              border: '1.5px solid #22C55E',
+              color: '#22C55E',
               fontSize: '0.78rem',
               fontWeight: 700,
               cursor: 'pointer',
               width: '100%',
-              transition: 'background var(--transition-fast)',
+              transition: 'all 0.18s ease',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="user" size={15} color="var(--accent)" />
+              <Icon name="user" size={15} color="#22C55E" />
               <span>Switch to Citizen View</span>
             </div>
-            <Icon name="arrow-right" size={14} color="var(--accent)" />
+            <Icon name="arrow-right" size={14} color="#22C55E" />
           </button>
 
           {/* Theme Switcher */}
@@ -202,24 +242,25 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
               justifyContent: 'space-between',
               padding: '8px 12px',
               borderRadius: 'var(--radius-md)',
-              background: 'var(--bg-surface-2)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-secondary)',
-              fontSize: '0.8rem',
+              background: '#111F14',
+              border: '1px solid #203526',
+              color: '#9CA3A5',
+              fontSize: '0.78rem',
               fontWeight: 600,
               cursor: 'pointer',
               width: '100%',
+              transition: 'background 0.18s ease',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Icon
                 name={theme === 'dark' ? 'sun' : 'moon'}
                 size={16}
-                color={theme === 'dark' ? '#fbbf24' : 'var(--text-secondary)'}
+                color={theme === 'dark' ? '#F59E0B' : '#9CA3A5'}
               />
               <span>{theme === 'dark' ? 'Light Theme' : 'Dark Theme'}</span>
             </div>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>Active</span>
+            <span style={{ fontSize: '0.70rem', color: '#66736A' }}>Active</span>
           </button>
 
           {/* User Shop Badge */}
@@ -232,22 +273,24 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
               padding: '8px 10px',
               borderRadius: 'var(--radius-md)',
               cursor: 'pointer',
-              background: 'transparent',
+              background: '#111F14',
+              border: '1px solid #203526',
+              transition: 'border-color 0.18s ease',
             }}
           >
             <div
               style={{
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 borderRadius: '50%',
-                background: 'rgba(37, 99, 235, 0.15)',
-                color: '#38bdf8',
+                background: 'rgba(34, 197, 94, 0.12)',
+                color: '#22C55E',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 800,
-                fontSize: '0.9rem',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
+                fontSize: '0.88rem',
+                border: '1px solid rgba(34, 197, 94, 0.35)',
                 flexShrink: 0,
               }}
             >
@@ -257,8 +300,8 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
               <div
                 style={{
                   fontWeight: 700,
-                  fontSize: '0.85rem',
-                  color: 'var(--text-primary)',
+                  fontSize: '0.84rem',
+                  color: '#F5F7F5',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -268,9 +311,12 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
               </div>
               <div
                 style={{
-                  fontSize: '0.72rem',
-                  color: '#38bdf8',
+                  fontSize: '0.70rem',
+                  color: '#22C55E',
                   fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
                 }}
               >
                 Verified Business Hub
@@ -293,14 +339,23 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
           flexDirection: 'column',
           alignItems: 'stretch',
           boxSizing: 'border-box',
+          backgroundColor: '#07100A',
         }}
       >
         <ProfileCompletionBanner />
         {children}
       </main>
 
-      {/* Mobile Bottom Navigation Bar (Local Shop) */}
-      <nav className="bottom-nav hide-desktop" role="navigation" aria-label="Local Shop Mobile Navigation">
+      {/* Mobile Bottom Navigation Bar (Local Shop Hub: Orange + Green Identity) */}
+      <nav
+        className="bottom-nav gl-shop-bottom-nav hide-desktop"
+        role="navigation"
+        aria-label="Local Shop Mobile Navigation"
+        style={{
+          backgroundColor: '#0D1710',
+          borderTop: '1px solid #203526',
+        }}
+      >
         {SHOP_NAV_ITEMS.map((item) => {
           if (item.isPost) {
             return (
@@ -313,8 +368,8 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
                 <div
                   className="nav-post-btn"
                   style={{
-                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                    boxShadow: '0 4px 16px rgba(37, 99, 235, 0.45)',
+                    background: '#F97316',
+                    boxShadow: '0 4px 16px rgba(249, 115, 22, 0.45)',
                   }}
                   aria-label="Post Bulk E-Waste"
                 >
@@ -324,7 +379,7 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
             )
           }
 
-          const isActive = location.pathname === item.path
+          const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path))
           return (
             <button
               key={item.path}
@@ -334,6 +389,7 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
                 background: 'none',
                 border: 'none',
                 width: '100%',
+                cursor: 'pointer',
               }}
               aria-label={item.label}
             >
@@ -341,13 +397,14 @@ export default function LocalShopAppShell({ children }: { children: ReactNode })
                 <Icon
                   name={item.icon}
                   size={22}
-                  color={isActive ? '#38bdf8' : 'var(--text-tertiary)'}
+                  color={isActive ? '#FB923C' : '#66736A'}
                 />
               </div>
               <span
                 style={{
-                  color: isActive ? '#38bdf8' : 'var(--text-tertiary)',
+                  color: isActive ? '#FB923C' : '#9CA3A5',
                   fontWeight: isActive ? 800 : 600,
+                  fontSize: '0.72rem',
                 }}
               >
                 {item.label}

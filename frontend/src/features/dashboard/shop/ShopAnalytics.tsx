@@ -57,7 +57,7 @@ export default function ShopAnalytics() {
                 padding: '6px 14px',
                 border: 'none',
                 borderRadius: 'var(--radius-sm)',
-                background: timePeriod === p ? '#2563eb' : 'transparent',
+                background: timePeriod === p ? '#F97316' : 'transparent',
                 color: timePeriod === p ? '#ffffff' : 'var(--text-secondary)',
                 fontWeight: timePeriod === p ? 800 : 600,
                 fontSize: '0.78rem',
@@ -92,7 +92,7 @@ export default function ShopAnalytics() {
           <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
             Completed Pickups
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#10b981', margin: '8px 0 4px' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#22C55E', margin: '8px 0 4px' }}>
             {loading ? '...' : data.completedPickups}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Confirmed doorstep runs</div>
@@ -112,7 +112,7 @@ export default function ShopAnalytics() {
           <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
             E-Waste Diverted
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#2563eb', margin: '8px 0 4px' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#FB923C', margin: '8px 0 4px' }}>
             {loading ? '...' : `${data.totalWeightKg} kg`}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Landfill diversion estimate</div>
@@ -122,7 +122,7 @@ export default function ShopAnalytics() {
           <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
             CO₂e Offset Impact
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#10b981', margin: '8px 0 4px' }}>
+          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#22C55E', margin: '8px 0 4px' }}>
             {loading ? '...' : `${co2DivertedKg} kg`}
           </div>
           <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Calculated lifecycle savings</div>
@@ -161,7 +161,7 @@ export default function ShopAnalytics() {
                     style={{
                       height: '100%',
                       width: `${cat.percentage}%`,
-                      background: 'linear-gradient(90deg, #2563eb, #38bdf8)',
+                      background: 'linear-gradient(90deg, #F97316, #22C55E)',
                       borderRadius: 5,
                       transition: 'width 0.5s ease',
                     }}
