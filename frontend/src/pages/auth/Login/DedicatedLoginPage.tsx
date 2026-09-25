@@ -4,6 +4,7 @@ import { useAuth } from '../../../context/AuthContext'
 import Icon from '../../../components/Icon'
 import { getRoleDashboardPath, normalizeRole } from '../../../services/role/roleService'
 import { getAuthTranslation } from '../../../utils/translations'
+import greenLoopLogo from '../../../assets/branding/green-loop-logo.png'
 
 export default function DedicatedLoginPage() {
   const navigate = useNavigate()
@@ -171,20 +172,13 @@ export default function DedicatedLoginPage() {
       >
         {/* Brand Header */}
         <div style={{ textAlign: 'center', marginBottom: 26 }}>
-          <div
-            style={{
-              width: 54,
-              height: 54,
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, var(--accent, #10b981), #047857)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 14px',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)',
-            }}
-          >
-            <Icon name="recycle" size={28} color="#ffffff" />
+          {/* Official Green Loop Brand Logo (Transparent) */}
+          <div className="login-logo-wrapper">
+            <img
+              src={greenLoopLogo}
+              alt="Green Loop"
+              className="login-logo-img"
+            />
           </div>
           <h1
             style={{

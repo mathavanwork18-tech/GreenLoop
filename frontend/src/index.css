@@ -1516,3 +1516,30 @@ input, textarea, select { font-family: inherit; max-width: 100%; }
 .gl-shop-bottom-nav .nav-post-btn:hover {
   background: var(--gl-orange-hover) !important;
 }
+
+/* ==================================================
+   GREEN LOOP LOGIN LOGO
+   ================================================== */
+.login-logo-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: transparent;
+  margin-bottom: 20px;
+}
+
+.login-logo-img {
+  width: 76px;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  background: transparent;
+  filter: drop-shadow(0 4px 16px rgba(16, 185, 129, 0.25));
+}
+
+@media (max-width: 640px) {
+  .login-logo-img {
+    width: 64px;
+  }
+}
+

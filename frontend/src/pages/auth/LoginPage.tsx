@@ -54,21 +54,14 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 48, position: 'relative' }}>
-          <img
-            src="/logo.png"
-            alt="Green Loop Logo"
-            style={{
-              width: 96,
-              height: 96,
-              borderRadius: '50%',
-              objectFit: 'contain',
-              backgroundColor: '#ffffff',
-              padding: 6,
-              margin: '0 auto 20px',
-              display: 'block',
-              boxShadow: '0 8px 32px rgba(16,185,129,0.35)'
-            }}
-          />
+          <div className="login-logo-wrapper">
+            <img
+              src="/logo.png"
+              alt="Green Loop"
+              className="login-logo-img"
+              style={{ width: 88 }}
+            />
+          </div>
           <h1 style={{
             fontSize: '2.5rem', fontWeight: 800, color: '#fff',
             letterSpacing: '-0.02em', marginBottom: 8
