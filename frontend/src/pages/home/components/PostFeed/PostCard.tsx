@@ -2,6 +2,9 @@ import type { Post } from '../../../../types/post.types'
 import Icon from '../../../../components/Icon'
 import VerificationBadge from '../../../../components/eco/VerificationBadge'
 import { formatCurrency } from '../../../../utils/formatting'
+import { useTranslation } from '../../../../i18n/useTranslation'
+import { translateCondition } from '../../../../i18n'
+import { usePostTranslation } from '../../../../hooks/usePostTranslation'
 
 interface PostCardProps {
   post: Post
@@ -11,6 +14,9 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, onSelect, onToggleLike, onToggleSave }: PostCardProps) {
+  const { t, currentLang } = useTranslation()
+  const { title, description, isTranslating, isTranslated } = usePostTranslation(post)
+
   const getPurposeBadge = () => {
     switch (post.purpose?.toLowerCase()) {
       case 'sell':
@@ -18,40 +24,41 @@ export default function PostCard({ post, onSelect, onToggleLike, onToggleSave }:
           bg: 'rgba(16, 185, 129, 0.12)',
           color: 'var(--accent-text)',
           border: '1px solid rgba(16, 185, 129, 0.25)',
-          label: 'For Sale',
+          label: t('marketplace.sell'),
         }
       case 'donate':
         return {
           bg: 'rgba(59, 130, 246, 0.12)',
           color: '#60a5fa',
           border: '1px solid rgba(59, 130, 246, 0.25)',
-          label: 'Donation',
+          label: t('marketplace.donate'),
         }
       case 'recycle':
         return {
           bg: 'rgba(16, 185, 129, 0.12)',
           color: 'var(--accent-text)',
           border: '1px solid rgba(16, 185, 129, 0.25)',
-          label: 'Recycle Scrap',
+          label: t('marketplace.recycle'),
         }
       case 'repair':
         return {
           bg: 'rgba(245, 158, 11, 0.12)',
           color: '#fbbf24',
           border: '1px solid rgba(245, 158, 11, 0.25)',
-          label: 'Needs Repair',
+          label: t('marketplace.repair'),
         }
       default:
         return {
           bg: 'rgba(139, 92, 246, 0.12)',
           color: '#c084fc',
           border: '1px solid rgba(139, 92, 246, 0.25)',
-          label: 'Exchange',
+          label: t('marketplace.exchange'),
         }
     }
   }
 
   const badge = getPurposeBadge()
+  const localizedCondition = translateCondition(post.condition, currentLang)
 
   return (
     <div
@@ -156,7 +163,7 @@ export default function PostCard({ post, onSelect, onToggleLike, onToggleSave }:
       >
         <img
           src={post.images[0]}
-          alt={post.title}
+          alt={title}
           loading="lazy"
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
@@ -177,7 +184,7 @@ export default function PostCard({ post, onSelect, onToggleLike, onToggleSave }:
             border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
-          {post.condition}
+          {localizedCondition}
         </div>
 
         {/* Distance Badge */}
@@ -224,7 +231,26 @@ export default function PostCard({ post, onSelect, onToggleLike, onToggleSave }:
               lineHeight: 1.3,
             }}
           >
-            {post.title}
+            {title}
+            {isTranslating && (
+              <span style={{ fontSize: '0.65rem', color: 'var(--accent)', marginLeft: 6, fontWeight: 600 }}>
+                ({t('common.translating')})
+              </span>
+            )}
+            {isTranslated && !isTranslating && (
+              <span
+                title={t('common.translatedFrom', { lang: '' })}
+                style={{
+                  display: 'inline-block',
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: 'var(--accent)',
+                  marginLeft: 4,
+                  verticalAlign: 'middle',
+                }}
+              />
+            )}
           </h3>
           <span
             style={{
@@ -234,7 +260,7 @@ export default function PostCard({ post, onSelect, onToggleLike, onToggleSave }:
               whiteSpace: 'nowrap',
             }}
           >
-            {post.price ? formatCurrency(post.price) : 'Free Pickup'}
+            {post.price ? formatCurrency(post.price) : t('marketplace.freeDonate')}
           </span>
         </div>
 
@@ -251,7 +277,7 @@ export default function PostCard({ post, onSelect, onToggleLike, onToggleSave }:
             flex: 1,
           }}
         >
-          {post.description}
+          {description}
         </p>
 
         <div
@@ -281,7 +307,7 @@ export default function PostCard({ post, onSelect, onToggleLike, onToggleSave }:
                 color: post.liked ? '#ef4444' : 'var(--text-tertiary)',
                 padding: '4px',
               }}
-              aria-label={post.liked ? 'Unlike' : 'Like'}
+              aria-label={post.liked ? t('common.like') : t('common.like')}
             >
               <Icon name="heart" size={16} color={post.liked ? '#ef4444' : 'currentColor'} />
               <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>{post.likes}</span>
@@ -296,7 +322,7 @@ export default function PostCard({ post, onSelect, onToggleLike, onToggleSave }:
                 color: post.saved ? 'var(--accent)' : 'var(--text-tertiary)',
                 padding: '4px',
               }}
-              aria-label={post.saved ? 'Unsave' : 'Save'}
+              aria-label={post.saved ? t('common.saved') : t('common.save')}
             >
               <Icon name="bookmark" size={16} color={post.saved ? 'var(--accent)' : 'currentColor'} />
             </button>

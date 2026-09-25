@@ -38,6 +38,9 @@ export interface Post {
   locationName?: string
   status?: 'available' | 'reserved' | 'recycled' | 'sold'
   recommendationReason?: string
+  original_title?: string
+  original_description?: string
+  original_language?: string
 }
 
 export interface AIAnalysisResult {

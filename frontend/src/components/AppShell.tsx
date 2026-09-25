@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
@@ -8,20 +8,9 @@ import GreenAiDrawer from './GreenAiDrawer'
 import Icon, { type IconName } from './Icon'
 import InstallButton from './InstallButton'
 import ProfileCompletionBanner from './profile/ProfileCompletionBanner'
-
-const PRIMARY_NAV_ITEMS: { path: string; icon: IconName; label: string; isPost?: boolean }[] = [
-  { path: '/',         icon: 'home',     label: 'Home'     },
-  { path: '/map',      icon: 'map',      label: 'Map'      },
-  { path: '/post',     icon: 'plus',     label: 'Post',  isPost: true },
-  { path: '/activity', icon: 'activity', label: 'Activity' },
-  { path: '/account',  icon: 'user',     label: 'Account'  },
-]
-
-const DESKTOP_EXTRA_NAV: { path: string; icon: IconName; label: string }[] = [
-  { path: '/chat',          icon: 'comment',  label: 'Messages & Chat' },
-  { path: '/notifications', icon: 'bell',     label: 'Notifications' },
-  { path: '/support',       icon: 'help',     label: 'Support Desk' },
-]
+import LanguageSwitcherModal from './LanguageSwitcherModal'
+import { useTranslation } from '../i18n/useTranslation'
+import { getLanguageName } from '../i18n/languages'
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -29,8 +18,24 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { isInstalled, openInstallModal } = usePwaInstall()
+  const { t, currentLang } = useTranslation()
   const [showAi, setShowAi] = useState(false)
+  const [showLangModal, setShowLangModal] = useState(false)
   const isMapPage = location.pathname === '/map'
+
+  const primaryNavItems: { path: string; icon: IconName; label: string; isPost?: boolean }[] = useMemo(() => [
+    { path: '/',         icon: 'home',     label: t('nav.home')     },
+    { path: '/map',      icon: 'map',      label: t('nav.map')      },
+    { path: '/post',     icon: 'plus',     label: t('nav.post'),  isPost: true },
+    { path: '/activity', icon: 'activity', label: t('nav.activity') },
+    { path: '/account',  icon: 'user',     label: t('nav.account')  },
+  ], [t])
+
+  const desktopExtraNav: { path: string; icon: IconName; label: string }[] = useMemo(() => [
+    { path: '/chat',          icon: 'comment',  label: t('nav.chat') },
+    { path: '/notifications', icon: 'bell',     label: t('nav.notifications') },
+    { path: '/support',       icon: 'help',     label: t('nav.support') },
+  ], [t])
 
   return (
     <>
@@ -106,7 +111,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               }}
             >
               <Icon name="plus" size={18} color="#ffffff" />
-              <span>Post E-Waste</span>
+              <span>{t('nav.postEwaste')}</span>
             </button>
           </div>
 
@@ -131,10 +136,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 padding: '8px 12px 4px',
               }}
             >
-              Main Menu
+              {t('nav.mainMenu')}
             </div>
 
-            {PRIMARY_NAV_ITEMS.filter((item) => !item.isPost).map((item) => {
+            {primaryNavItems.filter((item) => !item.isPost).map((item) => {
               const isActive = location.pathname === item.path
               return (
                 <div
@@ -175,10 +180,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 padding: '14px 12px 4px',
               }}
             >
-              Ecosystem
+              {t('nav.ecosystem')}
             </div>
 
-            {DESKTOP_EXTRA_NAV.map((item) => {
+            {desktopExtraNav.map((item) => {
               const isActive = location.pathname === item.path
               return (
                 <div
@@ -229,7 +234,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               }}
             >
               <Icon name="sparkles" size={18} color="var(--accent)" />
-              <span>Ask Green AI</span>
+              <span>{t('nav.askAi')}</span>
             </div>
           </nav>
 
@@ -244,6 +249,42 @@ export default function AppShell({ children }: { children: ReactNode }) {
               gap: 8,
             }}
           >
+            {/* Language Selector Button */}
+            <button
+              onClick={() => setShowLangModal(true)}
+              aria-label={t('common.language')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-surface-2)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-secondary)',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                width: '100%',
+                transition: 'background var(--transition-fast)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="globe" size={16} color="var(--accent)" />
+                <span>{getLanguageName(currentLang)}</span>
+              </div>
+              <span style={{
+                fontSize: '0.7rem',
+                background: 'var(--accent-light)',
+                color: 'var(--accent-text)',
+                padding: '1px 6px',
+                borderRadius: 4,
+                fontWeight: 800
+              }}>
+                {currentLang.toUpperCase()}
+              </span>
+            </button>
+
             {/* Install App CTA in Sidebar (Desktop) */}
             {isInstalled ? (
               <div
@@ -409,16 +450,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
               backdropFilter: 'blur(8px)',
             }}
             className="hide-desktop"
-            aria-label="Open Green AI Assistant"
+            aria-label={t('nav.askAi')}
           >
             <Icon name="sparkles" size={17} color="#ffffff" />
-            <span>Ask AI</span>
+            <span>{t('nav.askAi')}</span>
           </button>
         )}
 
         {/* Mobile Modern Bottom Navigation Bar */}
         <nav className="bottom-nav hide-desktop" role="navigation" aria-label="Mobile Navigation">
-          {PRIMARY_NAV_ITEMS.map((item) => {
+          {primaryNavItems.map((item) => {
             if (item.isPost) {
               return (
                 <div
@@ -432,7 +473,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
                     style={{
                       boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
                     }}
-                    aria-label="Post E-Waste"
+                    aria-label={t('nav.postEwaste')}
                   >
                     <Icon name="plus" size={24} color="#ffffff" />
                   </div>
@@ -473,6 +514,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
           })}
         </nav>
       </div>
+
+      {/* Language Switcher Modal */}
+      <LanguageSwitcherModal
+        isOpen={showLangModal}
+        onClose={() => setShowLangModal(false)}
+      />
 
       {/* Green AI Drawer Modal */}
       <GreenAiDrawer isOpen={showAi} onClose={() => setShowAi(false)} />

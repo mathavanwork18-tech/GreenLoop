@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import type { LanguageCode } from '../types/common.types'
+import { normalizeLanguage, type CanonicalLanguage } from '../i18n/languages'
 import { supabase, isAuthTestMode, DEV_DUMMY_OTP } from '../utils/supabase'
 import { normalizePhone } from '../utils/phone'
 import { normalizeRole, updateUserRoleInDatabase } from '../services/role/roleService'
@@ -32,6 +33,7 @@ export interface User {
   rating: number
   transactions: number
   joinedAt: string
+  preferred_language?: CanonicalLanguage
   preferences?: {
     language: LanguageCode
     preferredCategories: string[]
@@ -189,37 +191,42 @@ function mapDbProfileToUser(profile: any, authUser?: any, coinBalance?: number, 
         (profile?.address || profile?.city)
       )
 
-  return {
-    id: profile?.id || authUser?.id,
-    name: fullName,
-    username: fullName.toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'citizen',
-    email,
-    phone: profile?.phone || authUser?.user_metadata?.phone || '',
-    city: profile?.city || 'Coimbatore',
-    area: profile?.address || 'RS Puram',
-    bio: 'Eco-conscious Green Loop community member',
-    avatar,
-    role,
-    greenCoins: resolvedCoins,
-    level: resolvedCoins >= 5000 ? 'Planet Guardian' : resolvedCoins >= 2000 ? 'Eco Master' : resolvedCoins >= 500 ? 'Eco Champion' : 'Eco Beginner',
-    levelIcon: resolvedCoins >= 5000 ? 'verified' : resolvedCoins >= 2000 ? 'star' : resolvedCoins >= 500 ? 'sparkles' : 'leaf',
-    levelMin: 0,
-    levelMax: 499,
-    streak: resolvedStreak,
-    isVerified: true,
-    isPhoneVerified: Boolean(profile?.phone_verified),
-    isProfileComplete,
-    rating: 4.9,
-    transactions: 0,
-    joinedAt: profile?.created_at || new Date().toISOString(),
-    preferences: {
-      language: (localStorage.getItem('gl_language') as LanguageCode) || 'EN',
-      preferredCategories: ['Smartphones', 'Laptops'],
-      preferredAction: 'Recycle',
-      pickupPreference: 'doorstep',
-      aiRecommendations: true,
-      notifications: { email: true, sms: true, missionReminders: true, pickupUpdates: true },
-    },
+    const resolvedLang = profile?.preferred_language
+      ? normalizeLanguage(profile.preferred_language)
+      : normalizeLanguage(localStorage.getItem('gl_language') || 'en')
+
+    return {
+      id: profile?.id || authUser?.id,
+      name: fullName,
+      username: fullName.toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'citizen',
+      email,
+      phone: profile?.phone || authUser?.user_metadata?.phone || '',
+      city: profile?.city || 'Coimbatore',
+      area: profile?.address || 'RS Puram',
+      bio: 'Eco-conscious Green Loop community member',
+      avatar,
+      role,
+      greenCoins: resolvedCoins,
+      level: resolvedCoins >= 5000 ? 'Planet Guardian' : resolvedCoins >= 2000 ? 'Eco Master' : resolvedCoins >= 500 ? 'Eco Champion' : 'Eco Beginner',
+      levelIcon: resolvedCoins >= 5000 ? 'verified' : resolvedCoins >= 2000 ? 'star' : resolvedCoins >= 500 ? 'sparkles' : 'leaf',
+      levelMin: 0,
+      levelMax: 499,
+      streak: resolvedStreak,
+      isVerified: true,
+      isPhoneVerified: Boolean(profile?.phone_verified),
+      isProfileComplete,
+      rating: 4.9,
+      transactions: 0,
+      joinedAt: profile?.created_at || new Date().toISOString(),
+      preferred_language: resolvedLang,
+      preferences: {
+        language: resolvedLang as LanguageCode,
+        preferredCategories: ['Smartphones', 'Laptops'],
+        preferredAction: 'Recycle',
+        pickupPreference: 'doorstep',
+        aiRecommendations: true,
+        notifications: { email: true, sms: true, missionReminders: true, pickupUpdates: true },
+      },
     privacy: {
       showApproximateLocation: true,
       showPhoneToVerifiedOnly: true,
@@ -296,7 +303,7 @@ async function ensureProfile(
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [language, setLangState] = useState<LanguageCode>(() => {
-    return (localStorage.getItem('gl_language') as LanguageCode) || 'EN'
+    return normalizeLanguage(localStorage.getItem('gl_language') || 'en')
   })
 
   const [isInitializing, setIsInitializing] = useState(true)
@@ -437,11 +444,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const setLanguage = (lang: LanguageCode) => {
-    setLangState(lang)
-    localStorage.setItem('gl_language', lang)
+    const canonical = normalizeLanguage(lang)
+    setLangState(canonical)
+    localStorage.setItem('gl_language', canonical)
+    try {
+      window.dispatchEvent(new CustomEvent('gl_language_changed', { detail: { language: canonical } }))
+    } catch {}
+
     if (user) {
       const updated: User = {
         ...user,
+        preferred_language: canonical,
         preferences: {
           ...(user.preferences || {
             preferredCategories: [],
@@ -450,11 +463,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             aiRecommendations: true,
             notifications: { email: true, sms: true, missionReminders: true, pickupUpdates: true },
           }),
-          language: lang,
+          language: canonical,
         },
       }
       setUser(updated)
       localStorage.setItem('gl_user', JSON.stringify(updated))
+
+      try {
+        supabase
+          .from('profiles')
+          .update({ preferred_language: canonical })
+          .eq('id', user.id)
+          .then(() => {}, () => {})
+      } catch {}
     }
   }
 

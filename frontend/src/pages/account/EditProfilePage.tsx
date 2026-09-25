@@ -5,6 +5,7 @@ import { userService } from '../../services/userService'
 import type { UserSession } from '../../services/userService'
 import { CATEGORIES } from '../../data/mockData'
 import Icon from '../../components/Icon'
+import type { LanguageCode } from '../../types/common.types'
 
 export default function EditProfilePage() {
   const navigate = useNavigate()
@@ -24,7 +25,7 @@ export default function EditProfilePage() {
   const [avatar, setAvatar] = useState<string | null>(user?.avatar || null)
 
   // Preferences
-  const [language, setLanguage] = useState<'EN' | 'TA' | 'HI' | 'ML' | 'KN'>(user?.preferences?.language || 'EN')
+  const [language, setLanguage] = useState<LanguageCode>(user?.preferences?.language || 'EN')
   const [preferredCategories, setPreferredCategories] = useState<string[]>(
     user?.preferences?.preferredCategories || ['Mobile', 'Laptop']
   )
@@ -943,25 +944,29 @@ export default function EditProfilePage() {
                   { code: 'HI', label: 'हिंदी (Hindi)' },
                   { code: 'ML', label: 'മലയാളം (Malayalam)' },
                   { code: 'KN', label: 'ಕನ್ನಡ (Kannada)' },
-                ].map(l => (
-                  <button
-                    key={l.code}
-                    type="button"
-                    onClick={() => setLanguage(l.code as any)}
-                    style={{
-                      background: language === l.code ? 'var(--accent)' : 'var(--bg-surface-2)',
-                      color: language === l.code ? '#fff' : 'var(--text-secondary)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-full)',
-                      padding: '8px 14px',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {l.label}
-                  </button>
-                ))}
+                  { code: 'TE', label: 'తెలుగు (Telugu)' },
+                ].map(l => {
+                  const isSelected = String(language || '').toUpperCase() === l.code
+                  return (
+                    <button
+                      key={l.code}
+                      type="button"
+                      onClick={() => setLanguage(l.code as any)}
+                      style={{
+                        background: isSelected ? 'var(--accent)' : 'var(--bg-surface-2)',
+                        color: isSelected ? '#fff' : 'var(--text-secondary)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-full)',
+                        padding: '8px 14px',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {l.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 

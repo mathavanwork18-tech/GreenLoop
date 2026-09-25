@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useHomeFeed } from './hooks/useHomeFeed'
 import { useAuth } from '../../context/AuthContext'
+import { useTranslation } from '../../i18n/useTranslation'
+import { matchesMultilingualSearch } from '../../utils/multilingualSearch'
 import HomeHeader from './components/HomeHeader/HomeHeader'
 import HeroSection from './components/HeroSection/HeroSection'
 import SearchSection from './components/SearchSection/SearchSection'
@@ -17,6 +19,7 @@ import type { Post } from '../../types/post.types'
 export default function HomePage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { currentLang } = useTranslation()
   const {
     posts,
     recommended,
@@ -56,15 +59,7 @@ export default function HomePage() {
     let list = [...posts]
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      list = list.filter(
-        (p) =>
-          p.title.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          p.model.toLowerCase().includes(q) ||
-          p.location.toLowerCase().includes(q)
-      )
+      list = list.filter((p) => matchesMultilingualSearch(p, searchQuery, currentLang))
     }
 
     if (activeCategory !== 'all') {
@@ -95,7 +90,7 @@ export default function HomePage() {
     }
 
     return list
-  }, [posts, searchQuery, activeCategory, activeCondition, activeDistance, activeSort, verifiedOnly])
+  }, [posts, searchQuery, activeCategory, activeCondition, activeDistance, activeSort, verifiedOnly, currentLang])
 
   const activeFiltersCount =
     (activeCategory !== 'all' ? 1 : 0) +

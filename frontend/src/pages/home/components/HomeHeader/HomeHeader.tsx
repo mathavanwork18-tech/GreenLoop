@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../../context/AuthContext'
 import { useTheme } from '../../../../context/ThemeContext'
@@ -5,6 +6,8 @@ import { usePwaInstall } from '../../../../context/PwaInstallContext'
 import Icon from '../../../../components/Icon'
 import GreenCoinBadge from '../../../../components/eco/GreenCoinBadge'
 import InstallButton from '../../../../components/InstallButton'
+import LanguageSwitcherModal from '../../../../components/LanguageSwitcherModal'
+import { useTranslation } from '../../../../i18n/useTranslation'
 
 interface HomeHeaderProps {
   onNotificationClick: () => void
@@ -15,6 +18,8 @@ export default function HomeHeader({ onNotificationClick }: HomeHeaderProps) {
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { openInstallModal } = usePwaInstall()
+  const { currentLang, t } = useTranslation()
+  const [showLangModal, setShowLangModal] = useState(false)
 
   return (
     <header className="header" style={{ position: 'sticky', top: 0, zIndex: 30 }}>
@@ -50,6 +55,29 @@ export default function HomeHeader({ onNotificationClick }: HomeHeaderProps) {
         {/* Right: Green Coins, Theme Switcher & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <GreenCoinBadge coins={user?.greenCoins} onClick={() => navigate('/activity')} />
+
+          {/* Language Switcher Button */}
+          <button
+            onClick={() => setShowLangModal(true)}
+            aria-label={t('common.language')}
+            title={t('common.language')}
+            style={{
+              background: 'var(--bg-surface-2)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 999,
+              padding: '6px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              cursor: 'pointer',
+              color: 'var(--text-primary)',
+              fontSize: '0.74rem',
+              fontWeight: 800
+            }}
+          >
+            <Icon name="globe" size={14} color="var(--accent)" />
+            <span>{currentLang.toUpperCase()}</span>
+          </button>
 
           {/* Install Web App Button */}
           <InstallButton onFallback={openInstallModal} />
@@ -134,6 +162,11 @@ export default function HomeHeader({ onNotificationClick }: HomeHeaderProps) {
           </button>
         </div>
       </div>
+
+      <LanguageSwitcherModal
+        isOpen={showLangModal}
+        onClose={() => setShowLangModal(false)}
+      />
     </header>
   )
 }

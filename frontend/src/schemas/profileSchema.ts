@@ -13,7 +13,7 @@ export const profileFormSchema = z.object({
   avatar: z.string().nullable().optional(),
 
   // Preferences
-  language: z.enum(['EN', 'TA', 'HI', 'ML', 'KN']),
+  language: z.enum(['EN', 'TA', 'HI', 'ML', 'KN', 'TE', 'en', 'ta', 'hi', 'ml', 'kn', 'te']),
   preferredCategories: z.array(z.string()).min(1, 'Select at least one preferred category'),
   preferredAction: z.enum(['Sell', 'Donate', 'Recycle', 'Repair', 'Exchange']),
   pickupPreference: z.enum(['doorstep', 'hub_dropoff']),

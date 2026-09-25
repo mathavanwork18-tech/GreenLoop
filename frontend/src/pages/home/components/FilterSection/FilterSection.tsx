@@ -1,5 +1,7 @@
 import { CATEGORIES, CONDITIONS } from '../../../../constants/categories'
 import Icon from '../../../../components/Icon'
+import { useTranslation } from '../../../../i18n/useTranslation'
+import { translateCategory, translateCondition } from '../../../../i18n'
 
 interface FilterSectionProps {
   isOpen: boolean
@@ -32,6 +34,8 @@ export default function FilterSection({
   onVerifiedOnlyChange,
   onReset
 }: FilterSectionProps) {
+  const { t, currentLang } = useTranslation()
+
   return (
     <>
       {/* Category Pills Bar (Always visible on Home) */}
@@ -59,7 +63,7 @@ export default function FilterSection({
               flexShrink: 0
             }}
           >
-            All Items
+            {t('categories.all')}
           </button>
           {CATEGORIES.map(cat => (
             <button
@@ -81,7 +85,7 @@ export default function FilterSection({
               }}
             >
               <Icon name={cat.icon} size={13} color={activeCategory === cat.label ? '#fff' : 'var(--text-secondary)'} />
-              <span>{cat.label}</span>
+              <span>{translateCategory(cat.label, currentLang)}</span>
             </button>
           ))}
         </div>
@@ -110,7 +114,7 @@ export default function FilterSection({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
-                Filter & Sort E-Waste
+                {t('marketplace.filters')}
               </h3>
               <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 <Icon name="close" size={18} color="var(--text-secondary)" />
@@ -120,7 +124,7 @@ export default function FilterSection({
             {/* Condition */}
             <div style={{ marginBottom: 18 }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                Hardware Condition
+                {t('product.condition')}
               </label>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {['all', ...CONDITIONS.map(c => c.label)].map(cond => (
@@ -138,7 +142,7 @@ export default function FilterSection({
                       cursor: 'pointer'
                     }}
                   >
-                    {cond === 'all' ? 'All Conditions' : cond}
+                    {cond === 'all' ? t('common.filter') : translateCondition(cond, currentLang)}
                   </button>
                 ))}
               </div>
@@ -147,14 +151,14 @@ export default function FilterSection({
             {/* Distance */}
             <div style={{ marginBottom: 18 }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                Distance Radius
+                {t('marketplace.distance')}
               </label>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[
-                  { id: 'all', label: 'Anywhere' },
-                  { id: '2km', label: 'Within 2 km' },
-                  { id: '5km', label: 'Within 5 km' },
-                  { id: '10km', label: 'Within 10 km' },
+                  { id: 'all', label: t('marketplace.all') },
+                  { id: '2km', label: '2 km' },
+                  { id: '5km', label: '5 km' },
+                  { id: '10km', label: '10 km' },
                 ].map(d => (
                   <button
                     key={d.id}
@@ -180,14 +184,14 @@ export default function FilterSection({
             {/* Sort Order */}
             <div style={{ marginBottom: 18 }}>
               <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                Sort By
+                {t('marketplace.sortBy')}
               </label>
               <div style={{ display: 'flex', gap: 6 }}>
                 {[
-                  { id: 'newest', label: 'Newest First' },
-                  { id: 'price_low', label: 'Price: Low' },
-                  { id: 'price_high', label: 'Price: High' },
-                  { id: 'distance', label: 'Nearest' },
+                  { id: 'newest', label: t('marketplace.newest') },
+                  { id: 'price_low', label: t('marketplace.priceLow') },
+                  { id: 'price_high', label: t('marketplace.priceHigh') },
+                  { id: 'distance', label: t('marketplace.distance') },
                 ].map(s => (
                   <button
                     key={s.id}
@@ -239,10 +243,10 @@ export default function FilterSection({
             {/* Actions */}
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={onReset} className="btn btn-ghost btn-full" style={{ fontSize: '0.82rem' }}>
-                Reset All
+                {t('marketplace.resetFilters')}
               </button>
               <button onClick={onClose} className="btn btn-primary btn-full" style={{ fontSize: '0.82rem' }}>
-                Apply Filters
+                {t('common.continue')}
               </button>
             </div>
           </div>

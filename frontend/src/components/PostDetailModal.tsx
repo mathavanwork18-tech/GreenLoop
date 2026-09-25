@@ -7,6 +7,10 @@ import { chatService } from '../services/chat/chatService'
 import MarketplaceChatModal from './chat/MarketplaceChatModal'
 import { PurchaseCheckoutModal, TransactionDetailsModal } from './payment'
 import type { MarketplacePurchase } from '../types/payment.types'
+import { useTranslation } from '../i18n/useTranslation'
+import { translateCategory, translateCondition } from '../i18n'
+import { usePostTranslation } from '../hooks/usePostTranslation'
+import { getLanguageName } from '../i18n/languages'
 
 export interface PostItem {
   id: string
@@ -36,6 +40,9 @@ export interface PostItem {
     recommendation: string
     materialBreakdown?: string
   }
+  original_title?: string
+  original_description?: string
+  original_language?: string
 }
 
 export default function PostDetailModal({
@@ -56,6 +63,18 @@ export default function PostDetailModal({
   isSaved?: boolean
 }) {
   const { user } = useAuth()
+  const { t, currentLang } = useTranslation()
+  const {
+    title,
+    description,
+    isTranslating,
+    isTranslated,
+    originalLanguage,
+    sourceLanguage,
+    showOriginal,
+    setShowOriginal
+  } = usePostTranslation(post as any)
+
   const [activeImageIndex, setActiveImageIndex] = useState(0)
   const [deleting, setDeleting] = useState(false)
   const [showChat, setShowChat] = useState(false)
@@ -128,7 +147,8 @@ export default function PostDetailModal({
     }
   }
 
-
+  const localizedCategory = translateCategory(post.category, currentLang)
+  const localizedCondition = translateCondition(post.condition, currentLang)
 
   return (
     <>
@@ -174,11 +194,12 @@ export default function PostDetailModal({
               {post.purpose.toUpperCase()}
             </span>
             <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Item Details
+              {t('common.viewDetails')}
             </span>
           </div>
           <button
             onClick={onClose}
+            aria-label={t('common.close')}
             style={{
               background: 'var(--bg-surface-2)',
               border: 'none',
@@ -200,7 +221,7 @@ export default function PostDetailModal({
         <div style={{ position: 'relative', background: '#000', height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <img
             src={post.images[activeImageIndex] || post.images[0]}
-            alt={post.title}
+            alt={title}
             style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
             onError={e => {
               (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=500&q=80'
@@ -233,14 +254,66 @@ export default function PostDetailModal({
 
         {/* Content Container */}
         <div style={{ padding: '16px 20px' }}>
+          {/* Multilingual Translation Notification Banner */}
+          {isTranslated && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              background: 'rgba(16,185,129,0.08)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid rgba(16,185,129,0.22)',
+              marginBottom: 12,
+              fontSize: '0.74rem',
+              color: 'var(--text-secondary)'
+            }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon name="globe" size={14} color="var(--accent)" />
+                <span>
+                  {showOriginal
+                    ? t('common.originalContent')
+                    : t('common.translatedFrom', { lang: getLanguageName(originalLanguage || sourceLanguage) })}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowOriginal(!showOriginal)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: '0.74rem',
+                  textDecoration: 'underline',
+                  padding: 0
+                }}
+              >
+                {showOriginal ? t('common.viewTranslation') : t('common.viewOriginal')}
+              </button>
+            </div>
+          )}
+
           {/* Title & Price */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
             <div>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>{post.title}</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                {title}
+                {isTranslating && (
+                  <span style={{ fontSize: '0.68rem', color: 'var(--accent)', marginLeft: 6, fontWeight: 600 }}>
+                    ({t('common.translating')})
+                  </span>
+                )}
+              </h2>
               <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                <span className="badge badge-accent">{post.category}</span>
-                <span className="badge badge-gray">{post.condition} Condition</span>
-                {post.negotiable && <span className="badge" style={{ background: '#fef3c7', color: '#92400e' }}>Negotiable</span>}
+                <span className="badge badge-accent">{localizedCategory}</span>
+                <span className="badge badge-gray">{localizedCondition}</span>
+                {post.negotiable && (
+                  <span className="badge" style={{ background: '#fef3c7', color: '#92400e' }}>
+                    {t('product.negotiable')}
+                  </span>
+                )}
               </div>
             </div>
             {post.price !== null && (
@@ -248,7 +321,7 @@ export default function PostDetailModal({
                 <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--accent)' }}>
                   ₹{post.price.toLocaleString()}
                 </div>
-                <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>Estimated AI Value</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>{t('marketplace.estimatedAiValue')}</div>
               </div>
             )}
           </div>
@@ -291,7 +364,7 @@ export default function PostDetailModal({
               style={{ fontSize: '0.78rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 5 }}
             >
               <Icon name="comment" size={13} color="#fff" />
-              <span>Chat</span>
+              <span>{t('nav.chat')}</span>
             </button>
           </div>
 
@@ -350,7 +423,7 @@ export default function PostDetailModal({
                   onClick={handleSendChat}
                   style={{ borderRadius: 'var(--radius-full)', padding: '6px 14px' }}
                 >
-                  Send
+                  {t('common.submit')}
                 </button>
               </div>
             </div>
@@ -380,10 +453,14 @@ export default function PostDetailModal({
             </p>
           </div>
 
-          {/* Description */}
+          {/* Description with Dynamic Translation */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>Description</div>
-            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>{post.description}</p>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+              {t('product.description')}
+            </div>
+            <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+              {description}
+            </p>
           </div>
 
           {/* Public Comments */}
@@ -425,7 +502,7 @@ export default function PostDetailModal({
                 onClick={handleAddComment}
                 style={{ fontSize: '0.78rem' }}
               >
-                Post
+                {t('common.submit')}
               </button>
             </div>
           </div>
@@ -456,7 +533,7 @@ export default function PostDetailModal({
             }}
           >
             <Icon name="heart" size={16} color={isLiked ? '#ef4444' : 'var(--text-secondary)'} />
-            <span>{isLiked ? 'Liked' : 'Like'}</span>
+            <span>{isLiked ? t('common.liked') : t('common.like')}</span>
           </button>
           <button
             onClick={onSave}
@@ -475,7 +552,7 @@ export default function PostDetailModal({
             }}
           >
             <Icon name="certificate" size={16} color={isSaved ? 'var(--accent)' : 'var(--text-secondary)'} />
-            <span>{isSaved ? 'Saved' : 'Save'}</span>
+            <span>{isSaved ? t('common.saved') : t('common.save')}</span>
           </button>
           {isOwner ? (
             <button
@@ -494,7 +571,7 @@ export default function PostDetailModal({
               }}
             >
               <Icon name="trash" size={15} color="#b91c1c" />
-              <span>{deleting ? 'Deleting...' : 'Delete Listing'}</span>
+              <span>{deleting ? 'Deleting...' : t('common.delete')}</span>
             </button>
           ) : (
             <>
@@ -518,7 +595,7 @@ export default function PostDetailModal({
                 }}
               >
                 <Icon name="comment" size={16} color="var(--accent)" />
-                <span>Message Seller</span>
+                <span>{t('product.seller')}</span>
               </button>
 
               {/* BUY BUTTON - ALWAYS ACTIVE FOR ALL USERS (GENERAL & LOCAL SHOP) */}
@@ -557,17 +634,17 @@ export default function PostDetailModal({
                 {post.status === 'sold' ? (
                   <>
                     <Icon name="check" size={16} color="#8B949E" />
-                    <span>Item Sold</span>
+                    <span>{t('marketplace.itemSold')}</span>
                   </>
                 ) : isOwner ? (
                   <>
                     <Icon name="user" size={16} color="#8B949E" />
-                    <span>Your Listing</span>
+                    <span>{t('marketplace.yourListing')}</span>
                   </>
                 ) : (
                   <>
                     <Icon name="shopping-bag" size={16} color="#0D1117" />
-                    <span>BUY {post.price !== null && post.price !== undefined ? `• ₹${Number(post.price).toLocaleString()}` : ''}</span>
+                    <span>{t('marketplace.buy')} {post.price !== null && post.price !== undefined ? `• ₹${Number(post.price).toLocaleString()}` : ''}</span>
                   </>
                 )}
               </button>
@@ -581,7 +658,7 @@ export default function PostDetailModal({
         isOpen={openMarketplaceChat}
         listing={{
           id: post.id,
-          title: post.title,
+          title: title,
           askingPrice: post.price,
           location: post.location,
           category: post.category,
@@ -597,7 +674,7 @@ export default function PostDetailModal({
         isOpen={showCheckout}
         post={{
           id: post.id,
-          title: post.title,
+          title: title,
           price: post.price,
           images: post.images,
           condition: post.condition,

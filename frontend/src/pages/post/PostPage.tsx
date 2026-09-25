@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { postsApi } from '../../services/posts/posts.api'
 import { aiApi } from '../../services/ai/ai.api'
+import { detectLanguage } from '../../services/translation/translationService'
 import LiveCameraView from './components/Camera/LiveCameraView'
 import DevicePresets from './components/Camera/DevicePresets'
 import type { PresetDevice } from './components/Camera/DevicePresets'
@@ -257,8 +258,14 @@ export default function PostPage() {
       const postLat = 11.0168 + jitterLat
       const postLng = 76.9558 + jitterLng
 
+      const detectedLang = detectLanguage(title + ' ' + description)
+
       await postsApi.createPost({
         title,
+        original_title: title,
+        description,
+        original_description: description,
+        original_language: detectedLang,
         category,
         brand,
         model,
@@ -266,7 +273,6 @@ export default function PostPage() {
         purpose,
         price: purpose === 'Sell' && price !== '' ? Number(price) : null,
         negotiable: purpose === 'Sell' ? negotiable : false,
-        description,
         location,
         locationName: location,
         latitude: postLat,

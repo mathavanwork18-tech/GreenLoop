@@ -499,6 +499,152 @@ Language: Respond in ${language === 'ta' ? 'Tamil' : language === 'hi' ? 'Hindi'
     const data = await response.json()
     return data.embedding?.values || []
   }
+
+  /**
+   * Domain-Trained Multilingual Translation Engine:
+   * Translates user-generated e-waste marketplace content into the viewer's target language.
+   * Preserves specifications, numbers, prices, model names, and brand names.
+   */
+  static async translateContent({ texts, text, sourceLanguage = 'auto', targetLanguage = 'en' }) {
+    const apiKey = process.env.GEMINI_API_KEY?.trim()
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not configured in backend environment')
+    }
+
+    // Prepare dictionary of fields to translate
+    let fieldsToTranslate = {}
+    if (texts && typeof texts === 'object' && !Array.isArray(texts)) {
+      fieldsToTranslate = { ...texts }
+    } else if (typeof text === 'string' && text.trim()) {
+      fieldsToTranslate = { text: text.trim() }
+    }
+
+    // Filter out empty or whitespace-only values
+    const entries = Object.entries(fieldsToTranslate).filter(([_, val]) => typeof val === 'string' && val.trim().length > 0)
+    if (entries.length === 0) {
+      return {
+        translations: fieldsToTranslate,
+        translatedText: text || '',
+        detectedSourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
+        targetLanguage,
+      }
+    }
+
+    const LANG_NAME_MAP = {
+      en: 'English',
+      ta: 'Tamil',
+      hi: 'Hindi',
+      ml: 'Malayalam',
+      kn: 'Kannada',
+      te: 'Telugu',
+    }
+
+    const targetLangName = LANG_NAME_MAP[targetLanguage.toLowerCase()] || targetLanguage
+    const sourceLangName = sourceLanguage !== 'auto' && LANG_NAME_MAP[sourceLanguage.toLowerCase()]
+      ? LANG_NAME_MAP[sourceLanguage.toLowerCase()]
+      : 'the detected language (which may be Tamil, Hindi, Malayalam, Kannada, Telugu, English, or mixed Tanglish/Hinglish)'
+
+    const systemPrompt = `You are a multilingual translation engine for an e-waste marketplace.
+
+Translate the supplied user-generated content from ${sourceLangName} to ${targetLangName} (language code: ${targetLanguage.toLowerCase()}).
+
+Rules:
+- Preserve the original meaning.
+- Do not add information.
+- Do not remove information.
+- Do not invent product specifications.
+- Preserve numbers, prices, model numbers and units.
+- Preserve brand names.
+- Preserve names and IDs.
+- Keep the translation natural for a marketplace.
+- Return only the translated content as a valid JSON object matching the exact input field keys, plus "detectedSourceLanguage" (ISO 639-1 code like "ta", "hi", "en", "ml", "kn", "te").
+- Never translate database IDs or technical identifiers.`
+
+    const userPayload = JSON.stringify(fieldsToTranslate, null, 2)
+    const prompt = `${systemPrompt}\n\nFields to translate:\n${userPayload}\n\nRespond ONLY with valid JSON.`
+
+    const translationModels = [
+      'gemini-3.5-flash-lite',
+      'gemini-3-flash-preview',
+      'gemini-3.8-flash',
+      'gemini-flash-latest',
+    ]
+
+    let lastError = null
+
+    for (const model of translationModels) {
+      const abortController = new AbortController()
+      const timeoutId = setTimeout(() => abortController.abort(), 12000)
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          signal: abortController.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.1,
+              maxOutputTokens: 1000,
+            },
+          }),
+        })
+
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          const rawError = errData.error?.message || `HTTP ${response.status}`
+          console.warn(`[GeminiService Translation] Model ${model} returned error:`, sanitizeErrorMessage(rawError, apiKey))
+          lastError = new Error(sanitizeErrorMessage(rawError, apiKey))
+          continue
+        }
+
+        const data = await response.json()
+        const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text
+        if (!candidate || !candidate.trim()) {
+          throw new Error('Empty translation response received from Gemini')
+        }
+
+        let parsedJson
+        try {
+          parsedJson = JSON.parse(candidate)
+        } catch {
+          const match = candidate.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+          if (match) parsedJson = JSON.parse(match[1])
+          else throw new Error('Could not parse JSON from translation response')
+        }
+
+        const detectedLang = parsedJson.detectedSourceLanguage || (sourceLanguage !== 'auto' ? sourceLanguage : 'en')
+        delete parsedJson.detectedSourceLanguage
+
+        const translations = {}
+        for (const [key, origVal] of Object.entries(fieldsToTranslate)) {
+          translations[key] = parsedJson[key] || origVal
+        }
+
+        const translatedText = translations.text || translations.title || Object.values(translations)[0] || text || ''
+
+        return {
+          translations,
+          translatedText,
+          detectedSourceLanguage: detectedLang,
+          targetLanguage,
+          modelUsed: model,
+        }
+      } catch (err) {
+        clearTimeout(timeoutId)
+        lastError = err
+      }
+    }
+
+    throw lastError || new Error('All Gemini translation models failed')
+  }
 }
 
 export default GeminiService

@@ -16,6 +16,7 @@ const LANGUAGES: LanguageOption[] = [
   { code: 'HI', native: 'हिन्दी', english: 'Hindi', greeting: 'ग्रीन लूप में आपका स्वागत है' },
   { code: 'ML', native: 'മലയാളം', english: 'Malayalam', greeting: 'ഗ്രീൻ ലൂപ്പിലേക്ക് സ്വാഗതം' },
   { code: 'KN', native: 'ಕನ್ನಡ', english: 'Kannada', greeting: 'ಗ್ರೀನ್ ಲೂಪ್‌ಗೆ ಸುಸ್ವಾಗತ' },
+  { code: 'TE', native: 'తెలుగు', english: 'Telugu', greeting: 'గ్రీన్ లూప్‌కు స్వాగతం' },
 ]
 
 interface Props {

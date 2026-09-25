@@ -3,16 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useHomeFeed } from '../home/hooks/useHomeFeed'
 import PostDetailModal from '../../components/PostDetailModal'
 import Icon from '../../components/Icon'
+import LanguageSwitcherModal from '../../components/LanguageSwitcherModal'
+import { useTranslation } from '../../i18n/useTranslation'
+import { translateCondition } from '../../i18n'
+import { usePostTranslation } from '../../hooks/usePostTranslation'
+import { matchesMultilingualSearch } from '../../utils/multilingualSearch'
 import type { Post } from '../../types/post.types'
-
-const PURPOSE_TABS = [
-  { id: 'all', label: 'All Listings', icon: '\ud83d\udccb' },
-  { id: 'Sell', label: 'Buy & Sell', icon: '\ud83d\udcb0' },
-  { id: 'Donate', label: 'Donate', icon: '\ud83e\udd1d' },
-  { id: 'Exchange', label: 'Exchange', icon: '\ud83d\udd04' },
-  { id: 'Repair', label: 'Repair', icon: '\ud83d\udee0\ufe0f' },
-  { id: 'Recycle', label: 'Recycle', icon: '\u267b\ufe0f' },
-]
 
 const CONDITION_COLORS: Record<string, string> = {
   Flawless: '#10b981',
@@ -22,22 +18,33 @@ const CONDITION_COLORS: Record<string, string> = {
   'Hazmat (Swollen Battery)': '#ef4444',
 }
 
-const SORT_OPTIONS = [
-  { id: 'newest', label: 'Newest' },
-  { id: 'price_low', label: 'Price: Low to High' },
-  { id: 'price_high', label: 'Price: High to Low' },
-  { id: 'distance', label: 'Nearest' },
-]
-
 export default function MarketplacePage() {
   const navigate = useNavigate()
   const { posts, handleToggleLike, handleToggleSave, handleTrackPostOpen } = useHomeFeed()
+  const { t, currentLang } = useTranslation()
 
   const [activeTab, setActiveTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSort, setActiveSort] = useState('newest')
   const [showSortSheet, setShowSortSheet] = useState(false)
+  const [showLangModal, setShowLangModal] = useState(false)
   const [selectedPost, setSelectedPost] = useState<Post | null>(null)
+
+  const purposeTabs = useMemo(() => [
+    { id: 'all', label: t('marketplace.all'), icon: '📋' },
+    { id: 'Sell', label: t('marketplace.sell'), icon: '💰' },
+    { id: 'Donate', label: t('marketplace.donate'), icon: '🤝' },
+    { id: 'Exchange', label: t('marketplace.exchange'), icon: '🔄' },
+    { id: 'Repair', label: t('marketplace.repair'), icon: '🛠️' },
+    { id: 'Recycle', label: t('marketplace.recycle'), icon: '♻️' },
+  ], [t])
+
+  const sortOptions = useMemo(() => [
+    { id: 'newest', label: t('marketplace.newest') },
+    { id: 'price_low', label: t('marketplace.priceLowToHigh') },
+    { id: 'price_high', label: t('marketplace.priceHighToLow') },
+    { id: 'distance', label: t('marketplace.nearest') },
+  ], [t])
 
   const handleSelectPost = (post: Post) => {
     handleTrackPostOpen(post)
@@ -48,14 +55,7 @@ export default function MarketplacePage() {
     let list = [...posts]
 
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      list = list.filter(p =>
-        p.title.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        p.model.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
-        p.location.toLowerCase().includes(q)
-      )
+      list = list.filter(p => matchesMultilingualSearch(p, searchQuery, currentLang))
     }
 
     if (activeTab !== 'all') {
@@ -74,9 +74,9 @@ export default function MarketplacePage() {
     }
 
     return list
-  }, [posts, activeTab, searchQuery, activeSort])
+  }, [posts, activeTab, searchQuery, activeSort, currentLang])
 
-  const currentSort = SORT_OPTIONS.find(s => s.id === activeSort)?.label || 'Newest'
+  const currentSort = sortOptions.find(s => s.id === activeSort)?.label || t('marketplace.newest')
 
   return (
     <div className="page-content" style={{ paddingBottom: 'calc(var(--nav-height) + 32px)' }}>
@@ -91,13 +91,30 @@ export default function MarketplacePage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
             <h1 style={{ fontSize: '1.1rem', fontWeight: 900, margin: 0, color: 'var(--text-primary)' }}>
-              Marketplace
+              {t('marketplace.title')}
             </h1>
             <div style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-              {filteredPosts.length} listings near you
+              {t('marketplace.listingsNearYou', { count: filteredPosts.length })}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Language Switcher Trigger */}
+            <button
+              onClick={() => setShowLangModal(true)}
+              aria-label={t('common.language')}
+              title={t('common.language')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '7px 11px', borderRadius: 999,
+                background: 'var(--bg-surface-2)', color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)', fontSize: '0.74rem', fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="globe" size={13} color="var(--accent)" />
+              <span>{currentLang.toUpperCase()}</span>
+            </button>
+
             <button
               onClick={() => navigate('/post')}
               style={{
@@ -109,7 +126,7 @@ export default function MarketplacePage() {
               }}
             >
               <Icon name="plus" size={13} color="#fff" />
-              Post
+              {t('marketplace.postDevice')}
             </button>
           </div>
         </div>
@@ -125,7 +142,7 @@ export default function MarketplacePage() {
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search phones, laptops, batteries..."
+            placeholder={t('marketplace.searchPlaceholder')}
             style={{
               width: '100%', padding: '10px 12px 10px 36px',
               borderRadius: 12, border: '1px solid var(--border-color)',
@@ -151,7 +168,7 @@ export default function MarketplacePage() {
         <div style={{
           display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 12,
         }}>
-          {PURPOSE_TABS.map(tab => (
+          {purposeTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -179,7 +196,7 @@ export default function MarketplacePage() {
       }}>
         <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
           <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{filteredPosts.length}</span>{' '}
-          {activeTab === 'all' ? 'listings' : activeTab.toLowerCase() + ' listings'}
+          {activeTab === 'all' ? t('marketplace.title').toLowerCase() : activeTab.toLowerCase()}
         </div>
         <button
           onClick={() => setShowSortSheet(true)}
@@ -191,7 +208,7 @@ export default function MarketplacePage() {
           }}
         >
           <Icon name="filter" size={12} color="var(--text-secondary)" />
-          Sort: {currentSort}
+          {t('marketplace.sortBy')}: {currentSort}
         </button>
       </div>
 
@@ -201,10 +218,10 @@ export default function MarketplacePage() {
           <div style={{ textAlign: 'center', padding: '60px 20px' }}>
             <div style={{ fontSize: '3rem', marginBottom: 12 }}>{'\ud83d\udce6'}</div>
             <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 8 }}>
-              No listings found
+              {t('marketplace.noListings')}
             </div>
             <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', maxWidth: 260, margin: '0 auto 20px' }}>
-              Be the first to post in this category. Every device deserves a second life.
+              {t('marketplace.noListingsDesc')}
             </div>
             <button
               onClick={() => navigate('/post')}
@@ -213,7 +230,7 @@ export default function MarketplacePage() {
                 color: '#fff', border: 'none', fontSize: '0.88rem', fontWeight: 800, cursor: 'pointer',
               }}
             >
-              Post Your Device
+              {t('marketplace.postDevice')}
             </button>
           </div>
         ) : (
@@ -259,9 +276,9 @@ export default function MarketplacePage() {
             onClick={e => e.stopPropagation()}
           >
             <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 16 }}>
-              Sort By
+              {t('marketplace.sortBy')}
             </div>
-            {SORT_OPTIONS.map(opt => (
+            {sortOptions.map(opt => (
               <button
                 key={opt.id}
                 onClick={() => { setActiveSort(opt.id); setShowSortSheet(false) }}
@@ -284,11 +301,17 @@ export default function MarketplacePage() {
           </div>
         </div>
       )}
+
+      {/* Language Switcher Modal */}
+      <LanguageSwitcherModal
+        isOpen={showLangModal}
+        onClose={() => setShowLangModal(false)}
+      />
     </div>
   )
 }
 
-// ─── Marketplace Card ─────────────────────────────────────────────────────
+// ─── Marketplace Card with Viewer-Specific Dynamic Translation ───────────────
 function MarketplaceCard({
   post,
   onSelect,
@@ -300,7 +323,12 @@ function MarketplaceCard({
   onLike: () => void
   onSave: () => void
 }) {
+  const { t, currentLang } = useTranslation()
+  const { title, isTranslating, isTranslated } = usePostTranslation(post)
+
   const condColor = CONDITION_COLORS[post.condition] || '#6b7280'
+  const localizedCondition = translateCondition(post.condition, currentLang)
+
   const purposeBg: Record<string, string> = {
     Sell: 'rgba(16,185,129,0.1)',
     Donate: 'rgba(236,72,153,0.1)',
@@ -314,6 +342,17 @@ function MarketplaceCard({
     Exchange: '#38bdf8',
     Repair: '#f59e0b',
     Recycle: '#34d399',
+  }
+
+  const getPurposeLabel = (purp: string) => {
+    switch (purp?.toLowerCase()) {
+      case 'sell': return t('marketplace.sell')
+      case 'donate': return t('marketplace.donate')
+      case 'exchange': return t('marketplace.exchange')
+      case 'repair': return t('marketplace.repair')
+      case 'recycle': return t('marketplace.recycle')
+      default: return purp
+    }
   }
 
   return (
@@ -330,7 +369,7 @@ function MarketplaceCard({
         {post.images?.[0] ? (
           <img
             src={post.images[0]}
-            alt={post.title}
+            alt={title}
             style={{
               position: 'absolute', inset: 0, width: '100%', height: '100%',
               objectFit: 'cover',
@@ -342,7 +381,7 @@ function MarketplaceCard({
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '2rem',
           }}>
-            {'\ud83d\udcf1'}
+            {'📱'}
           </div>
         )}
         {/* Purpose tag */}
@@ -353,7 +392,7 @@ function MarketplaceCard({
           fontSize: '0.6rem', fontWeight: 800, padding: '3px 7px', borderRadius: 999,
           backdropFilter: 'blur(6px)',
         }}>
-          {post.purpose}
+          {getPurposeLabel(post.purpose as string)}
         </div>
         {/* Save button */}
         <button
@@ -366,14 +405,38 @@ function MarketplaceCard({
             cursor: 'pointer',
           }}
         >
-          <Icon name={post.saved ? 'bookmark' : 'bookmark'} size={12} color={post.saved ? '#f59e0b' : '#fff'} />
+          <Icon name="bookmark" size={12} color={post.saved ? '#f59e0b' : '#fff'} />
         </button>
       </div>
 
       {/* Content */}
       <div style={{ padding: '10px 10px 8px' }}>
-        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.3, marginBottom: 4 }}>
-          {post.title}
+        <div style={{
+          fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)',
+          lineHeight: 1.3, marginBottom: 4,
+          minHeight: '2.4em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+          overflow: 'hidden'
+        }}>
+          {title}
+          {isTranslating && (
+            <span style={{ fontSize: '0.62rem', color: 'var(--accent)', marginLeft: 4, fontWeight: 600 }}>
+              ({t('common.translating')})
+            </span>
+          )}
+          {isTranslated && !isTranslating && (
+            <span
+              title={t('common.translated')}
+              style={{
+                display: 'inline-block',
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--accent)',
+                marginLeft: 4,
+                verticalAlign: 'middle'
+              }}
+            />
+          )}
         </div>
 
         {/* Condition badge */}
@@ -383,29 +446,29 @@ function MarketplaceCard({
           color: condColor, marginBottom: 6,
         }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: condColor, display: 'inline-block' }} />
-          {post.condition}
+          {localizedCondition}
         </div>
 
         {/* Price */}
         {post.price != null ? (
           <div style={{ fontSize: '0.95rem', fontWeight: 900, color: 'var(--accent)', marginBottom: 4 }}>
-            {'\u20b9'}{post.price.toLocaleString()}
+            {'₹'}{post.price.toLocaleString()}
             {post.negotiable && (
               <span style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', fontWeight: 600, marginLeft: 4 }}>
-                negotiable
+                {t('product.negotiable')}
               </span>
             )}
           </div>
         ) : (
           <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#ec4899', marginBottom: 4 }}>
-            {post.purpose === 'Donate' ? 'Free / Donate' : post.purpose}
+            {post.purpose === 'Donate' ? t('marketplace.donate') : getPurposeLabel(post.purpose as string)}
           </div>
         )}
 
         {/* Distance & Likes */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-            {'\ud83d\udccd'} {post.distance} km
+            {'📍'} {post.distance} km
           </span>
           <button
             onClick={e => { e.stopPropagation(); onLike() }}
@@ -414,7 +477,7 @@ function MarketplaceCard({
               background: 'none', border: 'none', cursor: 'pointer', padding: 0,
             }}
           >
-            <Icon name="heart" size={12} color={post.liked ? '#f87171' : 'var(--text-tertiary)'} />
+            <Icon name="heart" size={12} color={post.liked ? '#ef4444' : 'var(--text-tertiary)'} />
             <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
               {post.likes}
             </span>

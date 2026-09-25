@@ -54,6 +54,9 @@ function mapSupabasePostToAppPost(sbPost: any, _currentUserId?: string, likesCou
     comments: 0,
     liked,
     saved: false,
+    original_title: sbPost.original_title || sbPost.title,
+    original_description: sbPost.original_description !== undefined ? sbPost.original_description : (sbPost.description || ''),
+    original_language: sbPost.original_language,
   }
 }
 
@@ -130,6 +133,9 @@ export const postsApi = {
       asking_price: post.price,
       image_url: post.images?.[0] || null,
       status: 'available',
+      original_title: post.original_title || post.title,
+      original_description: post.original_description !== undefined ? post.original_description : post.description,
+      original_language: post.original_language,
     })
 
     const newPost: Post = {
@@ -140,6 +146,9 @@ export const postsApi = {
       comments: 0,
       liked: false,
       saved: false,
+      original_title: inserted.original_title || post.original_title || post.title,
+      original_description: inserted.original_description !== undefined ? inserted.original_description : (post.original_description || post.description),
+      original_language: inserted.original_language || post.original_language,
       seller: {
         name: inserted.profiles?.full_name || post.seller?.name || 'You',
         rating: 4.9,

@@ -2,7 +2,9 @@ import type { IconName } from '../components/Icon'
 
 export type Theme = 'light' | 'dark'
 
-export type LanguageCode = 'EN' | 'TA' | 'HI' | 'ML' | 'KN'
+export type LanguageCode =
+  | 'en' | 'ta' | 'hi' | 'ml' | 'kn' | 'te'
+  | 'EN' | 'TA' | 'HI' | 'ML' | 'KN' | 'TE'
 
 export interface BaseEntity {
   id: string

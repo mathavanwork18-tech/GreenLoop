@@ -19,6 +19,11 @@
   to = "/.netlify/functions/status"
   status = 200
 
+[[redirects]]
+  from = "/api/translate"
+  to = "/.netlify/functions/translate"
+  status = 200
+
 # Client-Side Routing for React Router SPA (prevents 404 on page refresh)
 [[redirects]]
   from = "/*"
