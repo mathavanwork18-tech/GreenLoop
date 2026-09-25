@@ -1,6 +1,6 @@
 # Green Loop — E-Waste Management & Circular Electronics Platform ♻️⚡
 
-> 🌐 **Live Web Application:** [https://greenloopvercelapp.vercel.app/](https://greenloopvercelapp.vercel.app/)
+> 🌐 **Live Web Application:** [https://green-loopoffical.vercel.app/](https://green-loopoffical.vercel.app/)
 
 ![Green Loop](https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=1200&auto=format&fit=crop&q=80)
 

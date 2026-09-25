@@ -65,13 +65,23 @@ export const aiApi = {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Server returned error status ${response.status}`)
+      let errorMsg = `Server returned error status ${response.status}`
+      try {
+        const errorData = await response.json()
+        if (errorData?.error) errorMsg = errorData.error
+      } catch {}
+      throw new Error(errorMsg)
     }
 
-    const payload = await response.json()
-    if (!payload.success || !payload.data) {
-      throw new Error(payload.error || 'Failed to analyze product image')
+    let payload: any = null
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error('Invalid response received from AI service.')
+    }
+
+    if (!payload?.success || !payload?.data) {
+      throw new Error(payload?.error || 'Failed to analyze product image')
     }
 
     const d = payload.data
@@ -144,13 +154,23 @@ export const aiApi = {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Server error ${response.status}`)
+      let errorMsg = `Server error ${response.status}`
+      try {
+        const errorData = await response.json()
+        if (errorData?.error) errorMsg = errorData.error
+      } catch {}
+      throw new Error(errorMsg)
     }
 
-    const payload = await response.json()
-    if (!payload.success || !payload.data) {
-      throw new Error(payload.error || 'Failed to get AI response')
+    let payload: any = null
+    try {
+      payload = await response.json()
+    } catch {
+      throw new Error('Invalid response received from chat service')
+    }
+
+    if (!payload?.success || !payload?.data) {
+      throw new Error(payload?.error || 'Failed to get AI response')
     }
 
     return payload.data
