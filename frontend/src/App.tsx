@@ -128,6 +128,8 @@ function AppRoutes() {
           <Route path="/account/edit" element={<EditProfilePage />} />
           <Route path="/complete-profile" element={<CompleteProfilePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/shop/chat" element={<ChatPage />} />
           {/* Strict Role Guard: Any other route redirects to / */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
