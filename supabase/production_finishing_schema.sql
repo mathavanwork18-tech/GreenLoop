@@ -89,18 +89,13 @@ BEGIN
     'Green Loop Member'
   );
 
-  -- Admin check: ONLY recognized Green Loop creators can obtain admin status
-  IF LOWER(v_name) IN ('mathavan', 'vimal raj', 'vimalraj', 'thiru loop', 'thiruloop')
-     OR LOWER(new.email) LIKE '%mathavan%'
-     OR LOWER(new.email) LIKE '%vimal%'
-     OR LOWER(new.email) LIKE '%thiru%' THEN
-    v_role := 'admin';
-  ELSIF v_raw_role IN ('shop', 'local_shop', 'shop_owner') THEN
+  -- Strict role assignment: admin role cannot be self-assigned or inferred from strings
+  IF v_raw_role IN ('shop', 'local_shop', 'shop_owner') THEN
     v_role := 'shop';
   ELSIF v_raw_role IN ('company', 'recycler', 'enterprise') THEN
     v_role := 'company';
   ELSE
-    -- Any arbitrary or malicious role input (e.g. attempting 'admin' from public signup) defaults safely to citizen
+    -- Any arbitrary or unauthorized role input (e.g. attempting 'admin' from public signup) defaults safely to citizen
     v_role := 'citizen';
   END IF;
 

@@ -6,16 +6,17 @@ import {
   verifyOtp,
   completeProfile,
 } from '../controllers/authController.js';
+import { authLimiter } from '../middlewares/rateLimiter.js';
 
 const router = express.Router();
 
-// Phone OTP Authentication Flow
-router.post('/send-otp', sendOtp);
-router.post('/verify-otp', verifyOtp);
-router.post('/complete-profile', completeProfile);
+// Phone OTP Authentication Flow (Rate Limited)
+router.post('/send-otp', authLimiter, sendOtp);
+router.post('/verify-otp', authLimiter, verifyOtp);
+router.post('/complete-profile', authLimiter, completeProfile);
 
-// Legacy Email/Password Authentication (Preserved)
-router.post('/register', register);
-router.post('/login', login);
+// Legacy Email/Password Authentication (Rate Limited)
+router.post('/register', authLimiter, register);
+router.post('/login', authLimiter, login);
 
 export default router;

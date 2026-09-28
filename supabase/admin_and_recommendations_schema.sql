@@ -62,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON public.admin_audit_log
 -- Grant schema permissions
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON TABLE public.recommendation_events TO anon, authenticated;
-GRANT ALL ON TABLE public.admin_audit_logs TO anon, authenticated;
+GRANT SELECT, INSERT ON TABLE public.admin_audit_logs TO authenticated;
 
 -- ------------------------------------------------------------------------------
 -- 4. RLS POLICIES FOR RECOMMENDATION EVENTS & AUDIT LOGS
@@ -154,17 +154,11 @@ BEGIN
     'Green Loop Citizen'
   );
 
-  IF LOWER(v_name) IN ('mathavan', 'vimal raj', 'vimalraj', 'thiru loop', 'thiruloop')
-     OR LOWER(new.email) LIKE '%mathavan%'
-     OR LOWER(new.email) LIKE '%vimal%'
-     OR LOWER(new.email) LIKE '%thiru%' THEN
-    v_role := 'admin';
-  ELSIF v_raw_role IN ('shop', 'local_shop') THEN
+  -- Strict role assignment: admin role cannot be self-assigned or inferred from strings
+  IF v_raw_role IN ('shop', 'local_shop') THEN
     v_role := 'shop';
   ELSIF v_raw_role IN ('company', 'recycler') THEN
     v_role := 'company';
-  ELSIF v_raw_role = 'admin' THEN
-    v_role := 'admin';
   ELSE
     v_role := 'citizen';
   END IF;

@@ -22,11 +22,52 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middlewares
+// Configured and default allowed origins for secure CORS
+const allowedOrigins = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const defaultOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+];
+
+const allAllowedOrigins = new Set([...allowedOrigins, ...defaultOrigins]);
+
+// Security HTTP Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
+// Hardened CORS Middleware
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    // Allow non-browser requests (mobile apps, server-to-server, curl)
+    if (!origin) return callback(null, true);
+
+    const isExplicitlyAllowed = allAllowedOrigins.has(origin);
+    const isVercelOrNetlify = origin.endsWith('.vercel.app') || origin.endsWith('.netlify.app');
+    const isDevLocalhost = process.env.NODE_ENV !== 'production' && /^http:\/\/localhost(:\d+)?$/.test(origin);
+
+    if (isExplicitlyAllowed || isVercelOrNetlify || isDevLocalhost) {
+      return callback(null, true);
+    }
+
+    return callback(new Error('CORS request blocked by Green Loop security policy'));
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
+
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use(morgan('dev'));
@@ -58,12 +99,14 @@ app.use((req, res) => {
   });
 });
 
-// Global Error Handler
+// Sanitized Global Error Handler
 app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err);
-  res.status(500).json({
+  const isDev = process.env.NODE_ENV !== 'production';
+  const status = err.status || 500;
+  res.status(status).json({
     success: false,
-    message: err.message || 'Internal Server Error',
+    message: isDev ? (err.message || 'Internal Server Error') : 'An unexpected internal server error occurred.',
   });
 });
 

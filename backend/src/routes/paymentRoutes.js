@@ -1,5 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
+import { paymentLimiter } from '../middlewares/rateLimiter.js';
 
 const router = express.Router();
 
@@ -7,7 +8,7 @@ const router = express.Router();
  * 1. POST /api/payments/create-order
  * Creates an official Razorpay order server-side before collecting payment.
  */
-router.post('/create-order', async (req, res) => {
+router.post('/create-order', paymentLimiter, async (req, res) => {
   try {
     const { amount, currency = 'INR', purchaseId, postTitle } = req.body;
 
@@ -90,7 +91,7 @@ router.post('/create-order', async (req, res) => {
  * 2. POST /api/payments/verify
  * Verifies Razorpay payment signature server-side using HMAC SHA256.
  */
-router.post('/verify', (req, res) => {
+router.post('/verify', paymentLimiter, (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, purchaseId } = req.body;
 

@@ -1,5 +1,6 @@
 import express from 'express'
 import { GeminiService } from '../services/geminiService.js'
+import { aiLimiter } from '../middlewares/rateLimiter.js'
 
 const router = express.Router()
 
@@ -40,7 +41,7 @@ router.get('/status', (req, res) => {
  * POST /api/ai/analyze-product
  * Analyzes e-waste image via multimodal Gemini and returns structured catalog data.
  */
-router.post('/analyze-product', async (req, res) => {
+router.post('/analyze-product', aiLimiter, async (req, res) => {
   try {
     const { image, description, language } = req.body
 
@@ -78,7 +79,7 @@ router.post('/analyze-product', async (req, res) => {
  * POST /api/ai/chat
  * Interactive conversational AI grounded in circular economy, repairs, and battery safety.
  */
-router.post('/chat', async (req, res) => {
+router.post('/chat', aiLimiter, async (req, res) => {
   try {
     const { message, history, context, language } = req.body
 
@@ -113,7 +114,7 @@ router.post('/chat', async (req, res) => {
  * POST /api/ai/embed
  * Generates vector embedding for post semantic understanding & query personalization.
  */
-router.post('/embed', async (req, res) => {
+router.post('/embed', aiLimiter, async (req, res) => {
   try {
     const { text, texts } = req.body
     if (Array.isArray(texts)) {
@@ -142,7 +143,7 @@ router.post('/embed', async (req, res) => {
  * POST /api/ai/translate
  * Multilingual dynamic translation endpoint for user-generated marketplace content.
  */
-router.post('/translate', async (req, res) => {
+router.post('/translate', aiLimiter, async (req, res) => {
   try {
     const { text, texts, title, description, sourceLanguage, targetLanguage = 'en' } = req.body
 

@@ -75,6 +75,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_chat_message()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 BEGIN
     UPDATE public.conversations

@@ -113,7 +113,7 @@ EXCEPTION
     -- Prevent notification failure from blocking message send
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS tr_on_new_direct_message ON public.direct_messages;
 CREATE TRIGGER tr_on_new_direct_message
