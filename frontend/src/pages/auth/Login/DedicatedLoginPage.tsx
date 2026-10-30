@@ -8,7 +8,7 @@ import greenLoopLogo from '../../../assets/branding/green-loop-logo.png'
 
 export default function DedicatedLoginPage() {
   const navigate = useNavigate()
-  const { login, signInWithGoogle, language } = useAuth()
+  const { login, signInWithGoogle, language, isAuthenticated, user } = useAuth()
   const t = getAuthTranslation(language)
 
   const [email, setEmail] = useState('')
@@ -17,6 +17,14 @@ export default function DedicatedLoginPage() {
   const [loading, setLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Redirect already authenticated users to their role dashboard
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      const targetPath = getRoleDashboardPath(normalizeRole(user.role))
+      navigate(targetPath, { replace: true })
+    }
+  }, [isAuthenticated, user, navigate])
 
   // Catch OAuth errors or cancellations in URL redirect
   React.useEffect(() => {

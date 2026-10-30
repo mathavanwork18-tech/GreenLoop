@@ -7,5 +7,5 @@
   "ignore": [
     "node_modules/**"
   ],
-  "delay": 200
+  "delay": 1500
 }

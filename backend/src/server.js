@@ -1,7 +1,8 @@
+import './env.js'  // ← MUST be first: loads .env before any other module reads process.env
+
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -16,8 +17,6 @@ import translateRoutes from './routes/translateRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -42,7 +41,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self)');
   res.removeHeader('X-Powered-By');
   next();
 });

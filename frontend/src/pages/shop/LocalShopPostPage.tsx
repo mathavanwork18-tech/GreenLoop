@@ -62,19 +62,60 @@ export default function LocalShopPostPage() {
   const startCamera = async () => {
     stopCamera()
     setCameraError(null)
+
+    if (typeof window !== 'undefined' && !window.isSecureContext && !navigator.mediaDevices) {
+      setCameraError('Live camera requires HTTPS or localhost. Please use "Take Photo" or "Upload Image" below.')
+      setIsCameraActive(false)
+      return
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError('Camera API is not supported in this browser. Please use "Take Photo" or "Upload Image" below.')
+      setIsCameraActive(false)
+      return
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      })
+      let stream: MediaStream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        })
+      } catch (constraintErr: any) {
+        if (
+          constraintErr?.name === 'OverconstrainedError' ||
+          constraintErr?.name === 'ConstraintNotSatisfiedError' ||
+          constraintErr?.name === 'NotFoundError'
+        ) {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        } else {
+          throw constraintErr
+        }
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        await videoRef.current.play()
+        try {
+          await videoRef.current.play()
+        } catch (playErr) {
+          console.warn('[LocalShopCamera] Autoplay interrupted:', playErr)
+        }
       }
       streamRef.current = stream
       setIsCameraActive(true)
-    } catch {
-      setCameraError('Camera access unavailable or permission denied. You can upload an image file instead.')
+    } catch (err: any) {
+      console.error('[LocalShopCamera] Access error:', err)
+      const errName = err?.name || ''
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+        setCameraError('Camera permission denied. Please allow camera access in browser settings, or use "Take Photo" below.')
+      } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+        setCameraError('No camera found on this device. You can upload an image file instead.')
+      } else if (errName === 'NotReadableError' || errName === 'TrackStartError') {
+        setCameraError('Camera is already in use by another application. Please close other camera apps and retry.')
+      } else {
+        setCameraError('Camera access unavailable. You can take a photo or upload an image file.')
+      }
       setIsCameraActive(false)
     }
   }
@@ -625,7 +666,7 @@ export default function LocalShopPostPage() {
                 <div style={{ fontSize: '0.76rem', color: '#9CA3A5', marginTop: 4, marginBottom: 14 }}>
                   Use your device camera or upload an image file to let Gemini AI estimate bulk recyclability
                 </div>
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     onClick={startCamera}
@@ -647,6 +688,25 @@ export default function LocalShopPostPage() {
                     <Icon name="camera" size={15} color="#FFFFFF" />
                     <span>Open Camera</span>
                   </button>
+                  <label
+                    style={{
+                      fontSize: '0.80rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      background: '#1b3823',
+                      border: '1px solid #22c55e',
+                      color: '#4ade80',
+                      padding: '8px 16px',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                  >
+                    <Icon name="camera" size={15} color="#4ade80" />
+                    <span>Take Photo</span>
+                    <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} style={{ display: 'none' }} />
+                  </label>
                   <label
                     style={{
                       fontSize: '0.80rem',

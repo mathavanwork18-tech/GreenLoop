@@ -7,10 +7,11 @@ try {
 
 // Verified active Gemini model IDs for multimodal analysis & chat
 const DEFAULT_MODELS = [
-  'gemini-3-flash-preview',  // Fast and highly available vision model
+  'gemini-2.5-flash',         // Google flagship production vision model
+  'gemini-3-flash-preview',   // Fast preview vision model
+  'gemini-flash-latest',      // High availability general flash alias
+  'gemini-2.5-flash-lite',    // High-speed lightweight model
   'gemini-flash-lite-latest', // High availability lite model
-  'gemini-3.6-flash',        // Google's flagship flash model
-  'gemini-flash-latest',     // General fallback
 ]
 
 const SUPPORTED_MIME_TYPES = new Set([

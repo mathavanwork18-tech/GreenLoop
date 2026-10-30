@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import type { LanguageCode } from '../types/common.types'
 import { normalizeLanguage, type CanonicalLanguage } from '../i18n/languages'
 import { supabase, isAuthTestMode, DEV_DUMMY_OTP } from '../utils/supabase'
@@ -107,9 +108,11 @@ export interface RegisterData {
 }
 
 interface AuthContextType {
+  session: Session | null
   user: User | null
   isAuthenticated: boolean
   isInitializing: boolean
+  profileError: string | null
   language: LanguageCode
   setLanguage: (lang: LanguageCode) => void
   sendOtp: (phone: string) => Promise<{ success: boolean; message: string; devOtp?: string }>
@@ -179,17 +182,17 @@ function mapDbProfileToUser(profile: any, authUser?: any, coinBalance?: number, 
     ? streakVal
     : (typeof profile?.current_streak === 'number' ? profile.current_streak : 1)
 
-  // Profile is complete only if explicitly marked complete in database,
-  // or (as fallback for pre-existing records) has role, non-default name, and location/address
-  const isProfileComplete = profile?.is_profile_complete !== undefined
-    ? Boolean(profile.is_profile_complete)
-    : Boolean(
-        profile?.id &&
-        profile?.full_name &&
-        profile?.full_name !== 'Green Loop Member' &&
-        profile?.role &&
-        (profile?.address || profile?.city)
-      )
+  // Profile is complete if explicitly true in DB, OR if the record has substantial user details
+  const hasSubstantiveDetails = Boolean(
+    profile?.id &&
+    profile?.full_name &&
+    profile.full_name !== 'Green Loop Member' &&
+    profile.full_name !== 'Green Loop Citizen' &&
+    profile?.role &&
+    (profile?.address || profile?.city)
+  )
+
+  const isProfileComplete = profile?.is_profile_complete === true || hasSubstantiveDetails
 
     const resolvedLang = profile?.preferred_language
       ? normalizeLanguage(profile.preferred_language)
@@ -256,6 +259,13 @@ async function ensureProfile(
 
   const dbRole = normalizeRole(meta?.role)
 
+  const isSubstantive = Boolean(
+    meta?.full_name &&
+    meta.full_name !== 'Green Loop Member' &&
+    meta.full_name !== 'Green Loop Citizen' &&
+    (meta?.city || meta?.address)
+  )
+
   const profilePayload: any = {
     id: userId,
     full_name: meta?.full_name || 'Green Loop Member',
@@ -267,6 +277,8 @@ async function ensureProfile(
 
   if (meta?.is_profile_complete !== undefined) {
     profilePayload.is_profile_complete = meta.is_profile_complete
+  } else {
+    profilePayload.is_profile_complete = isSubstantive
   }
 
   if (meta?.phone_verified !== undefined) {
@@ -282,6 +294,9 @@ async function ensureProfile(
 
     if (!upsertErr && upserted) {
       return upserted
+    }
+    if (upsertErr) {
+      console.warn('[Green Loop] Profile upsert notice:', upsertErr.message)
     }
   } catch (err: any) {
     console.warn('[Green Loop] Profile upsert notice:', err?.message)
@@ -306,7 +321,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return normalizeLanguage(localStorage.getItem('gl_language') || 'en')
   })
 
+  const [session, setSession] = useState<Session | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
+  const [profileError, setProfileError] = useState<string | null>(null)
   const [user, setUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem('gl_user')
@@ -316,118 +333,106 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   })
 
+  // Helper to safely load and sync profile for an authenticated Supabase user
+  const syncProfileForAuthUser = async (authUser: any): Promise<User> => {
+    let profileData: any = null
+    let hasProfileQueryError = false
+
+    try {
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle()
+
+      if (profileErr) {
+        hasProfileQueryError = true
+        console.warn('[Green Loop] Profile fetch notice:', profileErr.message)
+      } else {
+        profileData = profile
+      }
+    } catch (err: any) {
+      hasProfileQueryError = true
+      console.warn('[Green Loop] Profile fetch exception:', err?.message || err)
+    }
+
+    if (hasProfileQueryError) {
+      setProfileError('Notice: Could not sync profile with cloud database. Using session data.')
+    } else {
+      setProfileError(null)
+    }
+
+    if (!profileData && !hasProfileQueryError) {
+      const meta = authUser.user_metadata || {}
+      const pendingRole = (localStorage.getItem('gl_pending_role') as Role) || undefined
+      if (pendingRole) {
+        localStorage.removeItem('gl_pending_role')
+      }
+      const isCompleteMeta = typeof meta.is_profile_complete === 'boolean'
+        ? meta.is_profile_complete
+        : Boolean(meta.full_name && meta.role && (meta.city || meta.address))
+
+      profileData = await ensureProfile(authUser.id, {
+        full_name: meta.full_name || meta.name || authUser.email?.split('@')[0],
+        phone: meta.phone || '',
+        role: pendingRole || meta.role || 'citizen',
+        city: meta.city || 'Coimbatore',
+        is_profile_complete: isCompleteMeta,
+      })
+    }
+
+    let dailyCoins = 0
+    let dailyStreak = 1
+    try {
+      const dailyReward = await coinService.processDailyLoginReward(authUser.id)
+      dailyCoins = dailyReward.totalCoins
+      dailyStreak = dailyReward.streak
+    } catch {}
+
+    const syncedUser = mapDbProfileToUser(profileData, authUser, dailyCoins, dailyStreak)
+    setUser(syncedUser)
+    localStorage.setItem('gl_user', JSON.stringify(syncedUser))
+    return syncedUser
+  }
+
   // Hydrate user session from Supabase on mount and listen to auth changes
   useEffect(() => {
     let mounted = true
 
-    async function syncAuthSession() {
-      try {
-        const { data: sessionData, error: sessionErr } = await supabase.auth.getSession()
-        const session = sessionData?.session
-
-        if (sessionErr) {
-          console.warn('[Green Loop] Session check error:', sessionErr.message)
-        }
-
-        if (session?.user && mounted) {
-          let { data: profile, error: profileErr } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle()
-
-          if (!profile && !profileErr) {
-            const meta = session.user.user_metadata || {}
-            profile = await ensureProfile(session.user.id, {
-              full_name: meta.full_name || meta.name || session.user.email?.split('@')[0],
-              phone: meta.phone,
-              role: meta.role,
-              city: meta.city,
-              is_profile_complete: false,
-            })
-          }
-
-          let dailyCoins = 0
-          let dailyStreak = 1
-          try {
-            const dailyReward = await coinService.processDailyLoginReward(session.user.id)
-            dailyCoins = dailyReward.totalCoins
-            dailyStreak = dailyReward.streak
-          } catch {}
-
-          if (profile && mounted) {
-            const syncedUser = mapDbProfileToUser(profile, session.user, dailyCoins, dailyStreak)
-            setUser(syncedUser)
-            localStorage.setItem('gl_user', JSON.stringify(syncedUser))
-          }
-        } else if (mounted) {
-          setUser(null)
-          localStorage.removeItem('gl_user')
-        }
-      } catch (err) {
-        console.warn('[Green Loop] Session sync exception:', err)
-        if (mounted) {
-          setUser(null)
-          localStorage.removeItem('gl_user')
-        }
-      } finally {
-        if (mounted) {
-          setIsInitializing(false)
-        }
-      }
-    }
-
-    syncAuthSession()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Subscribe to auth state changes synchronously (no async work directly inside the listener)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return
 
-      if (event === 'INITIAL_SESSION') return
+      setSession(newSession)
 
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && session?.user) {
-        let { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
-        if (!profile) {
-          const meta = session.user.user_metadata || {}
-          const pendingRole = (localStorage.getItem('gl_pending_role') as Role) || undefined
-          if (pendingRole) {
-            localStorage.removeItem('gl_pending_role')
-          }
-          profile = await ensureProfile(session.user.id, {
-            full_name: meta.full_name || meta.name || session.user.email?.split('@')[0],
-            phone: meta.phone,
-            role: pendingRole || meta.role || 'citizen',
-            city: meta.city || 'Coimbatore',
-            is_profile_complete: false,
-          })
-        }
-
-        let dailyCoins = 0
-        let dailyStreak = 1
-        try {
-          const dailyReward = await coinService.processDailyLoginReward(session.user.id)
-          dailyCoins = dailyReward.totalCoins
-          dailyStreak = dailyReward.streak
-        } catch {}
-
-        if (profile && mounted) {
-          const syncedUser = mapDbProfileToUser(profile, session.user, dailyCoins, dailyStreak)
-          setUser(syncedUser)
-          localStorage.setItem('gl_user', JSON.stringify(syncedUser))
-        }
-      } else if (event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT' || !newSession) {
         recommendationTracker.clearUserSession()
         setUser(null)
+        setProfileError(null)
         localStorage.removeItem('gl_user')
         localStorage.removeItem('gl_registration_draft')
         localStorage.removeItem('gl_custom_coin_history')
         localStorage.removeItem('gl_posts')
         localStorage.removeItem('gl_sessions')
         sessionStorage.clear()
+        setIsInitializing(false)
+        return
+      }
+
+      if (newSession?.user) {
+        // Safe asynchronous profile restoration scheduled outside onAuthStateChange callback
+        setTimeout(() => {
+          if (!mounted) return
+          syncProfileForAuthUser(newSession.user)
+            .catch((err) => {
+              console.warn('[Green Loop] Background profile sync notice:', err)
+            })
+            .finally(() => {
+              if (mounted) {
+                setIsInitializing(false)
+              }
+            })
+        }, 0)
       }
     })
 
@@ -556,38 +561,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const authUser = authData.user
+    const authSession = authData.session
 
     // Evict previous caches
     recommendationTracker.clearUserSession()
 
-    // Retrieve profile from public.profiles
-    let { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authUser.id)
-      .maybeSingle()
-
-    if (!profile) {
-      const meta = authUser.user_metadata || {}
-      profile = await ensureProfile(authUser.id, {
-        full_name: meta.full_name || meta.name || authUser.email?.split('@')[0],
-        phone: meta.phone || '',
-        role: meta.role || 'citizen',
-        city: meta.city || 'Coimbatore',
-      })
+    // Explicitly set authoritative session and sync profile
+    if (authSession) {
+      setSession(authSession)
     }
-
-    let dailyCoins = 0
-    let dailyStreak = 1
-    try {
-      const dailyReward = await coinService.processDailyLoginReward(authUser.id)
-      dailyCoins = dailyReward.totalCoins
-      dailyStreak = dailyReward.streak
-    } catch {}
-
-    const loggedInUser = mapDbProfileToUser(profile, authUser, dailyCoins, dailyStreak)
-    setUser(loggedInUser)
-    localStorage.setItem('gl_user', JSON.stringify(loggedInUser))
+    const loggedInUser = await syncProfileForAuthUser(authUser)
     return loggedInUser
   }
 
@@ -886,6 +869,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
 
     const newUser = mapDbProfileToUser(createdProfile, authUser, dbRole === 'citizen' ? 50 : 100, 1)
+    if (authData.session) {
+      setSession(authData.session)
+    }
     setUser(newUser)
     localStorage.setItem('gl_user', JSON.stringify(newUser))
     return newUser
@@ -988,7 +974,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {}
     }
     recommendationTracker.clearUserSession()
+    setSession(null)
     setUser(null)
+    setProfileError(null)
     localStorage.removeItem('gl_user')
     localStorage.removeItem('gl_registration_draft')
     localStorage.removeItem('gl_posts')
@@ -1064,9 +1052,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
+        session,
         user,
-        isAuthenticated: !!user && user.isProfileComplete !== false,
+        isAuthenticated: !!session && !!user,
         isInitializing,
+        profileError,
         language,
         setLanguage,
         sendOtp,

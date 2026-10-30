@@ -124,18 +124,55 @@ export default function EditProfilePage() {
   const startCamera = async (mode: 'user' | 'environment' = cameraFacing) => {
     stopCamera()
     setCameraError(null)
+
+    if (typeof window !== 'undefined' && !window.isSecureContext && !navigator.mediaDevices) {
+      setCameraError('Camera requires HTTPS or localhost. Please upload an image file instead.')
+      return
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError('Camera API is not supported in this browser. Please upload an image file instead.')
+      return
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode, width: { ideal: 640 }, height: { ideal: 640 } },
-        audio: false
-      })
+      let stream: MediaStream
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: mode }, width: { ideal: 640 }, height: { ideal: 640 } },
+          audio: false
+        })
+      } catch (constraintErr: any) {
+        if (
+          constraintErr?.name === 'OverconstrainedError' ||
+          constraintErr?.name === 'ConstraintNotSatisfiedError' ||
+          constraintErr?.name === 'NotFoundError'
+        ) {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        } else {
+          throw constraintErr
+        }
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        await videoRef.current.play()
+        try {
+          await videoRef.current.play()
+        } catch (playErr) {
+          console.warn('[ProfileCamera] Autoplay interrupted:', playErr)
+        }
       }
       cameraStreamRef.current = stream
-    } catch {
-      setCameraError('Camera access denied or unavailable.')
+    } catch (err: any) {
+      console.error('[ProfileCamera] Access error:', err)
+      const errName = err?.name || ''
+      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+        setCameraError('Camera permission denied. Please allow camera access in browser settings.')
+      } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
+        setCameraError('No camera found on this device.')
+      } else {
+        setCameraError('Camera access denied or unavailable. Please upload a photo instead.')
+      }
     }
   }
 

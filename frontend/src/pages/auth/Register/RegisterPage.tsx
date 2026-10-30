@@ -44,7 +44,15 @@ const ROLE_OPTIONS = [
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const { register, signInWithGoogle, language, setLanguage } = useAuth()
+  const { register, signInWithGoogle, language, setLanguage, isAuthenticated, user } = useAuth()
+
+  // Redirect already authenticated users to their role dashboard
+  React.useEffect(() => {
+    if (isAuthenticated && user) {
+      const targetPath = getRoleDashboardPath(normalizeRole(user.role))
+      navigate(targetPath, { replace: true })
+    }
+  }, [isAuthenticated, user, navigate])
 
   const [step, setStep] = useState<Step>('ROLE')
   const [selectedRole, setSelectedRole] = useState<RegistrationRole>('GENERAL_USER')
